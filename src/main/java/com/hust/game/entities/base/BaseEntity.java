@@ -1,4 +1,4 @@
-package com.hust.game.entities;
+package com.hust.game.entities.base;
 
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
@@ -42,19 +42,17 @@ public abstract class BaseEntity{
 
     //hàm render để cắt sprite
     public void render(GraphicsContext gc){
-        if (spriteSheet != null){
-            // bước 1: tính toán toạ độ cắt nguồn (sx) trên dải ảnh gốc dựa trên frameIndex
-            double sx = frameIndex * frameWidth;
-            double sy = 0;
+        if (spriteSheet == null) return;
 
-            //bước 2: dùng constructor drawImage 
-            //gc.drawImage(ảnh, sx, sy, sw, sh, dx, dy, dw, dh)
-            // - sx, sy: toạ độ nguồn (để cắt)
-            // - sw, sh: kích thước nguồn (kích thước gốc của 1 ô)
-            // - dx, dy: toạ độ đích trên màn game
-            // - dw, dh: kích thước đích(để upscale)
-            gc.drawImage(spriteSheet, sx, sy, frameWidth, frameHeight, x, y, renderWidth, renderHeight);
-        }
+        double sx = frameIndex * frameWidth;
+        /*Tất cả frame nằm trên 1 hàng ngang duy nhất
+        Chỉ cần dịch sx sang phải theo frameIndex là lấy được frame tiếp theo
+        sy luôn = 0 vì không có hàng nào khác phía dưới
+
+        Nếu sprite sheet có nhiều hàng (ví dụ hàng 1 idle, hàng 2 run) thì lúc đó sy mới cần tính.*/
+
+        gc.drawImage(spriteSheet, sx, 0, frameWidth, frameHeight,
+                     x, y, renderWidth, renderHeight);
     }
 
     public Rectangle2D getBoundary(){
