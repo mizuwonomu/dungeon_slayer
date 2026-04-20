@@ -109,13 +109,14 @@ public class App extends Application {
             Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
 
-            // Sinh quái vật để test di chuyển
-            enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy(10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE);
-            enemyManager.spawnEnemy(100, 100, treeImg, 1, TILE_SIZE, TILE_SIZE);
-
+            // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2, iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight, 8,
                     TILE_SIZE, TILE_SIZE);
+
+            // Sinh quái vật để test di chuyển
+            enemyManager = new EnemyManager();
+            enemyManager.spawnEnemy(10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy(100, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
 
             obstacles.add(new BaseEntity(300, 300, wallImg, 1, TILE_SIZE, TILE_SIZE) {
                 @Override

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import com.hust.game.entities.Player;
 
 public class EnemyManager {
     // Danh sách chứa toàn bộ quái vật đang sống trên bản đồ
@@ -14,8 +15,8 @@ public class EnemyManager {
     }
 
     // Hàm sinh thái quái vật, nhét vào danh sách
-    public void spawnEnemy(double x, double y, Image sprite, int numFrames, double w, double h) {
-        Enemy newEnemy = new Enemy(x, y, sprite, numFrames, w, h);
+    public void spawnEnemy(double x, double y, Image sprite, int numFrames, double w, double h, Player targetPlayer) {
+        Enemy newEnemy = new Enemy(x, y, sprite, numFrames, w, h, targetPlayer);
         enemyList.add(newEnemy);
     }
 
