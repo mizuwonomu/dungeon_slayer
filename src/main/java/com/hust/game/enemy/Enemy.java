@@ -4,10 +4,14 @@ import com.hust.game.entities.base.MovingEntity;
 import com.hust.game.entities.Player;
 import javafx.scene.image.Image;
 
-public class Enemy extends MovingEntity {
+public abstract class Enemy extends MovingEntity {
 
     protected double speed = 1.0;
     protected Player targetPlayer;
+    protected int maxHp;
+    protected int hp;
+    protected int damage;
+    protected int knockback;
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,

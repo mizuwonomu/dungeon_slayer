@@ -105,8 +105,9 @@ public class App extends Application {
 
             Image wallImg = new Image(getClass().getResourceAsStream("/assets/wall.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
-
             Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), TILE_SIZE, TILE_SIZE, true,
+                    false);
+            Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
 
             // Khai báo Player trước khi đưa cho Quái
@@ -115,8 +116,8 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy(10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy(100, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", 10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Slime", 100, 100, slimeImg, 1, TILE_SIZE, TILE_SIZE, player);
 
             obstacles.add(new BaseEntity(300, 300, wallImg, 1, TILE_SIZE, TILE_SIZE) {
                 @Override
