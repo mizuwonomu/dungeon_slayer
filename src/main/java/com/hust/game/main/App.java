@@ -1,7 +1,7 @@
 package com.hust.game.main;
 
-import com.hust.game.entities.BaseEntity;
-import com.hust.game.entities.Player;
+import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
 import com.hust.game.enemy.EnemyManager;
@@ -111,8 +111,7 @@ public class App extends Application {
                     false);
 
             // Khai báo Player trước khi đưa cho Quái
-            player = new Player(WIDTH / 2, HEIGHT / 2, iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight, 8,
-                    TILE_SIZE, TILE_SIZE);
+            player = new Player(WIDTH / 2, HEIGHT / 2, iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();

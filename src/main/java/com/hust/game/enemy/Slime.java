@@ -1,6 +1,6 @@
 package com.hust.game.enemy;
 
-import com.hust.game.entities.Player;
+import com.hust.game.entities.player.Player;
 import javafx.scene.image.Image;
 
 public class Slime extends Enemy {

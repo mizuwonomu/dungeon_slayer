@@ -1,12 +1,12 @@
 package com.hust.game.enemy;
 
 import com.hust.game.entities.base.MovingEntity;
-import com.hust.game.entities.Player;
+import com.hust.game.entities.player.Player;
 import javafx.scene.image.Image;
 
 public abstract class Enemy extends MovingEntity {
 
-    protected double speed = 1.0;
+    // Đã xóa dòng protected double speed = 1.0;
     protected Player targetPlayer;
     protected int maxHp;
     protected int hp;
@@ -16,7 +16,7 @@ public abstract class Enemy extends MovingEntity {
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer) {
-        super(x, y, spriteSheet, numFrames, renderWidth, renderHeight);
+        super(x, y, spriteSheet, numFrames, renderWidth, renderHeight, 1.0);
         this.targetPlayer = targetPlayer; // Chốt mục tiêu
     }
 

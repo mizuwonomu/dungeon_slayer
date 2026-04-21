@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
-import com.hust.game.entities.Player;
+import com.hust.game.entities.player.Player;
 
 public class EnemyManager {
     // Danh sách chứa toàn bộ quái vật đang sống trên bản đồ
