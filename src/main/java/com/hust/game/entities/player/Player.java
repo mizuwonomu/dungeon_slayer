@@ -16,9 +16,9 @@ import lombok.Getter;
  *
  * Kế thừa MovingEntity (có speed, direction, state, move*())
  * Implement 3 interface:
- *   - Collidable : xử lý khi va chạm vào tường/enemy
- *   - Damageable : nhận sát thương, kiểm tra HP
- *   - Attackable : tấn công enemy (Member C dùng)
+ * - Collidable : xử lý khi va chạm vào tường/enemy
+ * - Damageable : nhận sát thương, kiểm tra HP
+ * - Attackable : tấn công enemy (Member C dùng)
  */
 @Getter
 public class Player extends MovingEntity implements Collidable, Damageable, Attackable {
@@ -28,7 +28,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // Lý do tách file: sy luôn = 0, chỉ cần dịch sx theo frameIndex
     // -------------------------------------------------------
     private final Image idleUp, idleDown, idleLeft, idleRight; // đứng yên 4 hướng
-    private final Image runUp,  runDown,  runLeft,  runRight;  // chạy 4 hướng
+    private final Image runUp, runDown, runLeft, runRight; // chạy 4 hướng
 
     // -------------------------------------------------------
     // COLLISION ROLLBACK
@@ -48,7 +48,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     // HP — máu nhân vật
     // -------------------------------------------------------
-    private int currentHp;                              // máu hiện tại
+    private int currentHp; // máu hiện tại
     private final int maxHp = GameConstants.PLAYER_MAX_HP; // máu tối đa lấy từ constants
 
     // -------------------------------------------------------
@@ -58,7 +58,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     private int attackCooldown = 0;
     private static final int ATTACK_COOLDOWN_MAX = 30; // ~0.5 giây ở 60fps
-    private final int attackDamage = 10;               // sát thương mỗi đòn
+    private final int attackDamage = 10; // sát thương mỗi đòn
 
     // -------------------------------------------------------
     // CONSTRUCTOR
@@ -66,26 +66,26 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // numFrames và renderSize lấy từ GameConstants → không hardcode
     // -------------------------------------------------------
     public Player(double x, double y,
-                  Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
-                  Image runDown,  Image runUp,  Image runLeft,  Image runRight) {
+            Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
+            Image runDown, Image runUp, Image runLeft, Image runRight) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
         super(x, y,
-              idleDown,
-              GameConstants.PLAYER_NUM_FRAMES,
-              GameConstants.TILE_SIZE, GameConstants.TILE_SIZE,
-              GameConstants.PLAYER_SPEED);
+                idleDown,
+                GameConstants.PLAYER_NUM_FRAMES,
+                GameConstants.TILE_SIZE, GameConstants.TILE_SIZE,
+                GameConstants.PLAYER_SPEED);
 
         // Lưu tất cả 8 sprite sheet vào field
-        this.idleDown  = idleDown;
-        this.idleUp    = idleUp;
-        this.idleLeft  = idleLeft;
+        this.idleDown = idleDown;
+        this.idleUp = idleUp;
+        this.idleLeft = idleLeft;
         this.idleRight = idleRight;
-        this.runDown   = runDown;
-        this.runUp     = runUp;
-        this.runLeft   = runLeft;
-        this.runRight  = runRight;
+        this.runDown = runDown;
+        this.runUp = runUp;
+        this.runLeft = runLeft;
+        this.runRight = runRight;
 
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
@@ -101,16 +101,16 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private void updateSpriteSheet() {
         // Dùng switch expression (Java 14+) cho gọn
         this.spriteSheet = switch (state) {
-            case IDLE    -> switch (direction) {
-                case UP    -> idleUp;
-                case DOWN  -> idleDown;
-                case LEFT  -> idleLeft;
+            case IDLE -> switch (direction) {
+                case UP -> idleUp;
+                case DOWN -> idleDown;
+                case LEFT -> idleLeft;
                 case RIGHT -> idleRight;
             };
             case RUNNING -> switch (direction) {
-                case UP    -> runUp;
-                case DOWN  -> runDown;
-                case LEFT  -> runLeft;
+                case UP -> runUp;
+                case DOWN -> runDown;
+                case LEFT -> runLeft;
                 case RIGHT -> runRight;
             };
         };
@@ -124,7 +124,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     /**
      * Đổi trạng thái (IDLE / RUNNING).
-     * Chỉ cập nhật sprite khi state thực sự thay đổi → tránh reset animation liên tục.
+     * Chỉ cập nhật sprite khi state thực sự thay đổi → tránh reset animation liên
+     * tục.
      */
     public void setState(EntityState newState) {
         if (this.state != newState) {
@@ -169,7 +170,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
 
         // Giảm cooldown tấn công mỗi frame (đếm ngược về 0)
-        if (attackCooldown > 0) attackCooldown--;
+        if (attackCooldown > 0)
+            attackCooldown--;
     }
 
     // -------------------------------------------------------
@@ -197,27 +199,39 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     @Override
-    public int getCurrentHp() { return currentHp; }
+    public int getCurrentHp() {
+        return currentHp;
+    }
 
     @Override
-    public int getMaxHp() { return maxHp; }
+    public int getMaxHp() {
+        return maxHp;
+    }
 
     /** Trả về true khi máu = 0 → game over */
     @Override
-    public boolean isDead() { return currentHp <= 0; }
+    public boolean isDead() {
+        return currentHp <= 0;
+    }
 
     // -------------------------------------------------------
     // ATTACKABLE — tấn công (Member C dùng)
     // -------------------------------------------------------
 
     @Override
-    public int getAttackDamage() { return attackDamage; }
+    public int getAttackDamage() {
+        return attackDamage;
+    }
 
     /** Chỉ cho tấn công khi cooldown đã về 0 */
     @Override
-    public boolean canAttack() { return attackCooldown == 0; }
+    public boolean canAttack() {
+        return attackCooldown == 0;
+    }
 
     /** Gọi sau khi tấn công để bắt đầu đếm cooldown */
     @Override
-    public void resetAttackCooldown() { attackCooldown = ATTACK_COOLDOWN_MAX; }
+    public void resetAttackCooldown() {
+        attackCooldown = ATTACK_COOLDOWN_MAX;
+    }
 }
