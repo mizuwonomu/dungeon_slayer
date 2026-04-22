@@ -1,8 +1,8 @@
 package com.hust.game.combat;
 
 import com.hust.game.enemy.Enemy;
+import com.hust.game.entities.Direction;
 import com.hust.game.entities.player.Player;
-import com.hust.game.entities.player.PlayerCombat;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
@@ -86,12 +86,26 @@ public class CombatManager {
             actualDamage *= SKILL_DAMAGE_MULTIPLIER;
         }
 
-        // Lấy hitbox chém dựa trên vị trí và hướng player hiện tại
-        Rectangle2D attackBox = PlayerCombat.getAttackHitbox(
-            player.getX(), player.getY(),
-            player.getRenderWidth(), player.getRenderHeight(),
-            player.getDirection()
-        );
+        // Tính toán hitbox tấn công trực tiếp để tránh lỗi thiếu class PlayerCombat
+        double attackRange = 30.0; // Tầm chém (khoảng cách hitbox mở rộng ra phía trước)
+        double px = player.getX();
+        double py = player.getY();
+        double pw = player.getRenderWidth();
+        double ph = player.getRenderHeight();
+        
+        Rectangle2D attackBox;
+        switch (player.getDirection()) {
+            case UP:
+                attackBox = new Rectangle2D(px, py - attackRange, pw, attackRange); break;
+            case DOWN:
+                attackBox = new Rectangle2D(px, py + ph, pw, attackRange); break;
+            case LEFT:
+                attackBox = new Rectangle2D(px - attackRange, py, attackRange, ph); break;
+            case RIGHT:
+                attackBox = new Rectangle2D(px + pw, py, attackRange, ph); break;
+            default:
+                attackBox = new Rectangle2D(px, py, pw, ph); break;
+        }
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {

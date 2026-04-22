@@ -6,6 +6,8 @@ import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
+import com.hust.game.map.MapManager;
+import com.hust.game.collision.CollisionChecker;
 
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -24,8 +26,9 @@ import java.util.List;
 
 public class App extends Application {
     // kích thước cửa sổ
-    private static final int WIDTH = 800;
-    private static final int HEIGHT = 600;
+    // Cập nhật lại kích thước khớp với map level1.txt (17 cột x 13 hàng, TILE_SIZE = 48)
+    private static final int WIDTH = 816;  // 17 * 48
+    private static final int HEIGHT = 624; // 13 * 48
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
@@ -37,6 +40,8 @@ public class App extends Application {
 
     private EnemyManager enemyManager; // Gọi quản lý quái vật
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
+    private MapManager mapManager;
+    private CollisionChecker collisionChecker;
 
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
@@ -58,6 +63,12 @@ public class App extends Application {
         // nhận sự kiến phím bấm (keyboard input)
         scene.setOnKeyPressed(e -> input.add(e.getCode())); // khi ấn xuống -> cho vào set
         scene.setOnKeyReleased(e -> input.remove(e.getCode())); // khi thả ra -> xoá khỏi set
+
+        // Khởi tạo Map
+        mapManager = new MapManager();
+
+        // Khởi tạo bộ kiểm tra va chạm địa hình
+        collisionChecker = new CollisionChecker(mapManager);
 
         initializeEntities();
 
@@ -86,6 +97,9 @@ public class App extends Application {
 
                 // bước b: render (xoá màn cũ -> vẽ màn mới)
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
+
+                // Vẽ map trước (để các entity hiển thị đè lên trên)
+                mapManager.draw(gc);
 
                 for (BaseEntity wall : obstacles) {
                     wall.render(gc);
@@ -116,7 +130,7 @@ public class App extends Application {
             Image rLeft = new Image(getClass().getResourceAsStream("/assets/run_left.png"), 0, 0, true, false);
             Image rRight = new Image(getClass().getResourceAsStream("/assets/run_right.png"), 0, 0, true, false);
 
-            Image wallImg = new Image(getClass().getResourceAsStream("/assets/wall.png"), TILE_SIZE, TILE_SIZE, true,
+            Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
             Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
@@ -134,23 +148,7 @@ public class App extends Application {
             //tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
 
-            obstacles.add(new BaseEntity(300, 300, wallImg, 1, TILE_SIZE, TILE_SIZE) {
-                @Override
-                public void update() {
-                }
-            });
-            obstacles.add(new BaseEntity(300, 300 + TILE_SIZE, wallImg, 1, TILE_SIZE, TILE_SIZE) {
-                @Override
-                public void update() {
-                }
-            });
-            obstacles.add(new BaseEntity(WIDTH / 2 + 100, HEIGHT / 2, wallImg, 1, TILE_SIZE, TILE_SIZE) {
-                @Override
-                public void update() {
-                }
-            });
-
-        } catch (NullPointerException e) {
+        } catch (Exception e) {
             System.err.println("LỖI: Không tìm thấy file ảnh!");
             e.printStackTrace();
             System.exit(1);
@@ -202,6 +200,19 @@ public class App extends Application {
     }
 
     private void checkCollisions() {
+        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond)
+        double padding = 12; // Cắt bớt phần viền trong suốt của ảnh để nhân vật đi mượt hơn
+        int left = (int) (player.getX() + padding);
+        int right = (int) (player.getX() + player.getRenderWidth() - padding);
+        int top = (int) (player.getY() + padding);
+        int bottom = (int) (player.getY() + player.getRenderHeight() - padding);
+
+        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+            player.onCollision(null); // Gọi rollback vị trí nếu bị kẹt tường
+        }
+
+        // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau này)
         for (BaseEntity wall : obstacles) {
             if (player.intersects(wall)) {
                 player.onCollision(wall);

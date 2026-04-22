@@ -36,7 +36,7 @@
       <version>4.11</version>
       <scope>test</scope>
     </dependency>
-    <!-- Thư viện Lombok -->
+    <!-- Thêm lại thư viện Lombok -->
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
@@ -63,6 +63,7 @@
         <configuration>
           <source>17</source>
           <target>17</target>
+          <!-- Chỉ định Processor cho Lombok thay vì dùng compilerArgs can thiệp sâu -->
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>
@@ -70,10 +71,6 @@
               <version>1.18.36</version>
             </path>
           </annotationProcessorPaths>
-          <compilerArgs>
-            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-            <arg>-J--add-opens=jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED</arg>
-          </compilerArgs>
         </configuration>
       </plugin>
     </plugins>
