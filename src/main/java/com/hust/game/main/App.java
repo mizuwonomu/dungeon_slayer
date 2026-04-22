@@ -6,6 +6,7 @@ import com.hust.game.entities.EntityState;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.base.StaticEntity;
 import com.hust.game.entities.player.Player;
+import com.hust.game.enemy.Enemy;
 import com.hust.game.enemy.EnemyManager;
 
 import javafx.animation.AnimationTimer;
@@ -259,6 +260,31 @@ public class App extends Application {
             if (player.intersects(wall)) {
                 player.onCollision(wall); // rollback vị trí
                 break;
+            }
+        }
+
+        if (enemyManager != null) {
+            for (Enemy quai : enemyManager.getEnemyList()) {
+                // Check quái có chạm tường không
+                for (BaseEntity wall : obstacles) {
+                    if (quai.intersects(wall)) {
+                        quai.setX(quai.getLastX());
+                        quai.setY(quai.getLastY());
+
+                        quai.setX(quai.getX() + quai.getMoveX());
+                        if (quai.intersects(wall)) {
+                            // Kẹt X rồi, rụt chân X lại!
+                            quai.setX(quai.getLastX());
+                        }
+
+                        quai.setY(quai.getY() + quai.getMoveY());
+                        if (quai.intersects(wall)) {
+                            // Kẹt Y rồi, rụt chân Y lại!
+                            quai.setY(quai.getLastY());
+                        }
+                        break;
+                    }
+                }
             }
         }
     }
