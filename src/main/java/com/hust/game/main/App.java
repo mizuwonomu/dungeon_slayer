@@ -29,6 +29,7 @@ public class App extends Application {
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
+    private AnimationTimer timer;
 
     private GraphicsContext gc;
     private Player player;
@@ -61,7 +62,7 @@ public class App extends Application {
         initializeEntities();
 
         // khởi tạo và chạy game loop (60 fps)
-        AnimationTimer timer = new AnimationTimer() {
+        timer = new AnimationTimer() {
             @Override
             public void handle(long currentNanoTime) {
                 // xử lí input và update logic
@@ -76,6 +77,13 @@ public class App extends Application {
                 // kiểm tra va chạm giữa player và toàn bộ vật cản
                 checkCollisions();
 
+                if (player.isDead()){
+                    timer.stop();   
+
+                    System.out.println("CHẾT CON CỤ RỒI :(");
+                    return;
+                }
+
                 // bước b: render (xoá màn cũ -> vẽ màn mới)
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
 
@@ -88,6 +96,7 @@ public class App extends Application {
                 // Vẽ quái vật lên màn hình
                 if (enemyManager != null)
                     enemyManager.renderAll(gc);
+
             }
         };
         timer.start();
