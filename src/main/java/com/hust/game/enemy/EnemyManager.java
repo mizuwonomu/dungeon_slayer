@@ -17,12 +17,18 @@ public class EnemyManager {
     // Hàm sinh thái quái vật, nhét vào danh sách
     public void spawnEnemy(String enemyType, double x, double y, Image sprite, int numFrames, double w, double h,
             Player targetPlayer) {
+        spawnEnemy(enemyType, x, y, sprite, numFrames, w, h, targetPlayer, null);
+    }
+
+    // Hàm sinh thái quái vật (hỗ trợ ảnh skill)
+    public void spawnEnemy(String enemyType, double x, double y, Image sprite, int numFrames, double w, double h,
+            Player targetPlayer, Image skillSprite) {
         Enemy newEnemy = null;
 
         if (enemyType.equals("Slime")) {
             newEnemy = new Slime(x, y, sprite, numFrames, w, h, targetPlayer);
         } else if (enemyType.equals("Tree")) {
-            newEnemy = new Tree(x, y, sprite, numFrames, w, h, targetPlayer);
+            newEnemy = new Tree(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
         }
 
         if (newEnemy != null) {

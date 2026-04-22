@@ -180,6 +180,8 @@ public class App extends Application {
                     false);
             Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), 0, 0, true,
                     false);
+            Image treeSkillImg = new Image(getClass().getResourceAsStream("/assets/tree_skill.png"), 0, 0, true,
+                    false);
             Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), 0, 0, true,
                     false);
 
@@ -190,10 +192,10 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
             enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
             enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
 
             //tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
