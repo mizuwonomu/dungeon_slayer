@@ -21,6 +21,9 @@ public class Tree extends Enemy {
     public void update() {
         super.update();
 
+        // Chết hoặc đang bị choáng thì không thể xài Skill tấn công Player
+        if (this.hp <= 0 || this.flashTimer > 0) return;
+
         if (skillCoolDown > 0) {
             skillCoolDown--;
         }

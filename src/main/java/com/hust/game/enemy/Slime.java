@@ -20,6 +20,9 @@ public class Slime extends Enemy {
     public void update() {
         super.update();
 
+        // Chết hoặc đang bị choáng thì không thể tấn công Player
+        if (this.hp <= 0 || this.flashTimer > 0) return;
+
         if (damageTick > 0)
             damageTick--;
         if (this.intersects(targetPlayer)) {

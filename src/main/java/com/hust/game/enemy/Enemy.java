@@ -3,6 +3,7 @@ package com.hust.game.enemy;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.base.MovingEntity;
 import com.hust.game.entities.player.Player;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 
 public abstract class Enemy extends MovingEntity {
@@ -16,6 +17,7 @@ public abstract class Enemy extends MovingEntity {
     protected int animationDelay = 10;
     protected double lastX, lastY;
     protected double moveX, moveY;
+    protected int flashTimer = 0; // Bộ đếm nhấp nháy khi dính đòn
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -26,7 +28,14 @@ public abstract class Enemy extends MovingEntity {
 
     @Override
     public void update() {
-        // Lưu vị trí cũ
+        if (flashTimer > 0) flashTimer--; // Giảm dần thời gian nháy đỏ
+
+        // Nếu đang chịu đòn (nháy đỏ) hoặc đã cạn máu -> Bị choáng, đứng im tại chỗ
+        if (flashTimer > 0 || hp <= 0) {
+            return; // Thoát sớm, giữ nguyên lastX, lastY an toàn cũ
+        }
+
+        // Lưu vị trí cũ CHỈ KHI được phép di chuyển (Giúp knockback không bị kẹt tường)
         this.lastX = this.x;
         this.lastY = this.y;
 
@@ -66,19 +75,6 @@ public abstract class Enemy extends MovingEntity {
         int nextCol = (int) (nextX / TILE_SIZE);
         int nextRow = (int) (nextY / TILE_SIZE);
 
-        /*
-         * ------------------------------------------------------------------
-         * if (MapManager.map[nextRow][nextCol] == 1) {
-         * // Mảng số 1 là Tường -> Không cho phép gán nextX, nextY vào x, y
-         * // Quái sẽ đứng im đập mặt vào tường
-         * } else {
-         * // Mảng số 0 là Đường đi hợp lệ
-         * this.x = nextX;
-         * this.y = nextY;
-         * }
-         * ------------------------------------------------------------------
-         */
-
         this.x = nextX;
         this.y = nextY;
 
@@ -94,9 +90,46 @@ public abstract class Enemy extends MovingEntity {
         this.y = lastY;
     }
 
+    @Override
+    public void render(GraphicsContext gc) {
+        // Hiệu ứng nhấp nháy khi bị chém trúng
+        if (flashTimer > 0) {
+            // Cứ mỗi 7 frame thì ẩn ảnh 1 lần (Tạo ra 2 nhịp nháy trong khoảng 30 frame)
+            if ((flashTimer / 7) % 2 == 0) {
+                return; // Không vẽ ảnh ở frame này
+            }
+        }
+        super.render(gc);
+    }
+
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
     public double getLastX() { return lastX; }
     public double getLastY() { return lastY; }
     public double getMoveX() { return moveX; }
     public double getMoveY() { return moveY; }
+
+    // Hàm nhận sát thương từ Player
+    public void takeDamage(int amount) {
+        if (this.hp <= 0) return; // Nếu đã chết thì không nhận thêm sát thương nữa
+        this.hp -= amount;
+        if (this.hp < 0) this.hp = 0;
+        this.flashTimer = 30; // Kích hoạt nhấp nháy trong 30 frames (0.5 giây)
+        System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
+    }
+
+    // Hàm xử lý đẩy lùi quái vật (Knockback)
+    public void applyKnockback(com.hust.game.entities.Direction dir) {
+        double kbDistance = this.knockback * 15.0; // Khoảng cách đẩy lùi
+        switch (dir) {
+            case UP:    this.y -= kbDistance; break;
+            case DOWN:  this.y += kbDistance; break;
+            case LEFT:  this.x -= kbDistance; break;
+            case RIGHT: this.x += kbDistance; break;
+        }
+    }
+
+    // Kiểm tra xem quái vật đã chết và chạy xong hiệu ứng nhấp nháy báo tử chưa
+    public boolean isReadyToRemove() {
+        return this.hp <= 0 && this.flashTimer <= 0;
+    }
 }

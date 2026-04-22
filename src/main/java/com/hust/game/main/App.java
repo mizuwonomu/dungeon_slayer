@@ -6,6 +6,7 @@ import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
+import com.hust.game.enemy.Enemy;
 import com.hust.game.map.MapManager;
 import com.hust.game.collision.CollisionChecker;
 
@@ -46,6 +47,10 @@ public class App extends Application {
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
 
+    private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
+    private int screenShakeTimer = 0; // Bộ đếm rung màn hình
+    private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
+
     @Override
     public void start(Stage stage) {
         stage.setTitle("OOP Roguelike 8-bit Demo");
@@ -76,27 +81,35 @@ public class App extends Application {
         timer = new AnimationTimer() {
             @Override
             public void handle(long currentNanoTime) {
-                // xử lí input và update logic
-                handleInput();
-                player.update();
-                combatManager.update();
+                boolean isVictory = enemyManager != null && enemyManager.getEnemyList().isEmpty();
+                boolean isGameOver = player.isDead();
 
-                // Lệnh cho quái vật di chuyển
-                if (enemyManager != null)
-                    enemyManager.updateAll();
+                // Nếu chưa chết và chưa thắng thì mới update logic
+                if (!isGameOver && !isVictory) {
+                    handleInput();
+                    player.update();
+                    combatManager.update();
 
-                // kiểm tra va chạm giữa player và toàn bộ vật cản
-                checkCollisions();
+                    if (enemyManager != null)
+                        enemyManager.updateAll();
 
-                if (player.isDead()){
-                    timer.stop();   
-
-                    System.out.println("CHẾT CON CỤ RỒI :(");
-                    return;
+                    checkCollisions();
                 }
 
                 // bước b: render (xoá màn cũ -> vẽ màn mới)
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
+
+                gc.save();
+                // Hiệu ứng rung màn hình
+                if (screenShakeTimer > 0) {
+                    screenShakeTimer--;
+                    if (screenShakeAmplitude > 0) {
+                        // Hệ số 20 để amplitude 1.0 giật tối đa 10 pixel, amplitude 0.5 giật 5 pixel
+                        double dx = (Math.random() - 0.5) * screenShakeAmplitude * 20; 
+                        double dy = (Math.random() - 0.5) * screenShakeAmplitude * 20;
+                        gc.translate(dx, dy);
+                    }
+                }
 
                 // Vẽ map trước (để các entity hiển thị đè lên trên)
                 mapManager.draw(gc);
@@ -107,10 +120,37 @@ public class App extends Application {
 
                 player.render(gc);
 
+                // Hiển thị Combo Text trên đầu Player (chỉ hiện từ hit thứ 3 trở đi)
+                int currentCombo = combatManager.getComboCount();
+                if (currentCombo >= 3) {
+                    gc.setFill(javafx.scene.paint.Color.ORANGE); // Màu cam nổi bật
+                    gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 14 + Math.min(currentCombo * 2, 20)));
+                    gc.fillText("Combo x" + currentCombo, player.getX() - 10, player.getY() - 10);
+                }
+
                 // Vẽ quái vật lên màn hình
                 if (enemyManager != null)
                     enemyManager.renderAll(gc);
 
+                gc.restore();
+
+                // Vẽ màn hình Game Over / Victory đè lên
+                if (isGameOver || isVictory) {
+                    gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7)); // Phủ màn đen mờ
+                    gc.fillRect(0, 0, WIDTH, HEIGHT);
+                    gc.setFill(isVictory ? javafx.scene.paint.Color.YELLOW : javafx.scene.paint.Color.RED);
+                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
+                    String endText = isVictory ? "VICTORY!" : "GAME OVER";
+                    gc.fillText(endText, WIDTH / 2 - (isVictory ? 120 : 140), HEIGHT / 2 - 20);
+                    gc.setFill(javafx.scene.paint.Color.WHITE);
+                    gc.setFont(new javafx.scene.text.Font("Arial", 20));
+                    gc.fillText("Press ENTER to restart", WIDTH / 2 - 100, HEIGHT / 2 + 30);
+
+                    if (input.contains(KeyCode.ENTER)) {
+                        input.clear();
+                        initializeEntities(); // Reset lại toàn bộ map và nhân vật
+                    }
+                }
             }
         };
         timer.start();
@@ -130,20 +170,30 @@ public class App extends Application {
             Image rLeft = new Image(getClass().getResourceAsStream("/assets/run_left.png"), 0, 0, true, false);
             Image rRight = new Image(getClass().getResourceAsStream("/assets/run_right.png"), 0, 0, true, false);
 
+            Image cDown = new Image(getClass().getResourceAsStream("/assets/combatdown.png"), 0, 0, true, false);
+            Image cUp = new Image(getClass().getResourceAsStream("/assets/combatup.png"), 0, 0, true, false);
+            Image cLeft = new Image(getClass().getResourceAsStream("/assets/combatleft.png"), 0, 0, true, false);
+            Image cRight = new Image(getClass().getResourceAsStream("/assets/combatright.png"), 0, 0, true, false);
+            Image swordHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
+
             Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
-            Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), TILE_SIZE, TILE_SIZE, true,
+            Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), 0, 0, true,
                     false);
-            Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), TILE_SIZE, TILE_SIZE, true,
+            Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), 0, 0, true,
                     false);
 
             // Khai báo Player trước khi đưa cho Quái
-            player = new Player(WIDTH / 2, HEIGHT / 2, iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight);
+            player = new Player(WIDTH / 2, HEIGHT / 2, 
+                iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight, 
+                cDown, cUp, cLeft, cRight, swordHit);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", 10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Slime", 100, 100, slimeImg, 1, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8, TILE_SIZE, TILE_SIZE, player);
 
             //tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
@@ -160,32 +210,46 @@ public class App extends Application {
 
         boolean isAnyKeyPressed = false;
 
-        if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) {
-            player.setDirection(Direction.UP);
-            player.moveUp();
-            isAnyKeyPressed = true;
-        }
-
-        else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
-            player.setDirection(Direction.DOWN);
-            player.moveDown();
-            isAnyKeyPressed = true;
-        }
-
-        else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
-            player.setDirection(Direction.LEFT);
-            player.moveLeft();
-            isAnyKeyPressed = true;
-        }
-
-        else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
-            player.setDirection(Direction.RIGHT);
-            player.moveRight();
-            isAnyKeyPressed = true;
+        // Khóa di chuyển khi đang chém để animation hiển thị rõ ràng và uy lực hơn
+        if (!player.isAttacking()) {
+            if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) {
+                player.setDirection(Direction.UP);
+                player.moveUp();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
+                player.setDirection(Direction.DOWN);
+                player.moveDown();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
+                player.setDirection(Direction.LEFT);
+                player.moveLeft();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
+                player.setDirection(Direction.RIGHT);
+                player.moveRight();
+                isAnyKeyPressed = true;
+            }
         }
 
         if (input.contains(KeyCode.J)){
-            combatManager.playerAttack();
+            if (!isJHeld) { // Yêu cầu phải nhả phím J ra rồi bấm lại mới chém tiếp được
+                if (player.canAttack()) {
+                    int combo = combatManager.playerAttack();
+                    if (combo > 0) {
+                        screenShakeTimer = 5; // Tăng lên 5 frame để độ rung rõ ràng hơn một chút
+                        // Phân tầng độ rung theo Combo
+                        if (combo <= 2) screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
+                        else if (combo == 3) screenShakeAmplitude = 0.5; // Hit 3: Rung nhẹ
+                        else screenShakeAmplitude = 1.0; // Hit 4+: Rung dứt khoát
+                    }
+                }
+                isJHeld = true; // Đánh dấu là đang đè phím
+            }
+        } else {
+            isJHeld = false; // Nhả phím J ra thì reset cờ cho phép chém tiếp
         }
 
         if (input.contains(KeyCode.L)){
@@ -210,6 +274,21 @@ public class App extends Application {
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
             collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
             player.onCollision(null); // Gọi rollback vị trí nếu bị kẹt tường
+        }
+
+        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)
+        if (enemyManager != null) {
+            for (Enemy enemy : enemyManager.getEnemyList()) {
+                int eLeft = (int) (enemy.getX() + padding);
+                int eRight = (int) (enemy.getX() + enemy.getRenderWidth() - padding);
+                int eTop = (int) (enemy.getY() + padding);
+                int eBottom = (int) (enemy.getY() + enemy.getRenderHeight() - padding);
+
+                if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
+                    collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
+                    enemy.onCollision(null); // Bị kẹt tường -> Trở về lastX, lastY
+                }
+            }
         }
 
         // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau này)

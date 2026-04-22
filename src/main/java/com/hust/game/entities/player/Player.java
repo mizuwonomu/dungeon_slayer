@@ -8,6 +8,7 @@ import com.hust.game.entities.base.MovingEntity;
 import com.hust.game.entities.interfaces.Attackable;
 import com.hust.game.entities.interfaces.Collidable;
 import com.hust.game.entities.interfaces.Damageable;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import lombok.Getter;
 
@@ -30,6 +31,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private final Image idleUp, idleDown, idleLeft, idleRight; // đứng yên 4 hướng
     private final Image runUp, runDown, runLeft, runRight; // chạy 4 hướng
 
+    // Ảnh combat (đang chém)
+    private final Image combatUp, combatDown, combatLeft, combatRight;
+    
+    // Trạng thái tấn công
+    private boolean isAttacking = false;
+    private AttackEffect attackEffect;
+
     // -------------------------------------------------------
     // COLLISION ROLLBACK
     // Trước mỗi frame di chuyển, lưu lại vị trí cũ.
@@ -46,6 +54,12 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private int animationTimer = 0;
 
     // -------------------------------------------------------
+    // DAMAGE EFFECT
+    // Thời gian nhấp nháy khi nhận sát thương
+    // -------------------------------------------------------
+    private int flashTimer = 0;
+
+    // -------------------------------------------------------
     // HP — máu nhân vật
     // -------------------------------------------------------
     private int currentHp; // máu hiện tại
@@ -57,7 +71,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // mới được tấn công lại → tránh spam attack.
     // -------------------------------------------------------
     private int attackCooldown = 0;
-    private static final int ATTACK_COOLDOWN_MAX = 30; // ~0.5 giây ở 60fps
+    private static final int ATTACK_COOLDOWN_MAX = 8; // Rút ngắn cooldown để có thể "spam" chém liên tục
     private final int attackDamage = 10; // sát thương mỗi đòn
 
     // -------------------------------------------------------
@@ -67,7 +81,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     public Player(double x, double y,
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
-            Image runDown, Image runUp, Image runLeft, Image runRight) {
+            Image runDown, Image runUp, Image runLeft, Image runRight,
+            Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
+            Image swordHitImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
@@ -86,9 +102,16 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.runUp = runUp;
         this.runLeft = runLeft;
         this.runRight = runRight;
+        
+        this.combatDown = combatDown;
+        this.combatUp = combatUp;
+        this.combatLeft = combatLeft;
+        this.combatRight = combatRight;
 
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
+        // Tạo entity chứa hiệu ứng kiếm
+        this.attackEffect = new AttackEffect(swordHitImg, this);
     }
 
     // -------------------------------------------------------
@@ -99,6 +122,19 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // tránh hiện tượng nhảy frame giữa chừng khi đổi hướng.
     // -------------------------------------------------------
     private void updateSpriteSheet() {
+        if (isAttacking) {
+            this.spriteSheet = switch (direction) {
+                case UP -> combatUp;
+                case DOWN -> combatDown;
+                case LEFT -> combatLeft;
+                case RIGHT -> combatRight;
+            };
+            // Cập nhật số frame chém là 8
+            this.frameWidth = spriteSheet.getWidth() / 8; 
+            this.frameHeight = spriteSheet.getHeight(); // Tránh bị sai tỷ lệ ảnh
+            return; // Thoát sớm, không dùng idle hay run nữa
+        }
+
         // Dùng switch expression (Java 14+) cho gọn
         this.spriteSheet = switch (state) {
             case IDLE -> switch (direction) {
@@ -116,7 +152,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         };
 
         // Cập nhật lại frameWidth vì spriteSheet mới có thể khác kích thước
-        this.frameWidth = spriteSheet.getWidth() / numFrames;
+        this.frameWidth = spriteSheet.getWidth() / GameConstants.PLAYER_NUM_FRAMES;
+        this.frameHeight = spriteSheet.getHeight();
 
         // Reset về frame đầu tiên khi đổi animation
         this.frameIndex = 0;
@@ -159,19 +196,55 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     @Override
     public void update() {
-        // Đếm frame game đã trôi qua
-        animationTimer++;
+        if (flashTimer > 0) flashTimer--; // Giảm dần thời gian nháy đỏ
 
-        // Khi đủ delay → chuyển sang frame sprite tiếp theo
-        if (animationTimer >= GameConstants.PLAYER_ANIMATION_DELAY) {
-            animationTimer = 0;
-            // % numFrames để quay vòng: 0,1,2,...,7,0,1,2,...
-            frameIndex = (frameIndex + 1) % numFrames;
+        if (isAttacking) {
+            animationTimer++;
+            // Animation chém diễn ra nhanh hơn đi bộ
+            if (animationTimer >= 4) {
+                animationTimer = 0;
+                frameIndex++;
+                if (frameIndex >= 8) { // Kết thúc 8 frame chém
+                    isAttacking = false;
+                    frameIndex = 0;
+                    if (attackEffect != null) attackEffect.setActive(false);
+                    updateSpriteSheet(); // Khôi phục ảnh idle/run
+                }
+            }
+            if (attackEffect != null) attackEffect.update();
+        } else {
+            // Đếm frame game đã trôi qua cho trạng thái đi bộ/đứng
+            animationTimer++;
+            if (animationTimer >= GameConstants.PLAYER_ANIMATION_DELAY) {
+                animationTimer = 0;
+                frameIndex = (frameIndex + 1) % GameConstants.PLAYER_NUM_FRAMES;
+            }
         }
 
         // Giảm cooldown tấn công mỗi frame (đếm ngược về 0)
         if (attackCooldown > 0)
             attackCooldown--;
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        // Hiệu ứng nhấp nháy khi bị đánh (ẩn/hiện mỗi 7 frame)
+        boolean skipBody = (flashTimer > 0 && (flashTimer / 7) % 2 == 0);
+        if (!skipBody) {
+            super.render(gc); // Vẽ cơ thể nhân vật nếu không bị skip
+        }
+        
+        if (isAttacking && attackEffect != null) {
+            attackEffect.render(gc); // Vẽ hiệu ứng kiếm đè lên
+        }
+    }
+
+    public void triggerAttackVisuals() {
+        isAttacking = true;
+        frameIndex = 0;
+        animationTimer = 0;
+        updateSpriteSheet();
+        if (attackEffect != null) attackEffect.trigger();
     }
 
     // -------------------------------------------------------
@@ -196,6 +269,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     @Override
     public void takeDamage(int amount) {
         currentHp = Math.max(0, currentHp - amount);
+        flashTimer = 30; // Nhấp nháy trong 30 frame (0.5s) khi bị thương
     }
 
     @Override

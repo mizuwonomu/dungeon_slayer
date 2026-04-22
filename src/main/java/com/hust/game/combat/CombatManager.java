@@ -40,6 +40,13 @@ public class CombatManager {
     private static final int SKILL_HP_COST          = 10;   // máu bị rút khi dùng skill
     private static final int SKILL_DAMAGE_MULTIPLIER = 2;   // nhân đôi damage
 
+    // -------------------------------------------------------
+    // COMBO SYSTEM
+    // -------------------------------------------------------
+    private int comboCount = 0;
+    private int comboTimer = 0;
+    private static final int COMBO_WINDOW_FRAMES = 60; // 1 giây (60 fps)
+
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
         this.enemyList = enemyList;
@@ -65,6 +72,14 @@ public class CombatManager {
         if (skillCooldown > 0) {
             skillCooldown--;
         }
+
+        // Đếm ngược Combo
+        if (comboTimer > 0) {
+            comboTimer--;
+            if (comboTimer <= 0) {
+                comboCount = 0; // Hết 1 giây không chém trúng ai -> Reset Combo
+            }
+        }
     }
 
     /**
@@ -75,16 +90,20 @@ public class CombatManager {
      *   2. Lấy hitbox chém từ PlayerCombat
      *   3. Duyệt enemyList, enemy nào hitbox dính vào thì takeDamage
      *   4. Reset cooldown của player
+     * @return Số đòn Combo hiện tại (0 nếu chém trượt)
      */
-    public void playerAttack() {
+    public int playerAttack() {
         // Kiểm tra cooldown tấn công — nếu chưa hết thì bỏ qua
-        if (!player.canAttack()) return;
+        if (!player.canAttack()) return 0;
 
         // Tính damage thực tế — nhân đôi nếu skill đang bật
         int actualDamage = player.getAttackDamage();
         if (skillActive) {
             actualDamage *= SKILL_DAMAGE_MULTIPLIER;
         }
+
+        // Kích hoạt Animation chém và vẽ hiệu ứng
+        player.triggerAttackVisuals();
 
         // Tính toán hitbox tấn công trực tiếp để tránh lỗi thiếu class PlayerCombat
         double attackRange = 30.0; // Tầm chém (khoảng cách hitbox mở rộng ra phía trước)
@@ -107,6 +126,8 @@ public class CombatManager {
                 attackBox = new Rectangle2D(px, py, pw, ph); break;
         }
 
+        boolean hitAny = false;
+
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
             // Lấy boundary của enemy (Rectangle2D)
@@ -116,13 +137,23 @@ public class CombatManager {
             if (attackBox.intersects(enemyBox)) {
                 enemy.takeDamage(actualDamage);
 
-                // TODO: thêm knockback ở đây sau khi có asset
-                // enemy.applyKnockback(player.getDirection());
+                // Bật hiệu ứng knockback
+                enemy.applyKnockback(player.getDirection());
+                hitAny = true; // Xác nhận đã chém trúng
             }
+        }
+
+        // Xử lý tăng Combo nếu chém trúng
+        if (hitAny) {
+            if (comboTimer > 0) comboCount++; // Đang trong thời gian Combo -> Cộng dồn
+            else comboCount = 1; // Khởi đầu Combo mới
+            comboTimer = COMBO_WINDOW_FRAMES; // Reset lại đồng hồ 1 giây
         }
 
         // Reset cooldown tấn công của player
         player.resetAttackCooldown();
+
+        return hitAny ? comboCount : 0;
     }
 
     /**
@@ -162,4 +193,7 @@ public class CombatManager {
 
     /** Còn bao nhiêu frame trước khi dùng skill lại được */
     public int getSkillCooldownRemaining() { return skillCooldown; }
+
+    /** Trả về số đòn Combo hiện tại */
+    public int getComboCount() { return comboCount; }
 }

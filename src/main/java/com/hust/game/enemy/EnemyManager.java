@@ -32,6 +32,9 @@ public class EnemyManager {
 
     // Duyệt qua tất cả để chốt sổ tọa độ mới
     public void updateAll() {
+        // Dọn dẹp quái vật đã chết và nhấp nháy xong ra khỏi bản đồ
+        enemyList.removeIf(Enemy::isReadyToRemove);
+
         for (Enemy e : enemyList) {
             e.update();
         }
