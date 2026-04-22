@@ -278,7 +278,42 @@ public class App extends Application {
 
         // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)
         if (enemyManager != null) {
-            for (Enemy enemy : enemyManager.getEnemyList()) {
+            List<Enemy> enemies = enemyManager.getEnemyList();
+            
+            // Bước 1: Tính toán lực đẩy (Soft Collision) giữa các quái vật trước
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
+                // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
+                for (int j = i + 1; j < enemies.size(); j++) {
+                    Enemy otherEnemy = enemies.get(j);
+                    if (enemy.intersects(otherEnemy)) {
+                        // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt thành 1 cục)
+                        double cx1 = enemy.getX() + enemy.getRenderWidth() / 2.0;
+                        double cy1 = enemy.getY() + enemy.getRenderHeight() / 2.0;
+                        double cx2 = otherEnemy.getX() + otherEnemy.getRenderWidth() / 2.0;
+                        double cy2 = otherEnemy.getY() + otherEnemy.getRenderHeight() / 2.0;
+
+                        double dx = cx1 - cx2;
+                        double dy = cy1 - cy2;
+                        double dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist == 0) { // Xử lý góc lách ngẫu nhiên nếu 2 quái đè khít lên nhau từ lúc spawn
+                            dx = Math.random() - 0.5; dy = Math.random() - 0.5;
+                            dist = Math.sqrt(dx * dx + dy * dy);
+                        }
+                        double pushStrength = 1.5; // Lực đẩy trượt qua nhau
+                        enemy.setX(enemy.getX() + (dx / dist) * pushStrength);
+                        enemy.setY(enemy.getY() + (dy / dist) * pushStrength);
+                        otherEnemy.setX(otherEnemy.getX() - (dx / dist) * pushStrength);
+                        otherEnemy.setY(otherEnemy.getY() - (dy / dist) * pushStrength);
+                    }
+                }
+            }
+
+            // Bước 2: KIỂM TRA VA CHẠM TƯỜNG SAU KHI ĐÃ BỊ ĐẨY
+            // Việc này đảm bảo nếu quái bị xô đẩy văng vào tường, nó sẽ ngay lập tức bị giật ngược lại vị trí an toàn
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
                 int eLeft = (int) (enemy.getX() + padding);
                 int eRight = (int) (enemy.getX() + enemy.getRenderWidth() - padding);
                 int eTop = (int) (enemy.getY() + padding);
@@ -286,7 +321,7 @@ public class App extends Application {
 
                 if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
                     collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
-                    enemy.onCollision(null); // Bị kẹt tường -> Trở về lastX, lastY
+                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
                 }
             }
         }

@@ -20,8 +20,8 @@ public class Slime extends Enemy {
     public void update() {
         super.update();
 
-        // Chết hoặc đang bị choáng thì không thể tấn công Player
-        if (this.hp <= 0 || this.flashTimer > 0) return;
+        // Chết, bị choáng, hoặc đang nghỉ thì không thể tấn công Player
+        if (this.hp <= 0 || this.flashTimer > 0 || this.attackPauseTimer > 0) return;
 
         if (damageTick > 0)
             damageTick--;
@@ -29,6 +29,7 @@ public class Slime extends Enemy {
             if (damageTick <= 0) {
                 targetPlayer.takeDamage(this.damage);
                 damageTick = 30;
+                this.attackPauseTimer = 60; // Đứng im 1s (60 frame)
             }
         }
     }

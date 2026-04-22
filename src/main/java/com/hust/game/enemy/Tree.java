@@ -21,8 +21,8 @@ public class Tree extends Enemy {
     public void update() {
         super.update();
 
-        // Chết hoặc đang bị choáng thì không thể xài Skill tấn công Player
-        if (this.hp <= 0 || this.flashTimer > 0) return;
+        // Chết, bị choáng, hoặc đang nghỉ thì không thể xài Skill tấn công Player
+        if (this.hp <= 0 || this.flashTimer > 0 || this.attackPauseTimer > 0) return;
 
         if (skillCoolDown > 0) {
             skillCoolDown--;
@@ -31,6 +31,7 @@ public class Tree extends Enemy {
             if (skillCoolDown <= 0) {
                 castSkill();
                 skillCoolDown = SKILL_TIMING;
+                this.attackPauseTimer = 60; // Đứng im 1s (60 frame)
             }
         }
     }
