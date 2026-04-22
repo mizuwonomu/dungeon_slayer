@@ -4,6 +4,7 @@ import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
+import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
 
 import javafx.animation.AnimationTimer;
@@ -31,6 +32,8 @@ public class App extends Application {
 
     private GraphicsContext gc;
     private Player player;
+    private CombatManager combatManager;
+
     private EnemyManager enemyManager; // Gọi quản lý quái vật
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
 
@@ -64,6 +67,7 @@ public class App extends Application {
                 // xử lí input và update logic
                 handleInput();
                 player.update();
+                combatManager.update();
 
                 // Lệnh cho quái vật di chuyển
                 if (enemyManager != null)
@@ -118,6 +122,9 @@ public class App extends Application {
             enemyManager.spawnEnemy("Tree", 10, 100, treeImg, 1, TILE_SIZE, TILE_SIZE, player);
             enemyManager.spawnEnemy("Slime", 100, 100, slimeImg, 1, TILE_SIZE, TILE_SIZE, player);
 
+            //tạo combat manager
+            combatManager = new CombatManager(player, enemyManager.getEnemyList());
+
             obstacles.add(new BaseEntity(300, 300, wallImg, 1, TILE_SIZE, TILE_SIZE) {
                 @Override
                 public void update() {
@@ -168,6 +175,14 @@ public class App extends Application {
             player.setDirection(Direction.RIGHT);
             player.moveRight();
             isAnyKeyPressed = true;
+        }
+
+        if (input.contains(KeyCode.J)){
+            combatManager.playerAttack();
+        }
+
+        if (input.contains(KeyCode.L)){
+            combatManager.activateSkill();
         }
 
         if (isAnyKeyPressed) {

@@ -19,7 +19,24 @@ public abstract class Enemy extends MovingEntity {
         super(x, y, spriteSheet, numFrames, renderWidth, renderHeight, 1.0);
         this.targetPlayer = targetPlayer; // Chốt mục tiêu
     }
+    /**
+     * Nhận sát thương từ player.
+     * Không cho hp xuống dưới 0.
+     * TODO: thêm hiệu ứng chết (drop item, xóa khỏi enemyList) sau
+     */
+    public void takeDamage(int amount) {
+        this.hp = Math.max(0, this.hp - amount);
 
+        // In ra console để test logic trước khi có asset
+        System.out.println(this.getClass().getSimpleName()
+            + " nhận " + amount + " damage! HP còn: " + this.hp + "/" + this.maxHp);
+    }
+
+    /** Kiểm tra enemy đã chết chưa */
+    public boolean isDead() {
+        return this.hp <= 0;
+    }
+    
     @Override
     public void update() {
         // Không có mục tiêu -> đứng
