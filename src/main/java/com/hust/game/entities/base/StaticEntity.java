@@ -10,11 +10,11 @@ import javafx.scene.image.Image;
  * Entity đứng yên: tường, cổng, item nằm trên map.
  * Member A dùng class này để build tilemap.
  */
-public class StaticEntity extends BaseEntity {
+public class StaticEntity  extends BaseEntity{
     public StaticEntity(double x, double y, Image spriteSheets,
-            int numFrames, double renderWidth, double renderHeight) {
-        super(x, y, spriteSheets, numFrames, renderWidth, renderHeight);
-    }
+        int numFrames, double renderWidth, double renderHeight) {
+            super(x, y, spriteSheets, numFrames, renderWidth, renderHeight);
+        }
 
     @Override
     public void update() {

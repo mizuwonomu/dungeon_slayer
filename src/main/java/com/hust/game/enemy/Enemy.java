@@ -6,12 +6,13 @@ import javafx.scene.image.Image;
 
 public abstract class Enemy extends MovingEntity {
 
-    // Đã xóa dòng protected double speed = 1.0;
     protected Player targetPlayer;
     protected int maxHp;
     protected int hp;
     protected int damage;
     protected int knockback;
+    protected int animationTimer = 0;
+    protected int animationDelay = 10;
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -66,5 +67,11 @@ public abstract class Enemy extends MovingEntity {
 
         this.x = nextX;
         this.y = nextY;
+
+        animationTimer++;
+        if (animationTimer >= animationDelay) {
+            animationTimer = 0;
+            frameIndex = (frameIndex + 1) % numFrames;
+        }
     }
 }

@@ -9,11 +9,10 @@ import lombok.Setter;
 
 @Getter
 @Setter
-// định nghĩa tầng trung gian với thực thể có thể di chuyển như player, enemy
-// gom các thứ chung lại: speed, direction, state, và các hàm
-// moveUp/Down/Left/Right
+//định nghĩa tầng trung gian với thực thể có thể di chuyển như player, enemy
+//gom các thứ chung lại: speed, direction, state, và các hàm moveUp/Down/Left/Right 
 // — để Player và Enemy khỏi phải viết lại
-public abstract class MovingEntity extends BaseEntity {
+public abstract class MovingEntity extends BaseEntity{
     protected double speed;
     protected Direction direction = Direction.DOWN;
     protected EntityState state = EntityState.IDLE;
