@@ -113,8 +113,14 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
                 case LEFT -> runLeft;
                 case RIGHT -> runRight;
             };
+            //tạm thời dùng idle
+            case ATTACKING -> switch (direction) {
+                case UP -> idleUp;
+                case DOWN -> idleDown;
+                case LEFT -> idleLeft;
+                case RIGHT -> idleRight;
+            };
         };
-
         // Cập nhật lại frameWidth vì spriteSheet mới có thể khác kích thước
         this.frameWidth = spriteSheet.getWidth() / numFrames;
 
