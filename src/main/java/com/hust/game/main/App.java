@@ -206,9 +206,18 @@ public class App extends Application {
                     gc.setFill(isVictory ? javafx.scene.paint.Color.YELLOW : javafx.scene.paint.Color.RED);
                     gc.setFont(new javafx.scene.text.Font("Arial", 50));
 
-                    String text = isVictory ? "VICTORY!" : "GAME OVER";
-                    gc.fillText(text, WIDTH / 2 - 140, HEIGHT / 2);
+                    String text = isVictory ? "VICTORY!" : "Chết con cụ nó rồi";
 
+                    javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
+                    tempText.setFont(gc.getFont());
+
+                    double textWidth = tempText.getLayoutBounds().getWidth();
+                    double textHeight = tempText.getLayoutBounds().getHeight();
+
+                    double x = (WIDTH - textWidth) / 2;
+                    double y = (HEIGHT + textHeight) / 2 - 50;
+
+                    gc.fillText(text, x, y);
                     if (!isEndUIShown) {
                         gameLoop.stop();
 
