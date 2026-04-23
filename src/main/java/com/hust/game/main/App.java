@@ -150,8 +150,6 @@ public class App extends Application {
 
         initializeEntities();
 
-        hud = new HUD(player);
-
         gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
@@ -304,6 +302,7 @@ public class App extends Application {
         }
         mapManager = new MapManager();
         collisionChecker = new CollisionChecker(mapManager);
+        hud = new HUD(player, combatManager);
     }
 
     private void handleInput() {
