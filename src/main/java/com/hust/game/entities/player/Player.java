@@ -74,7 +74,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // mới được tấn công lại → tránh spam attack.
     // -------------------------------------------------------
     private int attackCooldown = 0;
-    private static final int ATTACK_COOLDOWN_MAX = 8; // Rút ngắn cooldown để có thể "spam" chém liên tục
+        private static final int ATTACK_COOLDOWN_MAX =
+            (8 * 4); // 8 frames attack delay giữa các lần đánh
     private final int attackDamage = 10; // sát thương mỗi đòn
 
     // -------------------------------------------------------

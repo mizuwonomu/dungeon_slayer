@@ -340,11 +340,11 @@ public class App extends Application {
                 if (player.canAttack()) {
                     int combo = combatManager.playerAttack();
                     if (combo > 0) {
-                        screenShakeTimer = 5; // Tăng lên 5 frame để độ rung rõ ràng hơn một chút
+                        screenShakeTimer = 3; // Tăng lên 3 frame để độ rung rõ ràng hơn một chút
                         // Phân tầng độ rung theo Combo
                         if (combo <= 2) screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
-                        else if (combo == 3) screenShakeAmplitude = 0.5; // Hit 3: Rung nhẹ
-                        else screenShakeAmplitude = 1.0; // Hit 4+: Rung dứt khoát
+                        else if (combo == 3) screenShakeAmplitude = 0.3; // Hit 3: Rung nhẹ
+                        else screenShakeAmplitude = 0.5;
                     }
                 }
                 isJHeld = true; // Đánh dấu là đang đè phím
