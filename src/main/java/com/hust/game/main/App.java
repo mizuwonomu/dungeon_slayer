@@ -270,7 +270,8 @@ public class App extends Application {
             Image cUp = new Image(getClass().getResourceAsStream("/assets/combatup.png"), 0, 0, true, false);
             Image cLeft = new Image(getClass().getResourceAsStream("/assets/combatleft.png"), 0, 0, true, false);
             Image cRight = new Image(getClass().getResourceAsStream("/assets/combatright.png"), 0, 0, true, false);
-            Image swordHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
+            Image swordHit = new Image(getClass().getResourceAsStream("/assets/wswordhit.png"), 0, 0, true, false);
+            Image rageHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
 
             Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
@@ -284,7 +285,7 @@ public class App extends Application {
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
-                    cDown, cUp, cLeft, cRight, swordHit);
+                    cDown, cUp, cLeft, cRight, swordHit, rageHit);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();

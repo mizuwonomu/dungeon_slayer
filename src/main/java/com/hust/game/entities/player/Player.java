@@ -34,6 +34,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // Ảnh combat (đang chém)
     private final Image combatUp, combatDown, combatLeft, combatRight;
     
+    // Thêm field bật skill
+    private final Image rageHitImg;
+
     // Trạng thái tấn công
     private boolean isAttacking = false;
     private AttackEffect attackEffect;
@@ -83,7 +86,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
             Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
-            Image swordHitImg) {
+            Image swordHitImg, Image rageHitImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
@@ -111,7 +114,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
         // Tạo entity chứa hiệu ứng kiếm
-        this.attackEffect = new AttackEffect(swordHitImg, this);
+        this.rageHitImg = rageHitImg;
+        this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
     }
 
     // -------------------------------------------------------
@@ -149,8 +153,14 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
                 case LEFT -> runLeft;
                 case RIGHT -> runRight;
             };
+            //tạm thời dùng idle
+            case ATTACKING -> switch (direction) {
+                case UP -> idleUp;
+                case DOWN -> idleDown;
+                case LEFT -> idleLeft;
+                case RIGHT -> idleRight;
+            };
         };
-
         // Cập nhật lại frameWidth vì spriteSheet mới có thể khác kích thước
         this.frameWidth = spriteSheet.getWidth() / GameConstants.PLAYER_NUM_FRAMES;
         this.frameHeight = spriteSheet.getHeight();
@@ -226,6 +236,12 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             attackCooldown--;
     }
 
+    // Thêm method — CombatManager gọi khi bật/tắt skill
+    public void setRageMode(boolean active) {
+        if (attackEffect != null) attackEffect.setRageMode(active);
+    }
+
+    
     @Override
     public void render(GraphicsContext gc) {
         // Hiệu ứng nhấp nháy khi bị đánh (ẩn/hiện mỗi 7 frame)

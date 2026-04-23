@@ -1,8 +1,8 @@
 package com.hust.game.combat;
 
 import com.hust.game.enemy.Enemy;
-import com.hust.game.entities.Direction;
 import com.hust.game.entities.player.Player;
+import com.hust.game.entities.player.PlayerCombat;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
@@ -65,6 +65,7 @@ public class CombatManager {
             if (skillDuration <= 0) {
                 skillActive   = false;
                 skillCooldown = SKILL_COOLDOWN_FRAMES;
+                player.setRageMode(false); // về sprite bình thường
             }
         }
 
@@ -165,6 +166,8 @@ public class CombatManager {
      *   - Player còn đủ máu để rút (> SKILL_HP_COST)
      */
     public void activateSkill() {
+        player.setRageMode(true);
+
         // Không cho dùng khi skill đang chạy hoặc còn cooldown
         if (skillActive || skillCooldown > 0) return;
 

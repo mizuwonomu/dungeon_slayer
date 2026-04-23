@@ -10,10 +10,16 @@ public class AttackEffect extends BaseEntity {
     private Player player;
     private double rotation = 0;
 
-    public AttackEffect(Image spriteSheet, Player player) {
+    // Thêm 2 field
+    private final Image normalSprite; // sprite kiếm thường
+    private final Image rageSprite;   // sprite kiếm khi bật skill
+
+    public AttackEffect(Image normalSprite, Image rageSprite, Player player) {
         // Phóng to kích thước render lên x1.5 (90x90)
-        super(0, 0, spriteSheet, 8, 90, 90);
+        super(0, 0, normalSprite, 8, 90, 90);
         this.player = player;
+        this.normalSprite = normalSprite;
+        this.rageSprite = rageSprite;
     }
 
     public void trigger() {
@@ -25,6 +31,12 @@ public class AttackEffect extends BaseEntity {
         this.active = active;
     }
 
+    // Thêm method đổi sprite
+    public void setRageMode(boolean active) {
+        this.spriteSheet = active ? rageSprite : normalSprite;
+        this.frameWidth  = spriteSheet.getWidth() / numFrames; // cập nhật frameWidth
+    }
+    
     @Override
     public void update() {
         if (!active) return;
