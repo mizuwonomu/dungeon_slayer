@@ -272,12 +272,12 @@ public class App extends Application {
             Image cRight = new Image(getClass().getResourceAsStream("/assets/combatright.png"), 0, 0, true, false);
             Image swordHit = new Image(getClass().getResourceAsStream("/assets/wswordhit.png"), 0, 0, true, false);
             Image rageHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
-
+            
             Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
                     false);
             Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), 0, 0, true,
                     false);
-            Image treeSkillImg = new Image(getClass().getResourceAsStream("/assets/tree_skill.png"), 0, 0, true,
+            Image treeSkillImg = new Image(getClass().getResourceAsStream("/assets/Tree_skill.png"), 0, 0, true,
                     false);
             Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), 0, 0, true,
                     false);
