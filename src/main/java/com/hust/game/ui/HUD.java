@@ -15,7 +15,7 @@ public class HUD {
     private final Player player;
     private final CombatManager combatManager;
 
-    // ✅ ONE constructor that takes BOTH
+    // ONE constructor that takes BOTH
     public HUD(Player player, CombatManager combatManager) {
         this.player = player;
         this.combatManager = combatManager;
@@ -61,18 +61,38 @@ public class HUD {
         manaIndex = Math.max(0, Math.min(5, manaIndex));
         gc.drawImage(manaBars[manaIndex], 0, 1, 300, 125);
 
-        // ✅ Skill UI
-        if (combatManager != null && combatManager.isSkillActive()) {
+        gc.setGlobalAlpha(1.0);
+
+        gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 14));
+
+        if (combatManager != null) {
 
             double x = 275;
             double y = 8;
+
+            boolean active = combatManager.isSkillActive();
+            boolean onCooldown = combatManager.getSkillCooldownRemaining() > 0;
+
+            // 🎯 Set opacity
+            if (active) {
+                gc.setGlobalAlpha(1.0); // full brightness
+            } else if (onCooldown) {
+                gc.setGlobalAlpha(0.4); // faded when on cooldown
+            } else {
+                gc.setGlobalAlpha(1.0); // ready to use
+            }
             gc.drawImage(berserkIcon, x, y, 60, 33.75);
 
-            // Timer (seconds)
-            int seconds = combatManager.getSkillDurationRemaining() / 60;
+            gc.setGlobalAlpha(1.0);
 
-            gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 14));
-            gc.fillText("Time: " + seconds + "s", x, y + 50);
+            // Timer display
+            if (active) {
+                int seconds = combatManager.getSkillDurationRemaining() / 60;
+                gc.fillText("Time: " + seconds + "s", x, y + 50);
+            } else if (onCooldown) {
+                int seconds = combatManager.getSkillCooldownRemaining() / 60;
+                gc.fillText("CD: " + seconds + "s", x, y + 50);
+            }
         }
     }
 
