@@ -66,7 +66,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // HP — máu nhân vật
     // -------------------------------------------------------
     private int currentHp; // máu hiện tại
-    private final int maxHp = GameConstants.PLAYER_MAX_HP; // máu tối đa lấy từ constants
+    private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ constants
+    private int currentMana;
+    private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
     // -------------------------------------------------------
     // ATTACK COOLDOWN
@@ -114,6 +116,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
+        this.currentMana = maxMana;
         // Tạo entity chứa hiệu ứng kiếm
         this.rageHitImg = rageHitImg;
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
@@ -289,6 +292,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         flashTimer = 30; // Nhấp nháy trong 30 frame (0.5s) khi bị thương
     }
 
+    public void takeMana(int amount) {
+        currentMana = Math.max(0, currentMana - amount);
+    }
+
     @Override
     public int getCurrentHp() {
         return currentHp;
@@ -297,6 +304,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     @Override
     public int getMaxHp() {
         return maxHp;
+    }
+
+    public int getMaxMana() {
+        return maxMana;
     }
 
     /** Trả về true khi máu = 0 → game over */

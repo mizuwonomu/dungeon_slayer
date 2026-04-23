@@ -38,6 +38,7 @@ public class CombatManager {
     private static final int SKILL_DURATION_FRAMES  = 600;  // 10 giây x 60fps
     private static final int SKILL_COOLDOWN_FRAMES  = 1800; // 30 giây x 60fps
     private static final int SKILL_HP_COST          = 10;   // máu bị rút khi dùng skill
+    private static final int SKILL_MANA_COST        = 10;
     private static final int SKILL_DAMAGE_MULTIPLIER = 2;   // nhân đôi damage
 
     // -------------------------------------------------------
@@ -166,20 +167,18 @@ public class CombatManager {
      *   - Player còn đủ máu để rút (> SKILL_HP_COST)
      */
     public void activateSkill() {
-        player.setRageMode(true);
-
         // Không cho dùng khi skill đang chạy hoặc còn cooldown
         if (skillActive || skillCooldown > 0) return;
 
-        // Không cho dùng nếu máu không đủ để rút
-        if (player.getCurrentHp() <= SKILL_HP_COST) return;
+        if (player.getCurrentMana() <= SKILL_HP_COST) return;
 
-        // Rút máu player
-        player.takeDamage(SKILL_HP_COST);
+        player.takeMana(SKILL_MANA_COST);
 
         // Bật skill + set duration
         skillActive   = true;
         skillDuration = SKILL_DURATION_FRAMES;
+
+        player.setRageMode(true);
 
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }

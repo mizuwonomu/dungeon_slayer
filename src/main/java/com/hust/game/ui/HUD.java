@@ -12,9 +12,6 @@ public class HUD {
 
     private final Player player;
 
-    private int currentMana = 100;
-    private final int maxMana = 100;
-
     public HUD(Player player) {
         this.player = player;
         loadAssets();
@@ -46,17 +43,9 @@ public class HUD {
         gc.drawImage(healthBars[indexhealth], 0, 1, 300, 125);
 
         // Mana (still local for now)
-        int indexmana = currentMana / 20;
+        int indexmana = player.getCurrentMana() / 10;
         indexmana = Math.max(0, Math.min(5, indexmana));
         gc.drawImage(manaBars[indexmana], 0, 1, 300, 125);
-    }
-
-    public void setMana(int mana) {
-        this.currentMana = Math.max(0, Math.min(maxMana, mana));
-    }
-
-    public int getMana() {
-        return currentMana;
     }
 
     private Image loadImg(String path) {
