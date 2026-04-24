@@ -18,7 +18,15 @@ public enum TileType {
     GOLD_WHEAT(14, "gold_wheat.png", false),
     WALL(15, "wall.png", true),
     POND(16, "pond.png", true),
-    WHEAT_HOUSE(17, "wheat_house.png", true);
+    WHEAT_HOUSE(17, "wheat_house.png", true),
+    BRICK_1(18, "brick_1.png", false),
+    BRICK_2(19, "brick_2.png", false),
+    BRICK_3(20, "brick_3.png", false),
+    BRICKWALL_1(21, "brickwall_1.png", true),
+    BRICKWALL_2(22, "brickwall_2.png", true),
+    BRICKWALL_3(23, "brickwall_3.png", true),
+    BRICKWALL_LEFT(24, "brickwall_left.png", true),
+    BRICKWALL_RIGHT(25, "brickwall_right.png", true);
 
     private final int id;
     private final String imageName;

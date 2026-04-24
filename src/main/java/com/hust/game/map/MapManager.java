@@ -14,7 +14,7 @@ public class MapManager {
         tiles = new Tile[TileType.values().length];
         mapTileNum = new int[GameConstants.MAX_SCREEN_ROW][GameConstants.MAX_SCREEN_COL];
         loadTiles();
-        loadMap("/assets/maps/level1.txt");
+        loadMap("/assets/maps/level2.txt");
     }
 
     public void loadTiles() {
