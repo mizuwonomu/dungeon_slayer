@@ -1,12 +1,19 @@
 package com.hust.game.main;
 
 import com.hust.game.constants.GameConstants;
+import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
-import com.hust.game.entities.base.BaseEntity;
-import com.hust.game.entities.base.StaticEntity;
-import com.hust.game.entities.player.Player;
+import com.hust.game.combat.CombatManager;
+import com.hust.game.enemy.EnemyManager;
+import com.hust.game.enemy.Enemy;
+import com.hust.game.map.MapManager;
+import com.hust.game.collision.CollisionChecker;
 
+import com.hust.game.ui.GameFinish;
+import com.hust.game.ui.HUD;
+import com.hust.game.ui.MenuScreen;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -14,249 +21,425 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
+import java.util.List;
 
-/**
- * App — điểm khởi chạy của game Dungeon Slayer.
- *
- * Extends Application của JavaFX → start() là hàm chính được gọi khi launch().
- *
- * Trách nhiệm của class này:
- *   1. Setup cửa sổ và canvas
- *   2. Nhận input bàn phím
- *   3. Chạy game loop 60fps
- *   4. Điều phối: input → update → collision → render
- *
- * App KHÔNG chứa logic game cụ thể — chỉ điều phối các entity.
- * Logic chi tiết nằm trong từng entity (Player, Enemy, ...).
- */
 public class App extends Application {
+    // kích thước cửa sổ
+    // Cập nhật lại kích thước khớp với map level1.txt (17 cột x 13 hàng, TILE_SIZE = 48)
+    private static final int WIDTH = 816;  // 17 * 48
+    private static final int HEIGHT = 624; // 13 * 48
 
-    // -------------------------------------------------------
-    // JAVAFX RENDERING
-    // GraphicsContext là "cây bút" để vẽ lên Canvas.
-    // Mọi lệnh render đều gọi qua gc.
-    // -------------------------------------------------------
+    // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
+    private static final int TILE_SIZE = 48;
+    private AnimationTimer timer;
+
     private GraphicsContext gc;
-
-    // -------------------------------------------------------
-    // ENTITIES
-    // player: nhân vật chính do người chơi điều khiển
-    // obstacles: danh sách vật cản tĩnh (tường, cổng...)
-    //            Member A sẽ thay thế bằng MapManager sau này
-    // -------------------------------------------------------
     private Player player;
-    private final List<BaseEntity> obstacles = new ArrayList<>();
+    private CombatManager combatManager;
 
-    // -------------------------------------------------------
-    // INPUT — bàn phím
-    // Dùng Set thay vì biến boolean riêng lẻ vì:
-    //   - Set tự động loại trùng
-    //   - Hỗ trợ nhiều phím cùng lúc (di chuyển chéo nếu cần)
-    //   - Thêm/xóa phím O(1)
-    // -------------------------------------------------------
-    private final Set<KeyCode> input = new HashSet<>();
+    private EnemyManager enemyManager; // Gọi quản lý quái vật
+    private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
+    private MapManager mapManager;
+    private CollisionChecker collisionChecker;
 
-    /**
-     * start() — JavaFX gọi hàm này sau launch().
-     * Đây là nơi setup toàn bộ UI và bắt đầu game loop.
-     */
+    // dùng set để lưu những phím đang được giữ để di chuyển chéo
+    private Set<KeyCode> input = new HashSet<>();
+
+    private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
+    private int screenShakeTimer = 0; // Bộ đếm rung màn hình
+    private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
+
     @Override
     public void start(Stage stage) {
-        stage.setTitle("Dungeon Slayer");
+        stage.setTitle("GHOULITE");
 
-        // Tạo Canvas — vùng vẽ pixel của game
-        // Kích thước lấy từ GameConstants, không hardcode
+        MenuScreen menu = new MenuScreen(v -> {
+            Scene gameScene = createGameScene(stage);
+            stage.setScene(gameScene);
+            gameLoop.start();
+        });
+
+        stage.setScene(menu.createScene());
+        stage.show();
+
+    }
+
+    private Scene createMenuScene(Stage stage) {
+        Image startImg = loadImg("/assets/start.png");
+        Image exitImg  = loadImg("/assets/exit.png");
+        Image startSelectImg  = loadImg("/assets/startselect.png");
+        Image exitselectImg  = loadImg("/assets/exitselect.png");
+
+        javafx.scene.control.Button startBtn = new javafx.scene.control.Button();
+        javafx.scene.control.Button exitBtn  = new javafx.scene.control.Button();
+
+// Set images into buttons
+        startBtn.setGraphic(new javafx.scene.image.ImageView(startImg));
+        exitBtn.setGraphic(new javafx.scene.image.ImageView(exitImg));
+
+        startBtn.setOnMouseEntered(e -> startBtn.setOpacity(0.7));
+        startBtn.setOnMouseExited(e -> startBtn.setOpacity(1.0));
+
+        exitBtn.setOnMouseEntered(e -> exitBtn.setOpacity(0.7));
+        exitBtn.setOnMouseExited(e -> exitBtn.setOpacity(1.0));
+
+        ImageView startView = new ImageView(startImg);
+        startView.setFitWidth(250);
+        startView.setPreserveRatio(true);
+
+        ImageView exitView = new ImageView(exitImg);
+        exitView.setFitWidth(250);
+        exitView.setPreserveRatio(true);
+
+        // START button hover
+        startBtn.setOnMouseEntered(e -> startView.setImage(startSelectImg));
+        startBtn.setOnMouseExited(e  -> startView.setImage(startImg));
+
+// QUIT button hover
+        exitBtn.setOnMouseEntered(e -> exitView.setImage(exitselectImg));
+        exitBtn.setOnMouseExited(e  -> exitView.setImage(exitImg));
+
+        startBtn.setGraphic(startView);
+        exitBtn.setGraphic(exitView);
+
+        startBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        exitBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+
+        startBtn.setOnAction(e -> {
+            Scene gameScene = createGameScene(stage);
+            stage.setScene(gameScene);
+            gameLoop.start();
+        });
+
+        exitBtn.setOnAction(e -> {
+            javafx.application.Platform.exit();
+        });
+
+        javafx.scene.text.Text title = new javafx.scene.text.Text("Dungeon Slayer");
+        title.setStyle("-fx-font-size: 36px; -fx-fill: white;");
+
+        javafx.scene.layout.VBox layout =
+                new javafx.scene.layout.VBox(30, title, startBtn, exitBtn);
+
+        layout.setStyle("-fx-alignment: center; -fx-background-color: black;");
+
+        return new Scene(layout, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+    }
+    private AnimationTimer gameLoop;
+    private HUD hud;
+
+    private GameFinish gameOverUI;
+    private boolean isEndUIShown = false;
+
+    private Scene createGameScene(Stage stage) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
-
-        // Lấy GraphicsContext từ canvas để dùng khi render
         gc = canvas.getGraphicsContext2D();
 
-        // Group là container gốc của JavaFX scene graph
-        // Scene bọc Group lại và gắn vào cửa sổ (Stage)
-        Scene scene = new Scene(new Group(canvas));
+        Group root = new Group(canvas);
+        Scene scene = new Scene(root);
 
-        // -------------------------------------------------------
-        // KEYBOARD INPUT
-        // setOnKeyPressed: khi người dùng nhấn phím → thêm vào Set
-        // setOnKeyReleased: khi người dùng thả phím → xóa khỏi Set
-        // Kết quả: Set luôn chứa đúng những phím đang được GIỮ
-        // -------------------------------------------------------
         scene.setOnKeyPressed(e  -> input.add(e.getCode()));
         scene.setOnKeyReleased(e -> input.remove(e.getCode()));
 
-        stage.setScene(scene);
-
-        // Load ảnh và khởi tạo các entity
         initializeEntities();
 
-        // -------------------------------------------------------
-        // GAME LOOP — AnimationTimer của JavaFX
-        // handle() được gọi mỗi frame, ~60 lần/giây
-        // currentNanoTime: thời gian hiện tại tính bằng nanosecond
-        //   (hiện tại chưa dùng, nhưng có thể dùng để tính delta time sau)
-        // -------------------------------------------------------
-        new AnimationTimer() {
+        gameLoop = new AnimationTimer() {
             @Override
-            public void handle(long currentNanoTime) {
+            public void handle(long now) {
 
-                // BƯỚC 1: Xử lý input → di chuyển player, đổi state/direction
-                handleInput();
+                boolean isVictory = enemyManager.getEnemyList().isEmpty();
+                boolean isGameOver = player.isDead();
 
-                // BƯỚC 2: Update logic nội tại của player (animation timer, cooldown...)
-                player.update();
+                if (!isVictory && !isGameOver) {
+                    handleInput();
+                    player.update();
+                    combatManager.update();
+                    enemyManager.updateAll();
+                    checkCollisions();
+                }
 
-                // BƯỚC 3: Kiểm tra va chạm sau khi đã di chuyển
-                // Nếu va chạm → player tự rollback về vị trí cũ
-                checkCollisions();
+                gc.clearRect(0, 0, WIDTH, HEIGHT);
 
-                // BƯỚC 4: Render — xóa frame cũ rồi vẽ frame mới
-                // Phải xóa trước, không thì frame trước bị chồng lên
-                gc.clearRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+                gc.save();
 
-                // Vẽ tất cả vật cản trước (background layer)
+                // Screen shake
+                if (screenShakeTimer > 0) {
+                    screenShakeTimer--;
+                    double dx = (Math.random() - 0.5) * screenShakeAmplitude * 20;
+                    double dy = (Math.random() - 0.5) * screenShakeAmplitude * 20;
+                    gc.translate(dx, dy);
+                }
+
+                // Draw map
+                mapManager.draw(gc);
+
                 obstacles.forEach(e -> e.render(gc));
 
-                // Vẽ player sau cùng (foreground layer)
-                player.render(gc);
-            }
-        }.start();
+                gc.restore();
 
-        stage.show();
+                player.render(gc);
+                enemyManager.renderAll(gc);
+
+                hud.render(gc);
+
+                // Combo text
+                int combo = combatManager.getComboCount();
+                if (combo >= 3) {
+                    gc.fillText("Combo x" + combo,
+                            player.getX() - 10,
+                            player.getY() - 10);
+                }
+                // End screen
+                if (isVictory || isGameOver) {
+                    gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
+                    gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+                    gc.setFill(isVictory ? javafx.scene.paint.Color.YELLOW : javafx.scene.paint.Color.RED);
+                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
+
+                    String text = isVictory ? "VICTORY!" : "Chết con cụ nó rồi";
+
+                    javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
+                    tempText.setFont(gc.getFont());
+
+                    double textWidth = tempText.getLayoutBounds().getWidth();
+                    double textHeight = tempText.getLayoutBounds().getHeight();
+
+                    double x = (WIDTH - textWidth) / 2;
+                    double y = (HEIGHT + textHeight) / 2 - 50;
+
+                    gc.fillText(text, x, y);
+                    if (!isEndUIShown) {
+                        gameLoop.stop();
+
+                        gameOverUI = new GameFinish(
+
+                                // Retry
+                                () -> {
+                                    isEndUIShown = false;
+                                    Scene newGame = createGameScene(stage);
+                                    stage.setScene(newGame);
+                                    gameLoop.start();
+                                },
+
+                                // Menu
+                                () -> {
+                                    isEndUIShown = false;
+
+                                    MenuScreen menu = new MenuScreen(v -> {
+                                        Scene gameScene = createGameScene(stage);
+                                        stage.setScene(gameScene);
+                                        gameLoop.start();
+                                    });
+
+                                    stage.setScene(menu.createScene());
+                                }
+                        );
+
+                        root.getChildren().add(gameOverUI.getRoot());
+                        isEndUIShown = true;
+                    }
+                }
+            }
+        };
+        return scene;
     }
 
-    /**
-     * initializeEntities() — load ảnh và tạo các entity ban đầu.
-     *
-     * Tách ra khỏi start() để giữ start() gọn,
-     * và dễ thay thế sau khi Member A làm xong MapManager.
-     */
     private void initializeEntities() {
         try {
-            // Load 8 sprite sheet cho player
-            // idle_* : đứng yên 4 hướng
-            // run_*  : chạy 4 hướng
-            Image iDown  = loadImg("/assets/idle_down.png");
-            Image iUp    = loadImg("/assets/idle_up.png");
-            Image iLeft  = loadImg("/assets/idle_left.png");
-            Image iRight = loadImg("/assets/idle_right.png");
-            Image rDown  = loadImg("/assets/run_down.png");
-            Image rUp    = loadImg("/assets/run_up.png");
-            Image rLeft  = loadImg("/assets/run_left.png");
-            Image rRight = loadImg("/assets/run_right.png");
+            Image iDown = new Image(getClass().getResourceAsStream("/assets/idle_down.png"), 0, 0, true, false);
+            Image iUp = new Image(getClass().getResourceAsStream("/assets/idle_up.png"), 0, 0, true, false);
+            Image iLeft = new Image(getClass().getResourceAsStream("/assets/idle_left.png"), 0, 0, true, false);
+            Image iRight = new Image(getClass().getResourceAsStream("/assets/idle_right.png"), 0, 0, true, false);
 
-            // Load ảnh tường, resize luôn về TILE_SIZE khi load
-            Image wallImg = loadImg("/assets/wall.png",
-                                     GameConstants.TILE_SIZE,
-                                     GameConstants.TILE_SIZE);
+            Image rDown = new Image(getClass().getResourceAsStream("/assets/run_down.png"), 0, 0, true, false);
+            Image rUp = new Image(getClass().getResourceAsStream("/assets/run_up.png"), 0, 0, true, false);
+            Image rLeft = new Image(getClass().getResourceAsStream("/assets/run_left.png"), 0, 0, true, false);
+            Image rRight = new Image(getClass().getResourceAsStream("/assets/run_right.png"), 0, 0, true, false);
 
-            // Khởi tạo player ở giữa màn hình
-            // numFrames và renderSize đã được Player tự lấy từ GameConstants
-            player = new Player(
-                GameConstants.WINDOW_WIDTH  / 2.0,
-                GameConstants.WINDOW_HEIGHT / 2.0,
-                iDown, iUp, iLeft, iRight,
-                rDown, rUp, rLeft, rRight
-            );
+            Image cDown = new Image(getClass().getResourceAsStream("/assets/combatdown.png"), 0, 0, true, false);
+            Image cUp = new Image(getClass().getResourceAsStream("/assets/combatup.png"), 0, 0, true, false);
+            Image cLeft = new Image(getClass().getResourceAsStream("/assets/combatleft.png"), 0, 0, true, false);
+            Image cRight = new Image(getClass().getResourceAsStream("/assets/combatright.png"), 0, 0, true, false);
+            Image swordHit = new Image(getClass().getResourceAsStream("/assets/wswordhit.png"), 0, 0, true, false);
+            Image rageHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
+            
+            Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
+                    false);
+            Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), 0, 0, true,
+                    false);
+            Image treeSkillImg = new Image(getClass().getResourceAsStream("/assets/Tree_skill.png"), 0, 0, true,
+                    false);
+            Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), 0, 0, true,
+                    false);
 
-            // -------------------------------------------------------
-            // TODO: Member A thay đoạn này bằng MapManager.loadMap()
-            // Tạm thời hardcode 3 tường để test collision
-            // -------------------------------------------------------
-            int ts = GameConstants.TILE_SIZE;
-            obstacles.add(new StaticEntity(300,       300,      wallImg, 1, ts, ts));
-            obstacles.add(new StaticEntity(300,       300 + ts, wallImg, 1, ts, ts));
-            obstacles.add(new StaticEntity(
-                GameConstants.WINDOW_WIDTH  / 2.0 + 100,
-                GameConstants.WINDOW_HEIGHT / 2.0,
-                wallImg, 1, ts, ts
-            ));
+            // Khai báo Player trước khi đưa cho Quái
+            player = new Player(WIDTH / 2, HEIGHT / 2,
+                    iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
+                    cDown, cUp, cLeft, cRight, swordHit, rageHit);
 
-        } catch (NullPointerException e) {
-            // NullPointerException xảy ra khi getResourceAsStream không tìm thấy file
-            // → in lỗi rõ ràng rồi thoát, không để game chạy với asset null
-            System.err.println("LỖI: Không tìm thấy file ảnh! Kiểm tra thư mục /assets");
-            System.err.println(e.getMessage());
+            // Sinh quái vật để test di chuyển
+            enemyManager = new EnemyManager();
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+
+            //tạo combat manager
+            combatManager = new CombatManager(player, enemyManager.getEnemyList());
+
+        } catch (Exception e) {
+            System.err.println("LỖI: Không tìm thấy file ảnh!");
+            e.printStackTrace();
             System.exit(1);
         }
+        mapManager = new MapManager();
+        collisionChecker = new CollisionChecker(mapManager);
+        hud = new HUD(player, combatManager);
     }
 
-    /**
-     * handleInput() — đọc Set phím đang giữ và ra lệnh cho player.
-     *
-     * Thứ tự ưu tiên: W/UP → S/DOWN → A/LEFT → D/RIGHT
-     * (else-if nên chỉ 1 hướng được xử lý mỗi frame → không di chuyển chéo)
-     *
-     * Gọi savePosition() TRƯỚC KHI di chuyển để có thể rollback nếu va chạm.
-     */
     private void handleInput() {
-        // Lưu vị trí hiện tại trước khi di chuyển
         player.savePosition();
 
-        boolean moving = false; // cờ để xác định player có đang di chuyển không
+        boolean isAnyKeyPressed = false;
 
-        if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) {
-            player.setDirection(Direction.UP);
-            player.moveUp();
-            moving = true;
-        } else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
-            player.setDirection(Direction.DOWN);
-            player.moveDown();
-            moving = true;
-        } else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
-            player.setDirection(Direction.LEFT);
-            player.moveLeft();
-            moving = true;
-        } else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
-            player.setDirection(Direction.RIGHT);
-            player.moveRight();
-            moving = true;
+        // Khóa di chuyển khi đang chém để animation hiển thị rõ ràng và uy lực hơn
+        if (!player.isAttacking()) {
+            if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) {
+                player.setDirection(Direction.UP);
+                player.moveUp();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
+                player.setDirection(Direction.DOWN);
+                player.moveDown();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
+                player.setDirection(Direction.LEFT);
+                player.moveLeft();
+                isAnyKeyPressed = true;
+            }
+            else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
+                player.setDirection(Direction.RIGHT);
+                player.moveRight();
+                isAnyKeyPressed = true;
+            }
         }
 
-        // Đổi state dựa trên có di chuyển hay không
-        // setState() chỉ trigger updateSpriteSheet() khi state thực sự thay đổi
-        player.setState(moving ? EntityState.RUNNING : EntityState.IDLE);
+        if (input.contains(KeyCode.J)){
+            if (!isJHeld) { // Yêu cầu phải nhả phím J ra rồi bấm lại mới chém tiếp được
+                if (player.canAttack()) {
+                    int combo = combatManager.playerAttack();
+                    if (combo > 0) {
+                        screenShakeTimer = 3; // Tăng lên 3 frame để độ rung rõ ràng hơn một chút
+                        // Phân tầng độ rung theo Combo
+                        if (combo <= 2) screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
+                        else if (combo == 3) screenShakeAmplitude = 0.3; // Hit 3: Rung nhẹ
+                        else screenShakeAmplitude = 0.5;
+                    }
+                }
+                isJHeld = true; // Đánh dấu là đang đè phím
+            }
+        } else {
+            isJHeld = false; // Nhả phím J ra thì reset cờ cho phép chém tiếp
+        }
+
+        if (input.contains(KeyCode.L)){
+            combatManager.activateSkill();
+        }
+
+        if (isAnyKeyPressed) {
+            player.setState(EntityState.RUNNING);
+        } else {
+            player.setState(EntityState.IDLE);
+        }
     }
 
-    /**
-     * checkCollisions() — kiểm tra player có đụng vào vật cản nào không.
-     *
-     * Dùng AABB (Axis-Aligned Bounding Box) qua intersects() của BaseEntity.
-     * Khi phát hiện va chạm → gọi onCollision() để player tự rollback.
-     * break ngay sau va chạm đầu tiên → tránh xử lý nhiều collision cùng lúc.
-     *
-     * TODO: Member B cần thêm collision giữa player và enemy vào đây.
-     */
     private void checkCollisions() {
+        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond)
+        double padding = 12; // Cắt bớt phần viền trong suốt của ảnh để nhân vật đi mượt hơn
+        int left = (int) (player.getX() + padding);
+        int right = (int) (player.getX() + player.getRenderWidth() - padding);
+        int top = (int) (player.getY() + padding);
+        int bottom = (int) (player.getY() + player.getRenderHeight() - padding);
+
+        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+                collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+            player.onCollision(null); // Gọi rollback vị trí nếu bị kẹt tường
+        }
+
+        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)
+        if (enemyManager != null) {
+            List<Enemy> enemies = enemyManager.getEnemyList();
+
+            // Bước 1: Tính toán lực đẩy (Soft Collision) giữa các quái vật trước
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
+                // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
+                for (int j = i + 1; j < enemies.size(); j++) {
+                    Enemy otherEnemy = enemies.get(j);
+                    if (enemy.intersects(otherEnemy)) {
+                        // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt thành 1 cục)
+                        double cx1 = enemy.getX() + enemy.getRenderWidth() / 2.0;
+                        double cy1 = enemy.getY() + enemy.getRenderHeight() / 2.0;
+                        double cx2 = otherEnemy.getX() + otherEnemy.getRenderWidth() / 2.0;
+                        double cy2 = otherEnemy.getY() + otherEnemy.getRenderHeight() / 2.0;
+
+                        double dx = cx1 - cx2;
+                        double dy = cy1 - cy2;
+                        double dist = Math.sqrt(dx * dx + dy * dy);
+
+                        if (dist == 0) { // Xử lý góc lách ngẫu nhiên nếu 2 quái đè khít lên nhau từ lúc spawn
+                            dx = Math.random() - 0.5; dy = Math.random() - 0.5;
+                            dist = Math.sqrt(dx * dx + dy * dy);
+                        }
+                        double pushStrength = 1.5; // Lực đẩy trượt qua nhau
+                        enemy.setX(enemy.getX() + (dx / dist) * pushStrength);
+                        enemy.setY(enemy.getY() + (dy / dist) * pushStrength);
+                        otherEnemy.setX(otherEnemy.getX() - (dx / dist) * pushStrength);
+                        otherEnemy.setY(otherEnemy.getY() - (dy / dist) * pushStrength);
+                    }
+                }
+            }
+
+            // Bước 2: KIỂM TRA VA CHẠM TƯỜNG SAU KHI ĐÃ BỊ ĐẨY
+            // Việc này đảm bảo nếu quái bị xô đẩy văng vào tường, nó sẽ ngay lập tức bị giật ngược lại vị trí an toàn
+            for (int i = 0; i < enemies.size(); i++) {
+                Enemy enemy = enemies.get(i);
+                int eLeft = (int) (enemy.getX() + padding);
+                int eRight = (int) (enemy.getX() + enemy.getRenderWidth() - padding);
+                int eTop = (int) (enemy.getY() + padding);
+                int eBottom = (int) (enemy.getY() + enemy.getRenderHeight() - padding);
+
+                if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
+                        collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
+                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
+                }
+            }
+        }
+
+        // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau này)
         for (BaseEntity wall : obstacles) {
             if (player.intersects(wall)) {
-                player.onCollision(wall); // rollback vị trí
+                player.onCollision(wall);
+
                 break;
             }
         }
     }
 
-    // -------------------------------------------------------
-    // HELPER — load ảnh từ resources
-    // Tách ra để tránh lặp code, đặt false để giữ pixel art sắc nét
-    // (smooth = false → không làm mờ khi upscale, giữ phong cách 8-bit)
-    // -------------------------------------------------------
-
-    /** Load ảnh với kích thước gốc */
     private Image loadImg(String path) {
         return new Image(getClass().getResourceAsStream(path), 0, 0, true, false);
     }
 
-    /** Load ảnh và resize về kích thước chỉ định */
-    private Image loadImg(String path, double w, double h) {
-        return new Image(getClass().getResourceAsStream(path), w, h, true, false);
-    }
 
     public static void main(String[] args) {
         launch(args);

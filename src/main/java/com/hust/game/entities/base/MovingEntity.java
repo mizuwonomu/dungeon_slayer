@@ -18,16 +18,27 @@ public abstract class MovingEntity extends BaseEntity{
     protected EntityState state = EntityState.IDLE;
 
     protected MovingEntity(double x, double y, Image spriteSheet,
-        int numFrames, double renderWidth, double renderHeight,
-        double speed){
-            super(x, y, spriteSheet, numFrames, renderWidth, renderHeight);
-            this.speed = speed;
-        }
+            int numFrames, double renderWidth, double renderHeight,
+            double speed) {
+        super(x, y, spriteSheet, numFrames, renderWidth, renderHeight);
+        this.speed = speed;
+    }
 
-    //di chuyển cơ bản - subclass tự gọi
-    public void moveUp() { y -= speed; }
-    public void moveDown() { y += speed; }
-    public void moveLeft() { x -= speed; }
-    public void moveRight() { x += speed; }
-    
+    // di chuyển cơ bản - subclass tự gọi
+    public void moveUp() {
+        y -= speed;
+    }
+
+    public void moveDown() {
+        y += speed;
+    }
+
+    public void moveLeft() {
+        x -= speed;
+    }
+
+    public void moveRight() {
+        x += speed;
+    }
+
 }

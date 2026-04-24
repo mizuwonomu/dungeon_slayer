@@ -1,3 +1,14 @@
 .vscode/
 target/
 .github/
+# IntelliJ
+.idea/
+*.iml
+
+# Build output
+target/
+out/
+
+# OS junk
+.DS_Store
+Thumbs.db
