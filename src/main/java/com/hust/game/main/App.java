@@ -254,31 +254,28 @@ public class App extends Application {
 
     private void initializeEntities() {
         try {
-            Image iDown = new Image(getClass().getResourceAsStream("/assets/idle_down.png"), 0, 0, true, false);
-            Image iUp = new Image(getClass().getResourceAsStream("/assets/idle_up.png"), 0, 0, true, false);
-            Image iLeft = new Image(getClass().getResourceAsStream("/assets/idle_left.png"), 0, 0, true, false);
-            Image iRight = new Image(getClass().getResourceAsStream("/assets/idle_right.png"), 0, 0, true, false);
+            Image iDown = loadImg("/assets/player/idle_down.png");
+            Image iUp = loadImg("/assets/player/idle_up.png");
+            Image iLeft = loadImg("/assets/player/idle_left.png");
+            Image iRight = loadImg("/assets/player/idle_right.png");
 
-            Image rDown = new Image(getClass().getResourceAsStream("/assets/run_down.png"), 0, 0, true, false);
-            Image rUp = new Image(getClass().getResourceAsStream("/assets/run_up.png"), 0, 0, true, false);
-            Image rLeft = new Image(getClass().getResourceAsStream("/assets/run_left.png"), 0, 0, true, false);
-            Image rRight = new Image(getClass().getResourceAsStream("/assets/run_right.png"), 0, 0, true, false);
+            Image rDown = loadImg("/assets/player/run_down.png");
+            Image rUp = loadImg("/assets/player/run_up.png");
+            Image rLeft = loadImg("/assets/player/run_left.png");
+            Image rRight = loadImg("/assets/player/run_right.png");
 
-            Image cDown = new Image(getClass().getResourceAsStream("/assets/combatdown.png"), 0, 0, true, false);
-            Image cUp = new Image(getClass().getResourceAsStream("/assets/combatup.png"), 0, 0, true, false);
-            Image cLeft = new Image(getClass().getResourceAsStream("/assets/combatleft.png"), 0, 0, true, false);
-            Image cRight = new Image(getClass().getResourceAsStream("/assets/combatright.png"), 0, 0, true, false);
-            Image swordHit = new Image(getClass().getResourceAsStream("/assets/wswordhit.png"), 0, 0, true, false);
-            Image rageHit = new Image(getClass().getResourceAsStream("/assets/bswordhit.png"), 0, 0, true, false);
+            Image cDown = loadImg("/assets/player/combatdown.png");
+            Image cUp = loadImg("/assets/player/combatup.png");
+            Image cLeft = loadImg("/assets/player/combatleft.png");
+            Image cRight = loadImg("/assets/player/combatright.png");
             
-            Image wallImg = new Image(getClass().getResourceAsStream("/assets/tiles/wall.png"), TILE_SIZE, TILE_SIZE, true,
-                    false);
-            Image treeImg = new Image(getClass().getResourceAsStream("/assets/tree.png"), 0, 0, true,
-                    false);
-            Image treeSkillImg = new Image(getClass().getResourceAsStream("/assets/Tree_skill.png"), 0, 0, true,
-                    false);
-            Image slimeImg = new Image(getClass().getResourceAsStream("/assets/slime.png"), 0, 0, true,
-                    false);
+            Image swordHit = loadImg("/assets/player/wswordhit.png");
+            Image rageHit = loadImg("/assets/player/bswordhit.png");
+            
+            Image wallImg = loadImg("/assets/tiles/wall.png", TILE_SIZE, TILE_SIZE);
+            Image treeImg = loadImg("/assets/enemy/tree.png");
+            Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
+            Image slimeImg = loadImg("/assets/enemy/slime.png");
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
@@ -437,7 +434,16 @@ public class App extends Application {
     }
 
     private Image loadImg(String path) {
-        return new Image(getClass().getResourceAsStream(path), 0, 0, true, false);
+        return loadImg(path, 0, 0);
+    }
+
+    private Image loadImg(String path, double w, double h) {
+        java.io.InputStream is = getClass().getResourceAsStream(path);
+        if (is == null) {
+            System.err.println("❌ LỖI KHÔNG TÌM THẤY ẢNH: " + path);
+            throw new IllegalArgumentException("Missing image file: " + path);
+        }
+        return new Image(is, w, h, true, false);
     }
 
 
