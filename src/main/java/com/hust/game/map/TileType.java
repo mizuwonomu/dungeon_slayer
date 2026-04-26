@@ -26,7 +26,23 @@ public enum TileType {
     BRICKWALL_2(22, "brickwall_2.png", true),
     BRICKWALL_3(23, "brickwall_3.png", true),
     BRICKWALL_LEFT(24, "brickwall_left.png", true),
-    BRICKWALL_RIGHT(25, "brickwall_right.png", true);
+    BRICKWALL_RIGHT(25, "brickwall_right.png", true),
+    C_INTERSEC(26, "crater_intersec.png", true),
+    C_CONNECT_LR(27, "crater_connect_lr.png", true),
+    C_CONNECT_UD(28, "crater_connect_ud.png", true),
+    C_L(29, "crater_l.png", true),
+    C_R(30, "crater_r.png", true),
+    C_U(31, "crater_u.png", true),
+    C_D(32, "crater_d.png", true),
+    C_CONNER_UL(33, "crater_ul.png", true),
+    C_CONNER_DL(34, "crater_dl.png", true),
+    C_CONNER_UR(35, "crater_ur.png", true),
+    C_CONNER_DR(36, "crater_dr.png", true),
+    C_THREE_ULR(37, "crater_ulr.png", true),
+    C_THREE_DLR(38, "crater_dlr.png", true),
+    C_THREE_LUD(39, "crater_lud.png", true),
+    C_THREE_RUD(40, "crater_rud.png", true),
+    SKULL(41, "skull.png", true);
 
     private final int id;
     private final String imageName;
