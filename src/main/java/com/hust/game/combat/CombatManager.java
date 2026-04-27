@@ -129,6 +129,9 @@ public class CombatManager {
         }
 
         boolean hitAny = false;
+        boolean hitSlime = false;
+        boolean hitKnight = false;
+        boolean isFinalHit = false;
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
@@ -142,6 +145,28 @@ public class CombatManager {
                 // Bật hiệu ứng knockback
                 enemy.applyKnockback(player.getDirection());
                 hitAny = true; // Xác nhận đã chém trúng
+
+                // Phân loại quái vật và xác định đòn kết liễu
+                if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
+                if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
+                
+                if (enemy.getHp() <= 0) isFinalHit = true;
+            }
+        }
+
+        // Phát âm thanh của Normal Sword (ns) nếu chưa dùng skill cuồng nộ
+        if (!skillActive) {
+            if (!hitAny) {
+                com.hust.game.audio.SoundManager.playNsMissSound();
+            } else if (isFinalHit) {
+                com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Ưu tiên đòn kết liễu
+            } else {
+                if (hitSlime) {
+                    com.hust.game.audio.SoundManager.playNsHitSlimeSound();
+                }
+                if (hitKnight) {
+                    com.hust.game.audio.SoundManager.playNsHitKnightSound();
+                }
             }
         }
 

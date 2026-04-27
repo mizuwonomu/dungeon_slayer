@@ -3,6 +3,7 @@ package com.hust.game.enemy;
 import com.hust.game.entities.player.Player;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.geometry.Rectangle2D;
 
 public class Knight extends Enemy {
 
@@ -38,6 +39,17 @@ public class Knight extends Enemy {
             this.flashTimer--;
         }
 
+        // --- BỔ SUNG LOGIC KNOCKBACK MÀ TRƯỚC ĐÓ BỊ THIẾU ---
+        this.lastX = this.x;
+        this.lastY = this.y;
+        if (this.kbTimer > 0) {
+            this.kbTimer--;
+            this.x += kbVectorX;
+            this.y += kbVectorY;
+            return; // Đang bị knockback thì ngắt AI lướt/đi bộ
+        }
+        // ----------------------------------------------------
+
         if (dashCooldownTimer > 0) {
             dashCooldownTimer--;
         }
@@ -65,8 +77,8 @@ public class Knight extends Enemy {
                 double distance = Math.sqrt(diffX * diffX + diffY * diffY);
 
                 if (distance > 0) {
-                    dashVectorX = (diffX / distance) * (this.speed * 10);
-                    dashVectorY = (diffY / distance) * (this.speed * 10);
+                    dashVectorX = (diffX / distance) * (this.speed * 40); // Tăng mạnh tốc độ lướt
+                    dashVectorY = (diffY / distance) * (this.speed * 40);
                 }
 
                 if (diffX < 0) {
@@ -76,6 +88,9 @@ public class Knight extends Enemy {
                 }
 
                 isDashing = true;
+                
+                com.hust.game.audio.SoundManager.playKnightReadySound();
+                
                 this.spriteSheet = skillSprite;
                 this.numFrames = 14;
                 this.frameWidth = skillSprite.getWidth() / this.numFrames;
@@ -87,8 +102,11 @@ public class Knight extends Enemy {
             if (this.animationTimer >= this.animationDelay) {
                 this.animationTimer = 0;
                 this.frameIndex++;
+                if (this.frameIndex == 8) { // Khoảnh khắc chuẩn bị lao đi
+                    com.hust.game.audio.SoundManager.playKnightAtkSound();
+                }
             }
-            if (this.frameIndex == 8 || this.frameIndex == 9) {
+            if (this.frameIndex == 8) { // Chỉ lướt trong 1 frame duy nhất để quãng đường ngắn lại
                 this.lastX = this.x;
                 this.lastY = this.y;
 
@@ -109,6 +127,19 @@ public class Knight extends Enemy {
 
     public boolean isDashing() {
         return this.isDashing;
+    }
+
+    public boolean isDealingDamage() {
+        // Chỉ gây sát thương đúng vào khoảnh khắc lướt (frame 8 và 9)
+        return this.isDashing && this.frameIndex >= 8 && this.frameIndex <= 9;
+    }
+
+    @Override
+    public Rectangle2D getBoundary() {
+        // Thu nhỏ hitbox của Knight: Cắt bớt 25% diện tích viền ngoài mỗi bên
+        double paddingX = this.renderWidth * 0.25;
+        double paddingY = this.renderHeight * 0.25;
+        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 
 }

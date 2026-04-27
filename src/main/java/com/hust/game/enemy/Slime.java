@@ -18,13 +18,6 @@ public class Slime extends Enemy {
 
     @Override
     public void update() {
-        // Nếu chết hoặc đang bị choáng (nháy đỏ) thì không làm gì cả
-        if (this.hp <= 0 || this.flashTimer > 0) {
-            if (this.flashTimer > 0)
-                this.flashTimer--;
-            return;
-        }
-
         // Lưu lại vị trí hiện tại trước khi update
         double prevX = this.x;
         double prevY = this.y;
@@ -33,15 +26,26 @@ public class Slime extends Enemy {
         // mới
         super.update(); // Gọi hàm của Enemy để di chuyển và cập nhật frameIndex
 
+        // Nếu cạn máu thì dừng các logic đặc thù của Slime (để super.update xử lý knockback và trừ flashTimer)
+        if (this.hp <= 0) {
+            return;
+        }
+
         // Slime có 8 frame (index 0 -> 7).
         // Frame 1, 2 (index 0, 1): Đứng im lấy đà.
-        if (this.frameIndex < 3) {
-            this.x = prevX; // Khôi phục lại toạ độ cũ để không di chuyển
+        // --- SỬA LỖI: Chỉ khôi phục vị trí (đứng im) nếu KHÔNG BỊ KNOCKBACK ---
+        if (this.kbTimer <= 0 && this.frameIndex < 3) {
+            this.x = prevX; 
             this.y = prevY;
         }
 
         // Xử lý logic tấn công (chạm vào người chơi)
         handleTouchDamage();
+
+        // slime_move: phát ngay sau khi frame di chuyển kết thúc (cycle animation về 0)
+        if (this.animationTimer == 0 && this.frameIndex == 0) {
+            com.hust.game.audio.SoundManager.playSlimeMoveSound();
+        }
     }
 
     /**

@@ -41,10 +41,23 @@ public class Tree extends Enemy {
             if (this.attackPauseTimer > 0)
                 this.attackPauseTimer--;
 
+            // --- BỔ SUNG KNOCKBACK KHI ĐANG CAST SKILL ---
+            this.lastX = this.x;
+            this.lastY = this.y;
+            if (this.kbTimer > 0) {
+                this.kbTimer--;
+                this.x += kbVectorX;
+                this.y += kbVectorY;
+            }
+
             skillAnimTimer++;
             if (skillAnimTimer >= animationDelay) {
                 skillAnimTimer = 0;
                 skillFrameIndex++;
+                
+                if (skillFrameIndex == 1) { // Frame thứ 2 khi tấn công (index đếm từ 0)
+                    com.hust.game.audio.SoundManager.playTreeAtkSound();
+                }
 
                 if (skillFrameIndex >= SKILL_NUM_FRAMES) {
                     isCastingSkill = false;
@@ -79,6 +92,11 @@ public class Tree extends Enemy {
         // các trạng thái (như attackPauseTimer > 0) để quyết định có di chuyển hay
         // không.
         super.update();
+
+        // tree_moving: phát vào frame đầu của tree mỗi khi di chuyển
+        if (this.animationTimer == 0 && this.frameIndex == 0 && (this.moveX != 0 || this.moveY != 0)) {
+            com.hust.game.audio.SoundManager.playTreeMovingSound();
+        }
     }
 
     private void castSkill() {

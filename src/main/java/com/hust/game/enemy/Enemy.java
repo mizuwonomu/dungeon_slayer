@@ -26,6 +26,11 @@ public abstract class Enemy extends MovingEntity {
     protected double dodgeDirX = 0;
     protected double dodgeDirY = 0;
 
+    // Các biến phục vụ Knockback mượt (Smooth Knockback)
+    protected int kbTimer = 0;
+    protected double kbVectorX = 0;
+    protected double kbVectorY = 0;
+
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer) {
@@ -40,14 +45,22 @@ public abstract class Enemy extends MovingEntity {
         if (attackPauseTimer > 0)
             attackPauseTimer--; // Giảm thời gian nghỉ
 
-        // Nếu đang chịu đòn, cạn máu, hoặc trong thời gian nghỉ sau đòn đánh -> Đứng im
-        if (flashTimer > 0 || hp <= 0 || attackPauseTimer > 0) {
-            return; // Thoát sớm, giữ nguyên lastX, lastY an toàn cũ
-        }
-
         // Lưu vị trí cũ CHỈ KHI được phép di chuyển (Giúp knockback không bị kẹt tường)
         this.lastX = this.x;
         this.lastY = this.y;
+
+        // Nếu đang bị knockback thì ưu tiên trượt lùi và KHÔNG thực hiện AI rượt đuổi
+        if (kbTimer > 0) {
+            kbTimer--;
+            this.x += kbVectorX;
+            this.y += kbVectorY;
+            return;
+        }
+
+        // Nếu cạn máu, hoặc trong thời gian nghỉ sau đòn đánh -> Đứng im
+        if (hp <= 0 || attackPauseTimer > 0) {
+            return; // Thoát sớm sau khi đã tính knockback
+        }
 
         // Không có mục tiêu -> đứng
         if (targetPlayer == null)
@@ -128,18 +141,27 @@ public abstract class Enemy extends MovingEntity {
         }
     }
 
+    // Tạo sẵn hiệu ứng tĩnh (static) để GPU không bị quá tải và rớt khung hình
+    private static final javafx.scene.effect.ColorAdjust RED_EFFECT = new javafx.scene.effect.ColorAdjust(-0.15, 0.8, 0.1, 0);
+    private static final javafx.scene.effect.ColorAdjust SLIME_RED_EFFECT = new javafx.scene.effect.ColorAdjust(0.8, 0.8, 0.1, 0);
+
     @Override
     public void render(GraphicsContext gc) {
-        // Hiệu ứng nhấp nháy khi bị chém trúng
+        gc.save(); // Lưu trạng thái GraphicsContext hiện tại
+
+        // Hiệu ứng đổi màu đỏ khi bị chém trúng (Sử dụng lại ColorAdjust)
         if (flashTimer > 0) {
-            // Cứ mỗi 7 frame thì ẩn ảnh 1 lần (Tạo ra 2 nhịp nháy trong khoảng 30 frame)
-            if ((flashTimer / 7) % 2 == 0) {
-                return; // Không vẽ ảnh ở frame này
+            if (this instanceof Slime) {
+                gc.setEffect(SLIME_RED_EFFECT); // Slime màu xanh dương -> Dịch hue +0.8
+            } else {
+                gc.setEffect(RED_EFFECT);
             }
         }
-        super.render(gc);
-    }
 
+        super.render(gc); // Gọi render của lớp cha để vẽ sprite của quái vật
+
+        gc.restore(); // Khôi phục trạng thái GraphicsContext (gỡ bỏ hiệu ứng ColorAdjust)
+    }
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
     public double getLastX() {
         return lastX;
@@ -161,6 +183,10 @@ public abstract class Enemy extends MovingEntity {
         return this.damage;
     }
 
+    public int getHp() {
+        return this.hp;
+    }
+
     // Hàm nhận sát thương từ Player
     public void takeDamage(int amount) {
         if (this.hp <= 0)
@@ -168,26 +194,21 @@ public abstract class Enemy extends MovingEntity {
         this.hp -= amount;
         if (this.hp < 0)
             this.hp = 0;
-        this.flashTimer = 30; // Kích hoạt nhấp nháy trong 30 frames (0.5 giây)
+        this.flashTimer = 15; // Kích hoạt hiệu ứng đỏ trong 15 frames (~0.25 giây) cho dứt khoát
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
     }
 
     // Hàm xử lý đẩy lùi quái vật (Knockback)
     public void applyKnockback(com.hust.game.entities.Direction dir) {
-        double kbDistance = this.knockback * 15.0; // Khoảng cách đẩy lùi
+        this.kbTimer = 6; // Bị đẩy lùi trượt đi trong 6 frames liên tiếp
+        double kbSpeed = this.knockback * 2.5; // Vận tốc đẩy mỗi frame
+        this.kbVectorX = 0;
+        this.kbVectorY = 0;
         switch (dir) {
-            case UP:
-                this.y -= kbDistance;
-                break;
-            case DOWN:
-                this.y += kbDistance;
-                break;
-            case LEFT:
-                this.x -= kbDistance;
-                break;
-            case RIGHT:
-                this.x += kbDistance;
-                break;
+            case UP: this.kbVectorY = -kbSpeed; break;
+            case DOWN: this.kbVectorY = kbSpeed; break;
+            case LEFT: this.kbVectorX = -kbSpeed; break;
+            case RIGHT: this.kbVectorX = kbSpeed; break;
         }
     }
 

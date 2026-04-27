@@ -1,5 +1,6 @@
 package com.hust.game.main;
 
+import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.player.Player;
@@ -279,6 +280,9 @@ public class App extends Application {
             Image slimeImg = loadImg("/assets/enemy/slime.png");
             Image knightImg = loadImg("/assets/enemy/knight_idle.png");
             Image knightSkillImg = loadImg("/assets/enemy/knight_attack.png");
+
+            // Tải toàn bộ âm thanh
+            SoundManager.loadSounds();
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
@@ -286,16 +290,10 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            // enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player,
-            // treeSkillImg);
-            // enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player);
-            // enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player);
-            // enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player,
-            // treeSkillImg);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
+                    TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
+                    TILE_SIZE, TILE_SIZE, player);
             enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2,
                     player,
                     knightSkillImg);
@@ -452,15 +450,8 @@ public class App extends Application {
                 // Phải soi xem nó có đụng Player không đã!
                 if (enemy.intersects(player)) {
 
-                    if (enemy instanceof Knight && ((Knight) enemy).isDashing()) {
+                    if (enemy instanceof Knight && ((Knight) enemy).isDealingDamage()) {
                         player.takeDamage(enemy.getDamage());
-                        double vX = player.getX() - enemy.getX();
-                        double vY = player.getY() - enemy.getY();
-                        double dist = Math.sqrt(vX * vX + vY * vY);
-                        if (dist > 0) {
-                            player.setX(player.getX() + (vX / dist) * 50);
-                            player.setY(player.getY() + (vY / dist) * 50);
-                        }
                     } else {
                         enemy.onCollision(player);
                     }
