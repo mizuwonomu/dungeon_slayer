@@ -135,6 +135,9 @@ public class CombatManager {
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
+            // Bỏ qua nếu quái vật đã chết (đang trong trạng thái mờ dần)
+            if (enemy.getHp() <= 0) continue;
+
             // Lấy boundary của enemy (Rectangle2D)
             Rectangle2D enemyBox = enemy.getBoundary();
 
@@ -175,6 +178,20 @@ public class CombatManager {
             if (comboTimer > 0) comboCount++; // Đang trong thời gian Combo -> Cộng dồn
             else comboCount = 1; // Khởi đầu Combo mới
             comboTimer = COMBO_WINDOW_FRAMES; // Reset lại đồng hồ 1 giây
+            
+            // Hiển thị chữ Combo bay lên (Tận dụng luôn DamageTextManager)
+            // Truyền `this` làm target để mỗi khi Combo tăng, số cũ sẽ biến mất nhường chỗ cho số mới
+            if (comboCount >= 3) {
+                javafx.scene.paint.Color comboColor;
+                if (comboCount == 3) {
+                    comboColor = javafx.scene.paint.Color.DEEPSKYBLUE; // Combo 3: Xanh nước biển sáng
+                } else if (comboCount == 4) {
+                    comboColor = javafx.scene.paint.Color.ORANGE; // Combo 4: Cam
+                } else {
+                    comboColor = javafx.scene.paint.Color.RED; // Combo 5 trở lên: Đỏ
+                }
+                com.hust.game.ui.DamageTextManager.addText(this, player.getX() - 10, player.getY() - 15, "Combo x" + comboCount, comboColor);
+            }
         }
 
         // Reset cooldown tấn công của player
@@ -223,4 +240,7 @@ public class CombatManager {
 
     /** Trả về số đòn Combo hiện tại */
     public int getComboCount() { return comboCount; }
+
+    /** Trả về thời gian combo còn lại để áp dụng hiệu ứng mờ dần */
+    public int getComboTimer() { return comboTimer; }
 }

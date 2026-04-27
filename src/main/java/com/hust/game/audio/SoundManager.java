@@ -4,28 +4,35 @@ import javafx.scene.media.AudioClip;
 import java.net.URL;
 
 public class SoundManager {
-    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit;
+    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
 
     public static void loadSounds() {
-        nsMiss = loadSound("normal_sword_miss.wav");
-        nsHitSlime = loadSound("normal_sword_hit_slime.wav");
-        nsHitKnight = loadSound("normal_sword_hit_knight.wav");
-        nsFinalHit = loadSound("normal_sword_final_hit.wav");
+        // Thêm tham số âm lượng (từ 0.0 đến 1.0) để điều chỉnh mức to/nhỏ của từng file
+        nsMiss = loadSound("normal_sword_miss.wav", 1.0);
+        nsHitSlime = loadSound("normal_sword_hit_slime.wav", 1.0);
+        nsHitKnight = loadSound("normal_sword_hit_knight.wav", 1.0);
+        nsFinalHit = loadSound("normal_sword_final_hit.wav", 1.0);
+        playerPowerUp = loadSound("player_power_up.wav", 1.0);
+        sPowerUp = loadSound("sword_power_up.wav", 1.0);
+
+        playerHitS = loadSound("player_hit.wav", 1.0);
         
-        slimeMove = loadSound("slime_move.wav");
-        knightAtk = loadSound("knight_atk.wav");
-        knightReady = loadSound("knight_ready.wav");
-        treeMoving = loadSound("tree_moving.wav");
-        treeAtk = loadSound("tree_atk.wav");
+        slimeMove = loadSound("slime_move.wav", 0.4); // Ví dụ: giảm âm lượng di chuyển của Slime xuống 40%
+        knightAtk = loadSound("knight_atk.wav", 0.8);
+        knightReady = loadSound("knight_ready.wav", 0.8);
+        treeMoving = loadSound("tree_moving.wav", 0.4);
+        treeAtk = loadSound("tree_atk.wav", 0.8);
     }
 
-    private static AudioClip loadSound(String fileName) {
+    private static AudioClip loadSound(String fileName, double volume) {
         try {
             // Tải từ thư mục resources/sounds
             URL url = SoundManager.class.getResource("/sounds/" + fileName);
             if (url != null) {
-                return new AudioClip(url.toString());
+                AudioClip clip = new AudioClip(url.toString());
+                clip.setVolume(volume); // Gán âm lượng mặc định cho file âm thanh
+                return clip;
             } else {
                 System.err.println("Không tìm thấy file âm thanh: /sounds/" + fileName);
             }
@@ -35,14 +42,36 @@ public class SoundManager {
         return null;
     }
 
-    public static void playNsMissSound() { if (nsMiss != null) nsMiss.play(); }
-    public static void playNsHitSlimeSound() { if (nsHitSlime != null) nsHitSlime.play(); }
-    public static void playNsHitKnightSound() { if (nsHitKnight != null) nsHitKnight.play(); }
-    public static void playNsFinalHitSound() { if (nsFinalHit != null) nsFinalHit.play(); }
+    public static void playNsMissSound() { 
+        if (nsMiss != null) { nsMiss.stop(); nsMiss.play(); } 
+    }
+    public static void playNsHitSlimeSound() { 
+        if (nsHitSlime != null) { nsHitSlime.stop(); nsHitSlime.play(); } 
+    }
+    public static void playNsHitKnightSound() { 
+        if (nsHitKnight != null) { nsHitKnight.stop(); nsHitKnight.play(); } 
+    }
+    public static void playNsFinalHitSound() { 
+        if (nsFinalHit != null) { nsFinalHit.stop(); nsFinalHit.play(); } 
+    }
+
+    public static void playPlayerHitSound() { 
+        if (playerHitS != null) { playerHitS.stop(); playerHitS.play(); } 
+    }
     
-    public static void playSlimeMoveSound() { if (slimeMove != null) slimeMove.play(); }
-    public static void playKnightAtkSound() { if (knightAtk != null) knightAtk.play(); }
-    public static void playKnightReadySound() { if (knightReady != null) knightReady.play(); }
-    public static void playTreeMovingSound() { if (treeMoving != null) treeMoving.play(); }
-    public static void playTreeAtkSound() { if (treeAtk != null) treeAtk.play(); }
+    public static void playSlimeMoveSound() { 
+        if (slimeMove != null) { slimeMove.stop(); slimeMove.play(); } 
+    }
+    public static void playKnightAtkSound() { 
+        if (knightAtk != null) { knightAtk.stop(); knightAtk.play(); } 
+    }
+    public static void playKnightReadySound() { 
+        if (knightReady != null) { knightReady.stop(); knightReady.play(); } 
+    }
+    public static void playTreeMovingSound() { 
+        if (treeMoving != null) { treeMoving.stop(); treeMoving.play(); } 
+    }
+    public static void playTreeAtkSound() { 
+        if (treeAtk != null) { treeAtk.stop(); treeAtk.play(); } 
+    }
 }

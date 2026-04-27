@@ -166,6 +166,7 @@ public class App extends Application {
                     combatManager.update();
                     enemyManager.updateAll();
                     checkCollisions();
+                    com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
                 }
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
@@ -189,16 +190,10 @@ public class App extends Application {
 
                 player.render(gc);
                 enemyManager.renderAll(gc);
+                com.hust.game.ui.DamageTextManager.render(gc); // Vẽ các số sát thương (vẽ sau quái để đè lên trên cùng)
 
                 hud.render(gc);
 
-                // Combo text
-                int combo = combatManager.getComboCount();
-                if (combo >= 3) {
-                    gc.fillText("Combo x" + combo,
-                            player.getX() - 10,
-                            player.getY() - 10);
-                }
                 // End screen
                 if (isVictory || isGameOver) {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
@@ -207,7 +202,7 @@ public class App extends Application {
                     gc.setFill(isVictory ? javafx.scene.paint.Color.YELLOW : javafx.scene.paint.Color.RED);
                     gc.setFont(new javafx.scene.text.Font("Arial", 50));
 
-                    String text = isVictory ? "VICTORY!" : "Chết con cụ nó rồi";
+                    String text = isVictory ? "VICTORY!" : "Gàaaa, Game Over!";
 
                     javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
                     tempText.setFont(gc.getFont());

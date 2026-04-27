@@ -46,7 +46,15 @@ public class Knight extends Enemy {
             this.kbTimer--;
             this.x += kbVectorX;
             this.y += kbVectorY;
-            return; // Đang bị knockback thì ngắt AI lướt/đi bộ
+        }
+
+        // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
+        if (this.hp <= 0) {
+            return; 
+        }
+        
+        if (this.kbTimer > 0) {
+            return; // Còn sống nhưng đang bị knockback thì ngắt AI lướt/đi bộ
         }
         // ----------------------------------------------------
 

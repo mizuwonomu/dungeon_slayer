@@ -66,7 +66,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // HP — máu nhân vật
     // -------------------------------------------------------
     private int currentHp; // máu hiện tại
-    private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ constants
+ //   private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ constants
+    private final int maxHp = 1000;
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
@@ -297,6 +298,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         if (flashTimer > 0) return; // Nếu đang trong trạng thái nháy đỏ -> Bất tử (Miễn nhiễm sát thương)
         currentHp = Math.max(0, currentHp - amount);
         flashTimer = 18; // Kích hoạt thời gian nháy đỏ và bất tử (18 frame ~ 0.3s)
+        com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.RED);
+        com.hust.game.audio.SoundManager.playPlayerHitSound(); // Phát âm thanh bị thương
     }
 
     public void takeMana(int amount) {

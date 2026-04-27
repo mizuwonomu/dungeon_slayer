@@ -45,73 +45,60 @@ public abstract class Enemy extends MovingEntity {
         if (attackPauseTimer > 0)
             attackPauseTimer--; // Giảm thời gian nghỉ
 
-        // Lưu vị trí cũ CHỈ KHI được phép di chuyển (Giúp knockback không bị kẹt tường)
         this.lastX = this.x;
         this.lastY = this.y;
 
-        // Nếu đang bị knockback thì ưu tiên trượt lùi và KHÔNG thực hiện AI rượt đuổi
+        // --- Logic di chuyển & AI ---
         if (kbTimer > 0) {
+            // Trạng thái: Bị đẩy lùi
             kbTimer--;
             this.x += kbVectorX;
             this.y += kbVectorY;
-            return;
-        }
+        } else if (hp > 0 && attackPauseTimer <= 0 && targetPlayer != null) {
+            // Trạng thái: AI hoạt động (đuổi theo player)
+            double playerX = targetPlayer.getX();
+            double playerY = targetPlayer.getY();
 
-        // Nếu cạn máu, hoặc trong thời gian nghỉ sau đòn đánh -> Đứng im
-        if (hp <= 0 || attackPauseTimer > 0) {
-            return; // Thoát sớm sau khi đã tính knockback
-        }
+            // Thuật toán nội suy tìm tọa độ Player
+            double diffX = playerX - this.x;
+            double diffY = playerY - this.y;
 
-        // Không có mục tiêu -> đứng
-        if (targetPlayer == null)
-            return;
+            double distance = Math.sqrt(diffX * diffX + diffY * diffY);
 
-        double playerX = targetPlayer.getX();
-        double playerY = targetPlayer.getY();
+            this.moveX = 0;
+            this.moveY = 0;
 
-        // Thuật toán nội suy tìm tọa độ Player
-        double diffX = playerX - this.x;
-        double diffY = playerY - this.y;
+            if (distance > 0) {
+                // Nếu đang trong trạng thái lách vật cản, ưu tiên đi men theo 1 trục
+                if (dodgeTimer > 0) {
+                    dodgeTimer--;
+                    this.moveX = dodgeDirX * speed;
+                    this.moveY = dodgeDirY * speed;
+                } else {
+                    this.moveX = (diffX / distance) * speed;
+                    this.moveY = (diffY / distance) * speed;
+                }
 
-        double distance = Math.sqrt(diffX * diffX + diffY * diffY);
-
-        this.moveX = 0;
-        this.moveY = 0;
-
-        if (distance > 0) {
-            // Nếu đang trong trạng thái lách vật cản, ưu tiên đi men theo 1 trục
-            if (dodgeTimer > 0) {
-                dodgeTimer--;
-                this.moveX = dodgeDirX * speed;
-                this.moveY = dodgeDirY * speed;
-            } else {
-                this.moveX = (diffX / distance) * speed;
-                this.moveY = (diffY / distance) * speed;
+                // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
+                if (diffX < 0) {
+                    this.isFlipped = true; // Đi sang trái thì lật mặt
+                } else if (diffX > 0) {
+                    this.isFlipped = false; // Đi sang phải thì giữ nguyên
+                }
             }
-
-            // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
-            if (diffX < 0) {
-                this.isFlipped = true; // Đi sang trái thì lật mặt
-            } else if (diffX > 0) {
-                this.isFlipped = false; // Đi sang phải thì giữ nguyên
-            }
+            this.x += this.moveX;
+            this.y += this.moveY;
         }
+        // else: Trạng thái Chết, Nghỉ, hoặc không có mục tiêu -> Đứng im, không làm gì cả.
 
-        double nextX = this.x + this.moveX;
-        double nextY = this.y + this.moveY;
-
-        int TILE_SIZE = 48;
-
-        int nextCol = (int) (nextX / TILE_SIZE);
-        int nextRow = (int) (nextY / TILE_SIZE);
-
-        this.x = nextX;
-        this.y = nextY;
-
-        animationTimer++;
-        if (animationTimer >= animationDelay) {
-            animationTimer = 0;
-            frameIndex = (frameIndex + 1) % numFrames;
+        // --- Logic animation ---
+        // Chỉ tiếp tục chạy hoạt ảnh nếu quái vật còn sống
+        if (this.hp > 0) {
+            animationTimer++;
+            if (animationTimer >= animationDelay) {
+                animationTimer = 0;
+                frameIndex = (frameIndex + 1) % numFrames;
+            }
         }
     }
 
@@ -141,27 +128,6 @@ public abstract class Enemy extends MovingEntity {
         }
     }
 
-    // Tạo sẵn hiệu ứng tĩnh (static) để GPU không bị quá tải và rớt khung hình
-    private static final javafx.scene.effect.ColorAdjust RED_EFFECT = new javafx.scene.effect.ColorAdjust(-0.15, 0.8, 0.1, 0);
-    private static final javafx.scene.effect.ColorAdjust SLIME_RED_EFFECT = new javafx.scene.effect.ColorAdjust(0.8, 0.8, 0.1, 0);
-
-    @Override
-    public void render(GraphicsContext gc) {
-        gc.save(); // Lưu trạng thái GraphicsContext hiện tại
-
-        // Hiệu ứng đổi màu đỏ khi bị chém trúng (Sử dụng lại ColorAdjust)
-        if (flashTimer > 0) {
-            if (this instanceof Slime) {
-                gc.setEffect(SLIME_RED_EFFECT); // Slime màu xanh dương -> Dịch hue +0.8
-            } else {
-                gc.setEffect(RED_EFFECT);
-            }
-        }
-
-        super.render(gc); // Gọi render của lớp cha để vẽ sprite của quái vật
-
-        gc.restore(); // Khôi phục trạng thái GraphicsContext (gỡ bỏ hiệu ứng ColorAdjust)
-    }
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
     public double getLastX() {
         return lastX;
@@ -192,10 +158,33 @@ public abstract class Enemy extends MovingEntity {
         if (this.hp <= 0)
             return; // Nếu đã chết thì không nhận thêm sát thương nữa
         this.hp -= amount;
-        if (this.hp < 0)
+        
+        if (this.hp <= 0) {
             this.hp = 0;
-        this.flashTimer = 15; // Kích hoạt hiệu ứng đỏ trong 15 frames (~0.25 giây) cho dứt khoát
+            this.flashTimer = 60; // Quái chết -> Tồn tại thêm 60 frames (1 giây) để chạy hiệu ứng mờ dần
+        } else {
+            this.flashTimer = 15; // Quái còn sống -> Khựng lại 15 frames (~0.25 giây)
+        }
+        
+        com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.WHITE);
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        // Nếu quái vật đã chết, kích hoạt hiệu ứng mờ dần (Fade out)
+        if (this.hp <= 0) {
+            gc.save();
+            double alpha = (double) this.flashTimer / 60.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            
+            gc.setGlobalAlpha(alpha);
+            super.render(gc); // Vẽ quái vật với độ mờ giảm dần
+            gc.restore();
+        } else {
+            super.render(gc); // Quái còn sống thì vẽ bình thường
+        }
     }
 
     // Hàm xử lý đẩy lùi quái vật (Knockback)

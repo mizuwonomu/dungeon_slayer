@@ -2,6 +2,7 @@ package com.hust.game.enemy;
 
 import com.hust.game.entities.player.Player;
 import javafx.scene.image.Image;
+import javafx.geometry.Rectangle2D;
 
 public class Slime extends Enemy {
     private int damageTick = 0;
@@ -42,8 +43,9 @@ public class Slime extends Enemy {
         // Xử lý logic tấn công (chạm vào người chơi)
         handleTouchDamage();
 
-        // slime_move: phát ngay sau khi frame di chuyển kết thúc (cycle animation về 0)
-        if (this.animationTimer == 0 && this.frameIndex == 0) {
+        // Phát âm thanh đúng vào khoảnh khắc Slime bắt đầu bật nhảy (frameIndex == 3)
+        // vì theo logic phía trên, frame 0, 1, 2 nó đang đứng im lấy đà.
+        if (this.animationTimer == 0 && this.frameIndex == 7) {
             com.hust.game.audio.SoundManager.playSlimeMoveSound();
         }
     }
@@ -61,5 +63,13 @@ public class Slime extends Enemy {
             targetPlayer.takeDamage(this.damage);
             damageTick = 30; // Cooldown 0.5s để tránh gây damage mỗi frame
         }
+    }
+
+    @Override
+    public Rectangle2D getBoundary() {
+        // Thu nhỏ hitbox của Slime lại 20% mỗi bên
+        double paddingX = this.renderWidth * 0.20;
+        double paddingY = this.renderHeight * 0.20;
+        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 }
