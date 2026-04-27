@@ -29,6 +29,8 @@ public class EnemyManager {
             newEnemy = new Slime(x, y, sprite, numFrames, w, h, targetPlayer);
         } else if (enemyType.equals("Tree")) {
             newEnemy = new Tree(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
+        } else if (enemyType.equals("Knight")) {
+            newEnemy = new Knight(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
         }
 
         if (newEnemy != null) {

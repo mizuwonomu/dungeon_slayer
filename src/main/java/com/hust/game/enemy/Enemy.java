@@ -35,8 +35,10 @@ public abstract class Enemy extends MovingEntity {
 
     @Override
     public void update() {
-        if (flashTimer > 0) flashTimer--; // Giảm dần thời gian nháy đỏ
-        if (attackPauseTimer > 0) attackPauseTimer--; // Giảm thời gian nghỉ
+        if (flashTimer > 0)
+            flashTimer--; // Giảm dần thời gian nháy đỏ
+        if (attackPauseTimer > 0)
+            attackPauseTimer--; // Giảm thời gian nghỉ
 
         // Nếu đang chịu đòn, cạn máu, hoặc trong thời gian nghỉ sau đòn đánh -> Đứng im
         if (flashTimer > 0 || hp <= 0 || attackPauseTimer > 0) {
@@ -73,10 +75,10 @@ public abstract class Enemy extends MovingEntity {
                 this.moveX = (diffX / distance) * speed;
                 this.moveY = (diffY / distance) * speed;
             }
-            
+
             // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
             if (diffX < 0) {
-                this.isFlipped = true;  // Đi sang trái thì lật mặt
+                this.isFlipped = true; // Đi sang trái thì lật mặt
             } else if (diffX > 0) {
                 this.isFlipped = false; // Đi sang phải thì giữ nguyên
             }
@@ -106,9 +108,11 @@ public abstract class Enemy extends MovingEntity {
 
         // Thuật toán trượt tường (Sliding) và lách nhau
         dodgeAxisX = !dodgeAxisX; // Đổi trục di chuyển để thử lách hướng khác
-        dodgeTimer = (other == null) ? 20 : 10; // Đập tường thì trượt lâu hơn (20 frame), đụng nhau thì lách nhanh (10 frame)
+        dodgeTimer = (other == null) ? 20 : 10; // Đập tường thì trượt lâu hơn (20 frame), đụng nhau thì lách nhanh (10
+                                                // frame)
 
-        if (targetPlayer == null) return;
+        if (targetPlayer == null)
+            return;
 
         double pX = targetPlayer.getX() - this.x;
         double pY = targetPlayer.getY() - this.y;
@@ -137,16 +141,33 @@ public abstract class Enemy extends MovingEntity {
     }
 
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
-    public double getLastX() { return lastX; }
-    public double getLastY() { return lastY; }
-    public double getMoveX() { return moveX; }
-    public double getMoveY() { return moveY; }
+    public double getLastX() {
+        return lastX;
+    }
+
+    public double getLastY() {
+        return lastY;
+    }
+
+    public double getMoveX() {
+        return moveX;
+    }
+
+    public double getMoveY() {
+        return moveY;
+    }
+
+    public int getDamage() {
+        return this.damage;
+    }
 
     // Hàm nhận sát thương từ Player
     public void takeDamage(int amount) {
-        if (this.hp <= 0) return; // Nếu đã chết thì không nhận thêm sát thương nữa
+        if (this.hp <= 0)
+            return; // Nếu đã chết thì không nhận thêm sát thương nữa
         this.hp -= amount;
-        if (this.hp < 0) this.hp = 0;
+        if (this.hp < 0)
+            this.hp = 0;
         this.flashTimer = 30; // Kích hoạt nhấp nháy trong 30 frames (0.5 giây)
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
     }
@@ -155,10 +176,18 @@ public abstract class Enemy extends MovingEntity {
     public void applyKnockback(com.hust.game.entities.Direction dir) {
         double kbDistance = this.knockback * 15.0; // Khoảng cách đẩy lùi
         switch (dir) {
-            case UP:    this.y -= kbDistance; break;
-            case DOWN:  this.y += kbDistance; break;
-            case LEFT:  this.x -= kbDistance; break;
-            case RIGHT: this.x += kbDistance; break;
+            case UP:
+                this.y -= kbDistance;
+                break;
+            case DOWN:
+                this.y += kbDistance;
+                break;
+            case LEFT:
+                this.x -= kbDistance;
+                break;
+            case RIGHT:
+                this.x += kbDistance;
+                break;
         }
     }
 

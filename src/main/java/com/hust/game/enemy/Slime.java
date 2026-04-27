@@ -20,7 +20,8 @@ public class Slime extends Enemy {
     public void update() {
         // Nếu chết hoặc đang bị choáng (nháy đỏ) thì không làm gì cả
         if (this.hp <= 0 || this.flashTimer > 0) {
-            if (this.flashTimer > 0) this.flashTimer--;
+            if (this.flashTimer > 0)
+                this.flashTimer--;
             return;
         }
 
@@ -28,7 +29,8 @@ public class Slime extends Enemy {
         double prevX = this.x;
         double prevY = this.y;
 
-        // Gọi update của Enemy để tự động lật mặt, chạy animation và tính toán toạ độ mới
+        // Gọi update của Enemy để tự động lật mặt, chạy animation và tính toán toạ độ
+        // mới
         super.update(); // Gọi hàm của Enemy để di chuyển và cập nhật frameIndex
 
         // Slime có 8 frame (index 0 -> 7).

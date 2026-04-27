@@ -7,6 +7,7 @@ import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
+import com.hust.game.enemy.Knight;
 import com.hust.game.enemy.Enemy;
 import com.hust.game.map.MapManager;
 import com.hust.game.collision.CollisionChecker;
@@ -32,8 +33,9 @@ import java.util.List;
 
 public class App extends Application {
     // kích thước cửa sổ
-    // Cập nhật lại kích thước khớp với map level1.txt (17 cột x 13 hàng, TILE_SIZE = 48)
-    private static final int WIDTH = 816;  // 17 * 48
+    // Cập nhật lại kích thước khớp với map level1.txt (17 cột x 13 hàng, TILE_SIZE
+    // = 48)
+    private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 624; // 13 * 48
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
@@ -73,14 +75,14 @@ public class App extends Application {
 
     private Scene createMenuScene(Stage stage) {
         Image startImg = loadImg("/assets/start.png");
-        Image exitImg  = loadImg("/assets/exit.png");
-        Image startSelectImg  = loadImg("/assets/startselect.png");
-        Image exitselectImg  = loadImg("/assets/exitselect.png");
+        Image exitImg = loadImg("/assets/exit.png");
+        Image startSelectImg = loadImg("/assets/startselect.png");
+        Image exitselectImg = loadImg("/assets/exitselect.png");
 
         javafx.scene.control.Button startBtn = new javafx.scene.control.Button();
-        javafx.scene.control.Button exitBtn  = new javafx.scene.control.Button();
+        javafx.scene.control.Button exitBtn = new javafx.scene.control.Button();
 
-// Set images into buttons
+        // Set images into buttons
         startBtn.setGraphic(new javafx.scene.image.ImageView(startImg));
         exitBtn.setGraphic(new javafx.scene.image.ImageView(exitImg));
 
@@ -100,11 +102,11 @@ public class App extends Application {
 
         // START button hover
         startBtn.setOnMouseEntered(e -> startView.setImage(startSelectImg));
-        startBtn.setOnMouseExited(e  -> startView.setImage(startImg));
+        startBtn.setOnMouseExited(e -> startView.setImage(startImg));
 
-// QUIT button hover
+        // QUIT button hover
         exitBtn.setOnMouseEntered(e -> exitView.setImage(exitselectImg));
-        exitBtn.setOnMouseExited(e  -> exitView.setImage(exitImg));
+        exitBtn.setOnMouseExited(e -> exitView.setImage(exitImg));
 
         startBtn.setGraphic(startView);
         exitBtn.setGraphic(exitView);
@@ -125,13 +127,13 @@ public class App extends Application {
         javafx.scene.text.Text title = new javafx.scene.text.Text("Dungeon Slayer");
         title.setStyle("-fx-font-size: 36px; -fx-fill: white;");
 
-        javafx.scene.layout.VBox layout =
-                new javafx.scene.layout.VBox(30, title, startBtn, exitBtn);
+        javafx.scene.layout.VBox layout = new javafx.scene.layout.VBox(30, title, startBtn, exitBtn);
 
         layout.setStyle("-fx-alignment: center; -fx-background-color: black;");
 
         return new Scene(layout, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
     }
+
     private AnimationTimer gameLoop;
     private HUD hud;
 
@@ -145,7 +147,7 @@ public class App extends Application {
         Group root = new Group(canvas);
         Scene scene = new Scene(root);
 
-        scene.setOnKeyPressed(e  -> input.add(e.getCode()));
+        scene.setOnKeyPressed(e -> input.add(e.getCode()));
         scene.setOnKeyReleased(e -> input.remove(e.getCode()));
 
         initializeEntities();
@@ -240,8 +242,7 @@ public class App extends Application {
                                     });
 
                                     stage.setScene(menu.createScene());
-                                }
-                        );
+                                });
 
                         root.getChildren().add(gameOverUI.getRoot());
                         isEndUIShown = true;
@@ -268,15 +269,16 @@ public class App extends Application {
             Image cUp = loadImg("/assets/player/combatup.png");
             Image cLeft = loadImg("/assets/player/combatleft.png");
             Image cRight = loadImg("/assets/player/combatright.png");
-            
+
             Image swordHit = loadImg("/assets/player/wswordhit.png");
             Image rageHit = loadImg("/assets/player/bswordhit.png");
-            
+
             Image wallImg = loadImg("/assets/tiles/wall.png", TILE_SIZE, TILE_SIZE);
             Image treeImg = loadImg("/assets/enemy/tree.png");
             Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
             Image slimeImg = loadImg("/assets/enemy/slime.png");
-
+            Image knightImg = loadImg("/assets/enemy/knight_idle.png");
+            Image knightSkillImg = loadImg("/assets/enemy/knight_attack.png");
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
@@ -284,12 +286,20 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-
-            //tạo combat manager
+            // enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player,
+            // treeSkillImg);
+            // enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player);
+            // enemyManager.spawnEnemy("Slime", WIDTH / 2, HEIGHT / 2 - 150, slimeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player);
+            // enemyManager.spawnEnemy("Tree", WIDTH / 2, HEIGHT / 2 + 150, treeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player,
+            // treeSkillImg);
+            enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2,
+                    player,
+                    knightSkillImg);
+            // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
 
         } catch (Exception e) {
@@ -313,34 +323,34 @@ public class App extends Application {
                 player.setDirection(Direction.UP);
                 player.moveUp();
                 isAnyKeyPressed = true;
-            }
-            else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
+            } else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
                 player.setDirection(Direction.DOWN);
                 player.moveDown();
                 isAnyKeyPressed = true;
-            }
-            else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
+            } else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
                 player.setDirection(Direction.LEFT);
                 player.moveLeft();
                 isAnyKeyPressed = true;
-            }
-            else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
+            } else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
                 player.setDirection(Direction.RIGHT);
                 player.moveRight();
                 isAnyKeyPressed = true;
             }
         }
 
-        if (input.contains(KeyCode.J)){
+        if (input.contains(KeyCode.J)) {
             if (!isJHeld) { // Yêu cầu phải nhả phím J ra rồi bấm lại mới chém tiếp được
                 if (player.canAttack()) {
                     int combo = combatManager.playerAttack();
                     if (combo > 0) {
                         screenShakeTimer = 3; // Tăng lên 3 frame để độ rung rõ ràng hơn một chút
                         // Phân tầng độ rung theo Combo
-                        if (combo <= 2) screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
-                        else if (combo == 3) screenShakeAmplitude = 0.3; // Hit 3: Rung nhẹ
-                        else screenShakeAmplitude = 0.5;
+                        if (combo <= 2)
+                            screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
+                        else if (combo == 3)
+                            screenShakeAmplitude = 0.3; // Hit 3: Rung nhẹ
+                        else
+                            screenShakeAmplitude = 0.5;
                     }
                 }
                 isJHeld = true; // Đánh dấu là đang đè phím
@@ -349,7 +359,7 @@ public class App extends Application {
             isJHeld = false; // Nhả phím J ra thì reset cờ cho phép chém tiếp
         }
 
-        if (input.contains(KeyCode.L)){
+        if (input.contains(KeyCode.L)) {
             combatManager.activateSkill();
         }
 
@@ -384,7 +394,8 @@ public class App extends Application {
                 for (int j = i + 1; j < enemies.size(); j++) {
                     Enemy otherEnemy = enemies.get(j);
                     if (enemy.intersects(otherEnemy)) {
-                        // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt thành 1 cục)
+                        // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt
+                        // thành 1 cục)
                         double cx1 = enemy.getX() + enemy.getRenderWidth() / 2.0;
                         double cy1 = enemy.getY() + enemy.getRenderHeight() / 2.0;
                         double cx2 = otherEnemy.getX() + otherEnemy.getRenderWidth() / 2.0;
@@ -395,7 +406,8 @@ public class App extends Application {
                         double dist = Math.sqrt(dx * dx + dy * dy);
 
                         if (dist == 0) { // Xử lý góc lách ngẫu nhiên nếu 2 quái đè khít lên nhau từ lúc spawn
-                            dx = Math.random() - 0.5; dy = Math.random() - 0.5;
+                            dx = Math.random() - 0.5;
+                            dy = Math.random() - 0.5;
                             dist = Math.sqrt(dx * dx + dy * dy);
                         }
                         double pushStrength = 1.5; // Lực đẩy trượt qua nhau
@@ -408,7 +420,8 @@ public class App extends Application {
             }
 
             // Bước 2: KIỂM TRA VA CHẠM TƯỜNG SAU KHI ĐÃ BỊ ĐẨY
-            // Việc này đảm bảo nếu quái bị xô đẩy văng vào tường, nó sẽ ngay lập tức bị giật ngược lại vị trí an toàn
+            // Việc này đảm bảo nếu quái bị xô đẩy văng vào tường, nó sẽ ngay lập tức bị
+            // giật ngược lại vị trí an toàn
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
                 int eLeft = (int) (enemy.getX() + padding);
@@ -423,12 +436,36 @@ public class App extends Application {
             }
         }
 
-        // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau này)
+        // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau
+        // này)
         for (BaseEntity wall : obstacles) {
             if (player.intersects(wall)) {
                 player.onCollision(wall);
 
                 break;
+            }
+        }
+
+        if (enemyManager != null) {
+            List<Enemy> enemies = enemyManager.getEnemyList();
+            for (Enemy enemy : enemies) {
+                // Phải soi xem nó có đụng Player không đã!
+                if (enemy.intersects(player)) {
+
+                    if (enemy instanceof Knight && ((Knight) enemy).isDashing()) {
+                        player.takeDamage(enemy.getDamage());
+                        double vX = player.getX() - enemy.getX();
+                        double vY = player.getY() - enemy.getY();
+                        double dist = Math.sqrt(vX * vX + vY * vY);
+                        if (dist > 0) {
+                            player.setX(player.getX() + (vX / dist) * 50);
+                            player.setY(player.getY() + (vY / dist) * 50);
+                        }
+                    } else {
+                        enemy.onCollision(player);
+                    }
+
+                }
             }
         }
     }
@@ -445,7 +482,6 @@ public class App extends Application {
         }
         return new Image(is, w, h, true, false);
     }
-
 
     public static void main(String[] args) {
         launch(args);
