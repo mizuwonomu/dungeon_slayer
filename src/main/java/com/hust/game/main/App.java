@@ -275,6 +275,8 @@ public class App extends Application {
             Image slimeImg = loadImg("/assets/enemy/slime.png");
             Image knightImg = loadImg("/assets/enemy/knight_idle.png");
             Image knightSkillImg = loadImg("/assets/enemy/knight_attack.png");
+            Image witchImg = loadImg("/assets/enemy/witch_summon.png");
+            Image witchSkillImg = loadImg("/assets/enemy/witch_atk.png");
 
             // Tải toàn bộ âm thanh
             SoundManager.loadSounds();
@@ -285,13 +287,16 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-                    TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-                    TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2,
-                    player,
-                    knightSkillImg);
+            // enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+            // enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
+            // TILE_SIZE, TILE_SIZE, player);
+            // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8,
+            // TILE_SIZE * 2, TILE_SIZE * 2,
+            // player,
+            // knightSkillImg);
+            enemyManager.spawnEnemy("Witch", WIDTH / 2, HEIGHT / 2 + 200, witchImg, 25, TILE_SIZE, TILE_SIZE,
+                    player, witchSkillImg);
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
 

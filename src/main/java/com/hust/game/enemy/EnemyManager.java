@@ -31,6 +31,8 @@ public class EnemyManager {
             newEnemy = new Tree(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
         } else if (enemyType.equals("Knight")) {
             newEnemy = new Knight(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
+        } else if (enemyType.equals("Witch")) {
+            newEnemy = new Witch(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite, this);
         }
 
         if (newEnemy != null) {
