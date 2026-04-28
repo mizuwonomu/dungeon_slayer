@@ -1,13 +1,19 @@
 package com.hust.game.enemy;
 
 import com.hust.game.entities.player.Player;
+import com.hust.game.main.App;
+
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.geometry.Rectangle2D;
 
 public class Witch extends Enemy {
 
+    private int summonTimer = 0;
+    private int circleCountSinceLastSummon = 3;
     private EnemyManager enemyManager;
+    private Image knightIdle;
+    private Image knightAtk;
 
     // Ảnh các kỹ năng
     private Image summonSprite;
@@ -41,6 +47,10 @@ public class Witch extends Enemy {
                     getClass().getResourceAsStream("/assets/enemy/witch_circle.png"));
             this.circleAtkSprite = new javafx.scene.image.Image(
                     getClass().getResourceAsStream("/assets/enemy/witch_circle_atk.png"));
+            this.knightIdle = new javafx.scene.image.Image(
+                    getClass().getResourceAsStream("/assets/enemy/knight_idle.png"));
+            this.knightAtk = new javafx.scene.image.Image(
+                    getClass().getResourceAsStream("/assets/enemy/knight_attack.png"));
         } catch (Exception e) {
             System.err.println("Lỗi nạp ảnh vòng lửa Phù thủy!");
         }
@@ -60,70 +70,78 @@ public class Witch extends Enemy {
         }
         // 1. CƠ CHẾ DỊCH CHUYỂN
         if (this.hp <= this.maxHp / 2 && this.flashTimer == 14) {
-
-            double angle = Math.random() * 2 * Math.PI;
-            double newX = targetPlayer.getX() + 200 * Math.cos(angle);
-            double newY = targetPlayer.getY() + 200 * Math.sin(angle);
-
-            double maxW = com.hust.game.constants.GameConstants.MAX_SCREEN_COL
-                    * com.hust.game.constants.GameConstants.TILE_SIZE;
-            double maxH = com.hust.game.constants.GameConstants.MAX_SCREEN_ROW
-                    * com.hust.game.constants.GameConstants.TILE_SIZE;
-            this.x = Math.max(0, Math.min(newX, maxW - this.renderWidth));
-            this.y = Math.max(0, Math.min(newY, maxH - this.renderHeight));
-
+            // Tự động dạt sang đầu kia của căn phòng
+            if (targetPlayer.getX() < App.getGameWidth() / 2) {
+                this.x = App.getGameWidth() - 150;
+            } else {
+                this.x = 100;
+            }
+            this.y = App.getGameHeight() / 2 - 50;
             return;
         }
         // 2. MÁY TRẠNG THÁI TẤN CÔNG
         if (isSummoning) {
-            // Tạm để trống. Bài sau ta sẽ gọi hàm spawnEnemy ở đây
-        } else if (isCastingCircle) {
             this.animationTimer++;
             if (this.animationTimer >= this.animationDelay) {
                 this.animationTimer = 0;
-                this.frameIndex++;
-                if (this.frameIndex >= this.numFrames) {
-                    this.frameIndex = 0;
+                this.frameIndex = (this.frameIndex + 1) % this.numFrames;
+            }
+
+            summonTimer++;
+            if (summonTimer == 60) {
+                int count = 0;
+                for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
+                    if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0)
+                        count++;
+                }
+                if (count == 0) {
+                    enemyManager.spawnEnemy("Knight", this.x - 80, this.y, knightIdle, 8, 96, 96, targetPlayer,
+                            knightAtk);
+                } else if (count == 1) {
+                    enemyManager.spawnEnemy("Knight", this.x + 80, this.y, knightIdle, 8, 96, 96, targetPlayer,
+                            knightAtk);
+                }
+            } else if (summonTimer > 90) {
+                isSummoning = false;
+                summonTimer = 0;
+            }
+        } else if (isCastingCircle) {
+            circleTimer++;
+            // 1. Giai đoạn gồng phép
+            if (circleTimer <= 60) {
+                this.frameIndex = 0;
+            } else {
+                // Sau 1 giây thì bắt đầu xả phép
+                this.animationTimer++;
+                if (this.animationTimer >= this.animationDelay) {
+                    this.animationTimer = 0;
+                    this.frameIndex++;
+                    if (this.frameIndex >= this.numFrames) {
+                        this.frameIndex = 0;
+                    }
                 }
             }
-            // 2. KỊCH BẢN VÒNG LỬA
-            circleTimer++;
-
-            if (circleTimer <= 120) {
-                // 2 giây: Bám đuôi Player liên tục
+            // 2. Giai đoạn xả Vòng lửa
+            if (circleTimer <= 180) {
+                // Bám đuôi Player
                 circleX = targetPlayer.getX() - 24;
                 circleY = targetPlayer.getY() - 15;
-            } else if (circleTimer <= 150) {
-                // 0.5 giây: Khóa mục tiêu (Không cập nhật X, Y nữa -> Vòng lửa dừng lại)
-            } else if (circleTimer == 151) {
-                // Nổ
-                // Tính khoảng cách từ tâm vòng lửa đến Player
+            } else if (circleTimer <= 210) {
+            } else if (circleTimer == 211) {
+                // Phát nổ
                 double centerCircleX = circleX + 48;
                 double centerCircleY = circleY + 48;
-
-                // Tìm tâm của Player
                 double centerPlayerX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2;
                 double centerPlayerY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2;
-
-                // Khoảng cách giữa 2 Tâm
                 double diffX = centerPlayerX - centerCircleX;
                 double diffY = centerPlayerY - centerCircleY;
                 double dist = Math.sqrt(diffX * diffX + diffY * diffY);
-
-                // Bán kính nổ
-                if (dist < 45) {
-                    targetPlayer.takeDamage(30);
+                if (dist <= 60) { // Phạm vi sát thương
+                    targetPlayer.takeDamage(this.damage);
                 }
-            } else if (circleTimer > 170) {
-                // Kết thúc
+            } else if (circleTimer > 230) {
                 isCastingCircle = false;
                 circleTimer = 0;
-
-                this.spriteSheet = this.summonSprite;
-                this.numFrames = 25;
-                this.frameWidth = this.spriteSheet.getWidth() / this.numFrames;
-                this.frameHeight = this.spriteSheet.getHeight();
-                this.frameIndex = 0;
             }
         } else {
             this.animationTimer++;
@@ -143,14 +161,46 @@ public class Witch extends Enemy {
             }
 
             circleTimer++;
-            if (circleTimer > 180) {
-                isCastingCircle = true;
+            if (circleTimer > 240) {
                 circleTimer = 0;
-                this.spriteSheet = castSprite;
-                this.numFrames = 20;
-                this.frameWidth = castSprite.getWidth() / this.numFrames;
-                this.frameHeight = castSprite.getHeight();
-                this.frameIndex = 0;
+
+                int knightCount = 0;
+                for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
+                    if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0) {
+                        knightCount++;
+                    }
+                }
+
+                if (knightCount < 2) {
+                    if (circleCountSinceLastSummon >= 3) {
+                        isSummoning = true;
+                        circleCountSinceLastSummon = 0;
+
+                        this.spriteSheet = this.summonSprite;
+                        this.numFrames = 25;
+                        this.frameWidth = this.summonSprite.getWidth() / this.numFrames;
+                        this.frameHeight = this.summonSprite.getHeight();
+                        this.frameIndex = 0;
+                    } else {
+                        isCastingCircle = true;
+                        circleCountSinceLastSummon++;
+
+                        this.spriteSheet = castSprite;
+                        this.numFrames = 20;
+                        this.frameWidth = castSprite.getWidth() / this.numFrames;
+                        this.frameHeight = castSprite.getHeight();
+                        this.frameIndex = 0;
+                    }
+                } else {
+                    isCastingCircle = true;
+                    circleCountSinceLastSummon = 0;
+
+                    this.spriteSheet = castSprite;
+                    this.numFrames = 20;
+                    this.frameWidth = castSprite.getWidth() / this.numFrames;
+                    this.frameHeight = castSprite.getHeight();
+                    this.frameIndex = 0;
+                }
             }
         }
     }
@@ -167,24 +217,27 @@ public class Witch extends Enemy {
         super.render(gc);
         gc.restore();
 
-        if (isCastingCircle) {
+        if (isCastingCircle && circleTimer > 60) {
             Image currentCircle;
             int cFrames;
             int cIndex;
-            if (circleTimer > 150) {
-                // Dùng ảnh nổ
+
+            if (circleTimer > 210) { // Cũ là 150 -> Mới là 210
+                // Vòng lửa phát nổ
                 currentCircle = circleAtkSprite;
                 cFrames = 8;
-                cIndex = ((circleTimer - 150) / 2) % cFrames;
+                cIndex = ((circleTimer - 210) / 2) % cFrames;
             } else {
-                // Dùng ảnh vòng bình thường
+                // Vòng lửa đang chạy bám theo người
                 currentCircle = circleSprite;
                 cFrames = 1;
-                cIndex = (circleTimer / 5) % cFrames;
+                cIndex = ((circleTimer - 60) / 5) % cFrames;
             }
+
             double cWidth = currentCircle.getWidth() / cFrames;
             double cHeight = currentCircle.getHeight();
             double circleSize = 96;
+
             gc.drawImage(currentCircle, cIndex * cWidth, 0, cWidth, cHeight,
                     circleX, circleY, circleSize, circleSize);
         }

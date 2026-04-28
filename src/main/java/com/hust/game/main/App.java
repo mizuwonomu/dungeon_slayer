@@ -474,6 +474,14 @@ public class App extends Application {
         return new Image(is, w, h, true, false);
     }
 
+    public static int getGameWidth() {
+        return WIDTH;
+    }
+
+    public static int getGameHeight() {
+        return HEIGHT;
+    }
+
     public static void main(String[] args) {
         launch(args);
     }

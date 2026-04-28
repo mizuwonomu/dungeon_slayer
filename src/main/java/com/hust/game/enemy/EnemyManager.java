@@ -45,8 +45,8 @@ public class EnemyManager {
         // Dọn dẹp quái vật đã chết và nhấp nháy xong ra khỏi bản đồ
         enemyList.removeIf(Enemy::isReadyToRemove);
 
-        for (Enemy e : enemyList) {
-            e.update();
+        for (int i = 0; i < enemyList.size(); i++) {
+            enemyList.get(i).update();
         }
     }
 
