@@ -40,6 +40,8 @@ public class Tree extends Enemy {
                 this.flashTimer--;
             if (this.attackPauseTimer > 0)
                 this.attackPauseTimer--;
+            if (this.hitStunTimer > 0)
+                this.hitStunTimer--;
 
             // --- BỔ SUNG KNOCKBACK KHI ĐANG CAST SKILL ---
             this.lastX = this.x;
@@ -52,6 +54,16 @@ public class Tree extends Enemy {
 
             // Chết khi đang cast skill -> giữ nguyên frame hiện tại và không làm gì nữa
             if (this.hp <= 0) {
+                return;
+            }
+            
+            // Nếu bị đánh trúng và đang bị khựng, gián đoạn skill và quay về animation di chuyển
+            if (this.hitStunTimer > 0) {
+                this.isCastingSkill = false;
+                this.spriteSheet = normalSprite;
+                this.frameWidth = normalSprite.getWidth() / this.numFrames;
+                this.frameHeight = normalSprite.getHeight();
+                this.frameIndex = 0;
                 return;
             }
 

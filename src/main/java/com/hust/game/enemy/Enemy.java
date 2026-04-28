@@ -19,6 +19,7 @@ public abstract class Enemy extends MovingEntity {
     protected double moveX, moveY;
     protected int flashTimer = 0; // Bộ đếm nhấp nháy khi dính đòn
     protected int attackPauseTimer = 0; // Bộ đếm thời gian nghỉ sau khi tấn công
+    protected int hitStunTimer = 0; // Thời gian khựng lại khi bị đánh trúng
 
     // Các biến phục vụ thuật toán lách vật cản (Wall Sliding)
     protected int dodgeTimer = 0;
@@ -44,6 +45,8 @@ public abstract class Enemy extends MovingEntity {
             flashTimer--; // Giảm dần thời gian nháy đỏ
         if (attackPauseTimer > 0)
             attackPauseTimer--; // Giảm thời gian nghỉ
+        if (hitStunTimer > 0)
+            hitStunTimer--; // Giảm thời gian khựng
 
         this.lastX = this.x;
         this.lastY = this.y;
@@ -54,7 +57,7 @@ public abstract class Enemy extends MovingEntity {
             kbTimer--;
             this.x += kbVectorX;
             this.y += kbVectorY;
-        } else if (hp > 0 && attackPauseTimer <= 0 && targetPlayer != null) {
+        } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null) {
             // Trạng thái: AI hoạt động (đuổi theo player)
             double playerX = targetPlayer.getX();
             double playerY = targetPlayer.getY();
@@ -93,12 +96,14 @@ public abstract class Enemy extends MovingEntity {
 
         // --- Logic animation ---
         // Chỉ tiếp tục chạy hoạt ảnh nếu quái vật còn sống
-        if (this.hp > 0) {
+        if (this.hp > 0 && hitStunTimer <= 0) {
             animationTimer++;
             if (animationTimer >= animationDelay) {
                 animationTimer = 0;
                 frameIndex = (frameIndex + 1) % numFrames;
             }
+        } else if (hitStunTimer > 0) {
+            this.frameIndex = 0; // Khựng lại, ép hiển thị ở frame đầu tiên
         }
     }
 
@@ -163,7 +168,7 @@ public abstract class Enemy extends MovingEntity {
             this.hp = 0;
             this.flashTimer = 60; // Quái chết -> Tồn tại thêm 60 frames (1 giây) để chạy hiệu ứng mờ dần
         } else {
-            this.flashTimer = 15; // Quái còn sống -> Khựng lại 15 frames (~0.25 giây)
+            this.flashTimer = 15; // Quái còn sống -> Chỉ nháy đỏ 15 frames (~0.25 giây)
         }
         
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.WHITE);
@@ -190,6 +195,8 @@ public abstract class Enemy extends MovingEntity {
     // Hàm xử lý đẩy lùi quái vật (Knockback)
     public void applyKnockback(com.hust.game.entities.Direction dir) {
         this.kbTimer = 6; // Bị đẩy lùi trượt đi trong 6 frames liên tiếp
+        this.hitStunTimer = 30; // Bị khựng lại (stun) trong 0.5s (30 frame)
+        this.frameIndex = 0; // Reset về frame animation đầu tiên
         double kbSpeed = this.knockback * 2.5; // Vận tốc đẩy mỗi frame
         this.kbVectorX = 0;
         this.kbVectorY = 0;

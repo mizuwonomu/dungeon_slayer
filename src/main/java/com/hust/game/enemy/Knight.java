@@ -38,6 +38,9 @@ public class Knight extends Enemy {
         if (this.flashTimer > 0) {
             this.flashTimer--;
         }
+        if (this.hitStunTimer > 0) {
+            this.hitStunTimer--;
+        }
 
         // --- BỔ SUNG LOGIC KNOCKBACK MÀ TRƯỚC ĐÓ BỊ THIẾU ---
         this.lastX = this.x;
@@ -53,8 +56,8 @@ public class Knight extends Enemy {
             return; 
         }
         
-        if (this.kbTimer > 0) {
-            return; // Còn sống nhưng đang bị knockback thì ngắt AI lướt/đi bộ
+        if (this.kbTimer > 0 || this.hitStunTimer > 0) {
+            return; // Còn sống nhưng đang bị knockback hoặc choáng thì ngắt AI lướt/đi bộ
         }
         // ----------------------------------------------------
 
@@ -148,6 +151,15 @@ public class Knight extends Enemy {
         double paddingX = this.renderWidth * 0.25;
         double paddingY = this.renderHeight * 0.25;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+    }
+
+    @Override
+    public void applyKnockback(com.hust.game.entities.Direction dir) {
+        // Hiệp sĩ miễn nhiễm với bị đẩy lùi và choáng khi đang dùng chiêu
+        if (this.isDashing) {
+            return;
+        }
+        super.applyKnockback(dir);
     }
 
 }
