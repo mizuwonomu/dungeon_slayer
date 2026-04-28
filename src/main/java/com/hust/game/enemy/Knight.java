@@ -7,7 +7,7 @@ import javafx.geometry.Rectangle2D;
 
 public class Knight extends Enemy {
 
-    private int dashCooldownTimer = 0;
+    private int dashCooldownTimer = 120;
     private final int MAX_DASH_COOLDOWN = 180;
     private int MAX_DASH_DURATION = 30;
     private Image normalSprite;
@@ -53,7 +53,7 @@ public class Knight extends Enemy {
 
         // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
         if (this.hp <= 0) {
-            return; 
+            return;
         }
         
         if (this.kbTimer > 0 || this.hitStunTimer > 0) {
@@ -99,9 +99,9 @@ public class Knight extends Enemy {
                 }
 
                 isDashing = true;
-                
+
                 com.hust.game.audio.SoundManager.playKnightReadySound();
-                
+
                 this.spriteSheet = skillSprite;
                 this.numFrames = 14;
                 this.frameWidth = skillSprite.getWidth() / this.numFrames;
