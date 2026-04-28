@@ -4,7 +4,7 @@ import javafx.scene.media.AudioClip;
 import java.net.URL;
 
 public class SoundManager {
-    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp;
+    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
 
     public static void loadSounds() {
@@ -13,6 +13,7 @@ public class SoundManager {
         nsHitSlime = loadSound("normal_sword_hit_slime.wav", 1.0);
         nsHitKnight = loadSound("normal_sword_hit_knight.wav", 1.0);
         nsFinalHit = loadSound("normal_sword_final_hit.wav", 1.0);
+        nsHitTree = loadSound("normal_sword_hit_tree.wav", 1.0);
         playerPowerUp = loadSound("player_power_up.wav", 1.0);
         sPowerUp = loadSound("sword_power_up.wav", 1.0);
 
@@ -48,6 +49,11 @@ public class SoundManager {
     public static void playNsHitSlimeSound() { 
         if (nsHitSlime != null) { nsHitSlime.stop(); nsHitSlime.play(); } 
     }
+
+    public static void playNsHitTreeSound() { 
+        if (nsHitTree != null) { nsHitTree.stop(); nsHitTree.play(); } 
+    }
+
     public static void playNsHitKnightSound() { 
         if (nsHitKnight != null) { nsHitKnight.stop(); nsHitKnight.play(); } 
     }
@@ -59,6 +65,18 @@ public class SoundManager {
         if (playerHitS != null) { playerHitS.stop(); playerHitS.play(); } 
     }
     
+    public static void playPlayerPowerUpSound() {
+        if (playerPowerUp != null) { playerPowerUp.stop(); playerPowerUp.play(); }
+    }
+
+    public static void playSwordPowerUpSound(double volume) {
+        if (sPowerUp != null) {
+            sPowerUp.stop();
+            sPowerUp.setVolume(volume);
+            sPowerUp.play();
+        }
+    }
+
     public static void playSlimeMoveSound() { 
         if (slimeMove != null) { slimeMove.stop(); slimeMove.play(); } 
     }

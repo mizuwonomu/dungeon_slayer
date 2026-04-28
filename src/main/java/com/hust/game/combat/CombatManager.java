@@ -131,6 +131,7 @@ public class CombatManager {
         boolean hitAny = false;
         boolean hitSlime = false;
         boolean hitKnight = false;
+        boolean hitTree = false;
         boolean isFinalHit = false;
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
@@ -152,24 +153,35 @@ public class CombatManager {
                 // Phân loại quái vật và xác định đòn kết liễu
                 if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
                 if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
+                if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
                 
                 if (enemy.getHp() <= 0) isFinalHit = true;
             }
         }
 
-        // Phát âm thanh của Normal Sword (ns) nếu chưa dùng skill cuồng nộ
-        if (!skillActive) {
+        // Xử lý âm thanh
+        if (skillActive) {
             if (!hitAny) {
-                com.hust.game.audio.SoundManager.playNsMissSound();
-            } else if (isFinalHit) {
-                com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Ưu tiên đòn kết liễu
+                com.hust.game.audio.SoundManager.playSwordPowerUpSound(0.5); // Chém trượt
             } else {
-                if (hitSlime) {
-                    com.hust.game.audio.SoundManager.playNsHitSlimeSound();
+                com.hust.game.audio.SoundManager.playSwordPowerUpSound(1.0); // Chém trúng
+                if (isFinalHit) {
+                    com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Phát thêm âm kết liễu
                 }
-                if (hitKnight) {
-                    com.hust.game.audio.SoundManager.playNsHitKnightSound();
-                }
+            }
+        } else {
+            if (!hitAny) {
+                com.hust.game.audio.SoundManager.playNsMissSound(); // Chém trượt
+            } else if (isFinalHit) {
+                com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Đòn kết liễu
+            } else {
+                // Chém thường trúng quái
+                if (hitSlime) com.hust.game.audio.SoundManager.playNsHitSlimeSound();
+                if (hitKnight) com.hust.game.audio.SoundManager.playNsHitKnightSound();
+                if (hitTree) {
+                    com.hust.game.audio.SoundManager.playNsHitTreeSound();
+                    com.hust.game.audio.SoundManager.playNsMissSound();
+                } // Cây dùng chung âm thanh với Knight
             }
         }
 
@@ -211,16 +223,19 @@ public class CombatManager {
     public void activateSkill() {
         // Không cho dùng khi skill đang chạy hoặc còn cooldown
         if (skillActive || skillCooldown > 0) return;
-
-        if (player.getCurrentMana() <= SKILL_HP_COST) return;
+        // Sửa lỗi: Phải kiểm tra với MANA_COST và điều kiện là < (thiếu mana mới return)
+        if (player.getCurrentMana() < SKILL_MANA_COST) return;
 
         player.takeMana(SKILL_MANA_COST);
 
         // Bật skill + set duration
         skillActive   = true;
         skillDuration = SKILL_DURATION_FRAMES;
-
+        
         player.setRageMode(true);
+
+        // Phát âm thanh Power Up
+        com.hust.game.audio.SoundManager.playPlayerPowerUpSound();
 
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }
