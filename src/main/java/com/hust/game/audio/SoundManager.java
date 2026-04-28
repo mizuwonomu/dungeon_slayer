@@ -6,6 +6,35 @@ import java.net.URL;
 public class SoundManager {
     public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
+    private static double masterVolume = 1.0; // 0.0 → 1.0
+
+    public static void setMasterVolume(double volume) {
+        masterVolume = volume;
+
+        // Apply to all loaded clips
+        applyVolume(nsMiss, 1.0);
+        applyVolume(nsHitSlime, 1.0);
+        applyVolume(nsHitKnight, 1.0);
+        applyVolume(nsFinalHit, 1.0);
+        applyVolume(nsHitTree, 1.0);
+
+        applyVolume(playerPowerUp, 1.0);
+        applyVolume(sPowerUp, 1.0);
+        applyVolume(thunder, 1.0);
+        applyVolume(playerHitS, 1.0);
+
+        applyVolume(slimeMove, 0.4);
+        applyVolume(knightAtk, 0.8);
+        applyVolume(knightReady, 0.8);
+        applyVolume(treeMoving, 0.4);
+        applyVolume(treeAtk, 0.8);
+    }
+
+    private static void applyVolume(AudioClip clip, double baseVolume) {
+        if (clip != null) {
+            clip.setVolume(baseVolume * masterVolume);
+        }
+    }
 
     public static void loadSounds() {
         // Thêm tham số âm lượng (từ 0.0 đến 1.0) để điều chỉnh mức to/nhỏ của từng file
@@ -27,13 +56,12 @@ public class SoundManager {
         treeAtk = loadSound("tree_atk.wav", 0.8);
     }
 
-    private static AudioClip loadSound(String fileName, double volume) {
+    private static AudioClip loadSound(String fileName, double baseVolume) {
         try {
-            // Tải từ thư mục resources/sounds
             URL url = SoundManager.class.getResource("/sounds/" + fileName);
             if (url != null) {
                 AudioClip clip = new AudioClip(url.toString());
-                clip.setVolume(volume); // Gán âm lượng mặc định cho file âm thanh
+                clip.setVolume(baseVolume * masterVolume); // ✅ correct variable
                 return clip;
             } else {
                 System.err.println("Không tìm thấy file âm thanh: /sounds/" + fileName);

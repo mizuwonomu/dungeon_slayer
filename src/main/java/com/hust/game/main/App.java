@@ -16,6 +16,7 @@ import com.hust.game.collision.CollisionChecker;
 import com.hust.game.ui.GameFinish;
 import com.hust.game.ui.HUD;
 import com.hust.game.ui.MenuScreen;
+import com.hust.game.ui.SettingsScreen;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -59,21 +60,50 @@ public class App extends Application {
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
 
+    // ... (everything above stays EXACTLY the same)
+
     @Override
     public void start(Stage stage) {
         stage.setTitle("GHOULITE");
 
-        MenuScreen menu = new MenuScreen(v -> {
-            Scene gameScene = createGameScene(stage);
-            stage.setScene(gameScene);
-            gameLoop.start();
-        });
+        MenuScreen menu = new MenuScreen(
+
+                // START
+                v -> {
+                    Scene gameScene = createGameScene(stage);
+                    stage.setScene(gameScene);
+                    gameLoop.start();
+                },
+
+                // SETTINGS
+                v -> showSettings(stage)
+        );
 
         stage.setScene(menu.createScene());
         stage.show();
+    }
+    private void showMenu(Stage stage) {
+        MenuScreen menu = new MenuScreen(
 
+                v -> {
+                    Scene gameScene = createGameScene(stage);
+                    stage.setScene(gameScene);
+                    gameLoop.start();
+                },
+
+                v -> showSettings(stage)
+        );
+
+        stage.setScene(menu.createScene());
     }
 
+    private void showSettings(Stage stage) {
+        SettingsScreen settings = new SettingsScreen(
+                v -> showMenu(stage)
+        );
+
+        stage.setScene(settings.createScene());
+    }
     private Scene createMenuScene(Stage stage) {
         Image startImg = loadImg("/assets/start.png");
         Image exitImg = loadImg("/assets/exit.png");
@@ -140,6 +170,7 @@ public class App extends Application {
 
     private GameFinish gameOverUI;
     private boolean isEndUIShown = false;
+
 
     private Scene createGameScene(Stage stage) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
@@ -231,13 +262,7 @@ public class App extends Application {
                                 () -> {
                                     isEndUIShown = false;
 
-                                    MenuScreen menu = new MenuScreen(v -> {
-                                        Scene gameScene = createGameScene(stage);
-                                        stage.setScene(gameScene);
-                                        gameLoop.start();
-                                    });
-
-                                    stage.setScene(menu.createScene());
+                                    showMenu(stage);
                                 });
 
                         root.getChildren().add(gameOverUI.getRoot());

@@ -7,7 +7,6 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.VBox;
-import javafx.scene.layout.HBox;
 import javafx.scene.text.Text;
 import javafx.geometry.Pos;
 
@@ -16,9 +15,11 @@ import java.util.function.Consumer;
 public class MenuScreen {
 
     private final Consumer<Void> onStart;
+    private final Consumer<Void> onSettings;
 
-    public MenuScreen(Consumer<Void> onStart) {
+    public MenuScreen(Consumer<Void> onStart, Consumer<Void> onSettings) {
         this.onStart = onStart;
+        this.onSettings = onSettings;
     }
 
     public Scene createScene() {
@@ -26,13 +27,20 @@ public class MenuScreen {
         Image startImg = loadImg("/assets/start.png");
         Image startHover = loadImg("/assets/startselect.png");
 
+        Image settingsImg = loadImg("/assets/setting.png");
+        Image settingsHover = loadImg("/assets/settingselect.png");
+
         Image exitImg = loadImg("/assets/exit.png");
         Image exitHover = loadImg("/assets/exitselect.png");
 
-        // ImageViews (bigger size)
+        // ImageViews
         ImageView startView = new ImageView(startImg);
         startView.setFitWidth(300);
         startView.setPreserveRatio(true);
+
+        ImageView settingsView = new ImageView(settingsImg);
+        settingsView.setFitWidth(300);
+        settingsView.setPreserveRatio(true);
 
         ImageView exitView = new ImageView(exitImg);
         exitView.setFitWidth(300);
@@ -40,24 +48,39 @@ public class MenuScreen {
 
         // Buttons
         Button startBtn = new Button();
-        Button exitBtn  = new Button();
+        Button settingsBtn = new Button();
+        Button exitBtn = new Button();
 
         startBtn.setGraphic(startView);
+        settingsBtn.setGraphic(settingsView);
         exitBtn.setGraphic(exitView);
 
+        // Remove default button styling
         startBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+        settingsBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
         exitBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
-        // Hover effects + slight zoom
+        // Hover effects
         startBtn.setOnMouseEntered(e -> {
             startView.setImage(startHover);
             startView.setScaleX(1.15);
             startView.setScaleY(1.15);
         });
-        startBtn.setOnMouseExited(e  -> {
+        startBtn.setOnMouseExited(e -> {
             startView.setImage(startImg);
             startView.setScaleX(1.0);
             startView.setScaleY(1.0);
+        });
+
+        settingsBtn.setOnMouseEntered(e -> {
+            settingsView.setImage(settingsHover);
+            settingsView.setScaleX(1.1);
+            settingsView.setScaleY(1.1);
+        });
+        settingsBtn.setOnMouseExited(e -> {
+            settingsView.setImage(settingsImg);
+            settingsView.setScaleX(1.0);
+            settingsView.setScaleY(1.0);
         });
 
         exitBtn.setOnMouseEntered(e -> {
@@ -65,7 +88,7 @@ public class MenuScreen {
             exitView.setScaleX(1.15);
             exitView.setScaleY(1.15);
         });
-        exitBtn.setOnMouseExited(e  -> {
+        exitBtn.setOnMouseExited(e -> {
             exitView.setImage(exitImg);
             exitView.setScaleX(1.0);
             exitView.setScaleY(1.0);
@@ -73,24 +96,25 @@ public class MenuScreen {
 
         // Actions
         startBtn.setOnAction(e -> onStart.accept(null));
+        settingsBtn.setOnAction(e -> onSettings.accept(null));
         exitBtn.setOnAction(e -> Platform.exit());
 
         // Title
         Text title = new Text("GHOULITE");
         title.setStyle("-fx-font-size: 48px; -fx-fill: white;");
 
-        // 🔥 Horizontal button layout
-        HBox buttonRow = new HBox(80, startBtn, exitBtn);
-        buttonRow.setAlignment(Pos.CENTER);
+        VBox buttonColumn = new VBox(-30, startBtn, settingsBtn, exitBtn);
+        buttonColumn.setAlignment(Pos.CENTER);
 
-        // Main layout (vertical: title on top, buttons below)
-        VBox layout = new VBox(60, title, buttonRow);
+        VBox layout = new VBox(-30, title, buttonColumn);
         layout.setAlignment(Pos.CENTER);
         layout.setStyle("-fx-background-color: black;");
 
-        return new Scene(layout,
+        return new Scene(
+                layout,
                 GameConstants.WINDOW_WIDTH,
-                GameConstants.WINDOW_HEIGHT);
+                GameConstants.WINDOW_HEIGHT
+        );
     }
 
     // Helper
