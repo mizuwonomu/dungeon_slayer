@@ -278,19 +278,22 @@ public class App extends Application {
             Image witchImg = loadImg("/assets/enemy/witch_summon.png");
             Image witchSkillImg = loadImg("/assets/enemy/witch_atk.png");
 
+            Image powerUpImg = loadImg("/assets/player/player_power_up.png");
+            Image thunderImg = loadImg("/assets/player/lightning.png");
+
             // Tải toàn bộ âm thanh
             SoundManager.loadSounds();
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
-                    cDown, cUp, cLeft, cRight, swordHit, rageHit);
+                    cDown, cUp, cLeft, cRight, swordHit, rageHit, powerUpImg, thunderImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            // enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            // enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-            // TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
+            TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
+            TILE_SIZE, TILE_SIZE, player);
             // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8,
             // TILE_SIZE * 2, TILE_SIZE * 2,
             // player,

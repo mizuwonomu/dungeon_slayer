@@ -4,7 +4,7 @@ import javafx.scene.media.AudioClip;
 import java.net.URL;
 
 public class SoundManager {
-    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree;
+    public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
 
     public static void loadSounds() {
@@ -16,6 +16,7 @@ public class SoundManager {
         nsHitTree = loadSound("normal_sword_hit_tree.wav", 1.0);
         playerPowerUp = loadSound("player_power_up.wav", 1.0);
         sPowerUp = loadSound("sword_power_up.wav", 1.0);
+        thunder = loadSound("thunder.wav", 1.0);
 
         playerHitS = loadSound("player_hit.wav", 1.0);
         
@@ -67,6 +68,10 @@ public class SoundManager {
     
     public static void playPlayerPowerUpSound() {
         if (playerPowerUp != null) { playerPowerUp.stop(); playerPowerUp.play(); }
+    }
+
+    public static void playThunderSound() {
+        if (thunder != null) { thunder.stop(); thunder.play(); }
     }
 
     public static void playSwordPowerUpSound(double volume) {

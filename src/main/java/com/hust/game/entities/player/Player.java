@@ -36,6 +36,17 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     // Thêm field bật skill
     private final Image rageHitImg;
+    private final Image powerUpImg;
+    private final Image thunderImg;
+
+    private boolean isRageActive = false;
+    private int rageTimer = 0;
+    private int powerUpFrameIndex = 0;
+    private int powerUpAnimTimer = 0;
+
+    private boolean isThunderActive = false;
+    private int thunderFrameIndex = 0;
+    private int thunderAnimTimer = 0;
 
     // Trạng thái tấn công
     private boolean isAttacking = false;
@@ -77,9 +88,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // Sau mỗi lần tấn công, phải chờ ATTACK_COOLDOWN_MAX frame
     // mới được tấn công lại → tránh spam attack.
     // -------------------------------------------------------
-    private int attackCooldown = 0;
+    private int attackCooldown = 0; 
     private static final int ATTACK_COOLDOWN_MAX = (8 * 4); // 8 frames attack delay giữa các lần đánh
-    private final int attackDamage = 50; // sát thương mỗi đòn
+    private final int attackDamage = 20; // sát thương mỗi đòn
 
     // -------------------------------------------------------
     // CONSTRUCTOR
@@ -90,7 +101,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
             Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
-            Image swordHitImg, Image rageHitImg) {
+            Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
@@ -120,6 +131,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.currentMana = maxMana;
         // Tạo entity chứa hiệu ứng kiếm
         this.rageHitImg = rageHitImg;
+        this.powerUpImg = powerUpImg;
+        this.thunderImg = thunderImg;
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
     }
 
@@ -242,12 +255,45 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         // Giảm cooldown tấn công mỗi frame (đếm ngược về 0)
         if (attackCooldown > 0)
             attackCooldown--;
+            
+        // Cập nhật hiệu ứng hào quang cuồng nộ
+        if (isRageActive) {
+            if (rageTimer > 0) rageTimer--;
+            powerUpAnimTimer++;
+            if (powerUpAnimTimer >= 8) { // Cứ 8 frames game đổi 1 hình của Power Up
+                powerUpAnimTimer = 0;
+                powerUpFrameIndex = (powerUpFrameIndex + 1) % 5;
+            }
+        }
+        
+        // Cập nhật hiệu ứng sấm sét
+        if (isThunderActive) {
+            thunderAnimTimer++;
+            // Tốc độ: 60 * 3 / 8 = 22.5 => Chạy khoảng 7-8 frames game cho mỗi 1 hình sấm sét
+            if (thunderAnimTimer >= 8) {
+                thunderAnimTimer = 0;
+                thunderFrameIndex++;
+                if (thunderFrameIndex >= 3) { // Hoàn thành 3 hình thì tắt sấm sét
+                    isThunderActive = false;
+                }
+            }
+        }
     }
 
     // Thêm method — CombatManager gọi khi bật/tắt skill
-    public void setRageMode(boolean active) {
-        if (attackEffect != null)
-            attackEffect.setRageMode(active);
+    public void setRageMode(boolean active, int duration) {
+        if (attackEffect != null) attackEffect.setRageMode(active);
+        this.isRageActive = active;
+        this.rageTimer = duration;
+        if (active) {
+            this.isThunderActive = true;
+            this.thunderFrameIndex = 0;
+            this.thunderAnimTimer = 0;
+            this.powerUpFrameIndex = 0;
+            this.powerUpAnimTimer = 0;
+        } else {
+            this.isThunderActive = false;
+        }
     }
 
     // Tạo sẵn hiệu ứng tĩnh (static) để GPU không bị quá tải khi load lại mỗi frame
@@ -264,6 +310,42 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
         super.render(gc);
         gc.restore();
+
+        // Vẽ hiệu ứng Power Up đè lên Player
+        if (isRageActive && powerUpImg != null) {
+            gc.save();
+            // Ở 60 frame (1 giây) cuối cùng -> giảm dần Alpha để tạo hiệu ứng mờ dần
+            double alpha = 1.0;
+            if (rageTimer <= 60) {
+                alpha = Math.max(0, (double) rageTimer / 60.0);
+            }
+            gc.setGlobalAlpha(alpha);
+            
+            double pw = powerUpImg.getWidth() / 5;
+            double ph = powerUpImg.getHeight();
+            double px = powerUpFrameIndex * pw;
+            
+            // Kích thước tương đương với Player và đè lên người
+            gc.drawImage(powerUpImg, px, 0, pw, ph, x, y, renderWidth, renderHeight);
+            gc.restore();
+        }
+        
+        // Vẽ hiệu ứng Thunder sấm sét đè lên tất cả
+        if (isThunderActive && thunderImg != null) {
+            double tw = thunderImg.getWidth() / 3;
+            double th = thunderImg.getHeight();
+            double tx = thunderFrameIndex * tw;
+            
+            double thunderRenderHeight = 256.0;
+            // Tính toán tỷ lệ bề ngang để hình không bị méo (hoặc kéo giãn theo đúng tỷ lệ ảnh)
+            double thunderRenderWidth = thunderRenderHeight * (tw / th);
+            
+            // Căn giữa tia sét và đồng bộ phần ĐÁY của sét với ĐÁY của nhân vật
+            double thunderX = x + (renderWidth / 2) - (thunderRenderWidth / 2);
+            double thunderY = y + renderHeight - thunderRenderHeight;
+            
+            gc.drawImage(thunderImg, tx, 0, tw, th, thunderX, thunderY, thunderRenderWidth, thunderRenderHeight);
+        }
 
         if (isAttacking && attackEffect != null) {
             attackEffect.render(gc); // Vẽ hiệu ứng kiếm đè lên

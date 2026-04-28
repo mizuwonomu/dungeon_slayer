@@ -66,7 +66,7 @@ public class CombatManager {
             if (skillDuration <= 0) {
                 skillActive   = false;
                 skillCooldown = SKILL_COOLDOWN_FRAMES;
-                player.setRageMode(false); // về sprite bình thường
+                player.setRageMode(false, 0); // về sprite bình thường
             }
         }
 
@@ -232,10 +232,11 @@ public class CombatManager {
         skillActive   = true;
         skillDuration = SKILL_DURATION_FRAMES;
         
-        player.setRageMode(true);
+        player.setRageMode(true, skillDuration);
 
         // Phát âm thanh Power Up
         com.hust.game.audio.SoundManager.playPlayerPowerUpSound();
+        com.hust.game.audio.SoundManager.playThunderSound();
 
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }
