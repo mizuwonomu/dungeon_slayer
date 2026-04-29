@@ -366,23 +366,35 @@ public class App extends Application {
 
         // Khóa di chuyển khi đang chém để animation hiển thị rõ ràng và uy lực hơn
         if (!player.isAttacking()) {
-            if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) {
-                player.setDirection(Direction.UP);
-                player.moveUp();
-                isAnyKeyPressed = true;
-            } else if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) {
-                player.setDirection(Direction.DOWN);
-                player.moveDown();
-                isAnyKeyPressed = true;
-            } else if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) {
-                player.setDirection(Direction.LEFT);
-                player.moveLeft();
-                isAnyKeyPressed = true;
-            } else if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) {
-                player.setDirection(Direction.RIGHT);
-                player.moveRight();
-                isAnyKeyPressed = true;
+            boolean up    = input.contains(KeyCode.W) || input.contains(KeyCode.UP);
+            boolean down  = input.contains(KeyCode.S) || input.contains(KeyCode.DOWN);
+            boolean left  = input.contains(KeyCode.A) || input.contains(KeyCode.LEFT);
+            boolean right = input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT);
+
+            // Xử lý direction — ưu tiên trục đơn, đi chéo thì giữ direction cũ
+            if      (up && !down && !left && !right) player.setDirection(Direction.UP);
+            else if (down && !up && !left && !right) player.setDirection(Direction.DOWN);
+            else if (left && !right && !up && !down) player.setDirection(Direction.LEFT);
+            else if (right && !left && !up && !down) player.setDirection(Direction.RIGHT);
+
+            // Di chuyển độc lập từng trục
+            double dx = 0, dy = 0;
+            if (up)    dy -= 1;
+            if (down)  dy += 1;
+            if (left)  dx -= 1;
+            if (right) dx += 1;
+
+            // Normalize vector chéo để tốc độ không bị nhanh hơn
+            if (dx != 0 && dy != 0) {
+                dx *= 0.7071; // 1 / √2
+                dy *= 0.7071;
             }
+
+            // Apply movement
+            if (dx != 0) player.setX(player.getX() + dx * GameConstants.PLAYER_SPEED);
+            if (dy != 0) player.setY(player.getY() + dy * GameConstants.PLAYER_SPEED);
+
+            isAnyKeyPressed = (up || down || left || right);
         }
 
         if (input.contains(KeyCode.J)) {
