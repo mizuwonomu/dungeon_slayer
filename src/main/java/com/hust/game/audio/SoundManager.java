@@ -9,6 +9,10 @@ public class SoundManager {
     public static AudioClip btnHover, btnClick;
     private static double masterVolume = 1.0; // 0.0 → 1.0
 
+    public static double getMasterVolume() {
+        return masterVolume;
+    }
+
     public static void setMasterVolume(double volume) {
         masterVolume = volume;
 

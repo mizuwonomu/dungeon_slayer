@@ -6,13 +6,21 @@ import javafx.animation.AnimationTimer;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.geometry.Pos;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.Cursor;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.util.Duration;
 
 import java.util.function.Consumer;
 
@@ -34,10 +42,12 @@ public class SettingsScreen {
     // -------------------------------------------------------
     // SOUND LEVEL — bước nhảy 10, từ 0 đến 100
     // -------------------------------------------------------
-    private int soundLevel = 50;
+    private int soundLevel;
 
     public SettingsScreen(Consumer<Void> onBack) {
         this.onBack = onBack;
+        // Đồng bộ mức âm lượng hiện tại khi mở cài đặt
+        this.soundLevel = (int) Math.round(SoundManager.getMasterVolume() * 100);
     }
 
     public Scene createScene() {
@@ -51,49 +61,43 @@ public class SettingsScreen {
         // LOAD ẢNH
         // -------------------------------------------------------
         Image bgSheet    = loadImg("/assets/menu_background.png");
-        Image menuImg    = loadImg("/assets/menu.png");
-        Image menuHover  = loadImg("/assets/menuselect.png");
-        Image minusImg   = loadImg("/assets/sound/minus.png");
-        Image minusHover = loadImg("/assets/sound/minusselect.png");
-        Image plusImg    = loadImg("/assets/sound/plus.png");
-        Image plusHover  = loadImg("/assets/sound/plusselect.png");
+        Image buttonSheet = loadImg("/assets/button.png"); // Dùng sprite sheet mới thay cho menu.png cũ
 
         // -------------------------------------------------------
         // TITLE
         // -------------------------------------------------------
         javafx.scene.text.Text title = new javafx.scene.text.Text("SETTINGS");
-        title.setStyle("-fx-font-size: 42px; -fx-fill: white; -fx-font-weight: bold;");
+        Font titleFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 80);
+        if (titleFont == null) {
+            titleFont = Font.font("Arial", FontWeight.BOLD, 80);
+        }
+        title.setFont(titleFont);
+        title.setFill(Color.WHITE);
+        title.setStroke(Color.BLACK);
+        title.setStrokeWidth(2.0);
 
         // -------------------------------------------------------
-        // SOUND IMAGE — ảnh 1920x1080, fitWidth 300 → height ~168px
+        // SOUND BUTTON — Thay thế ảnh thành dạng button hiển thị số
         // -------------------------------------------------------
-        ImageView soundView = new ImageView(loadSoundImage());
-        soundView.setFitWidth(300);
-        soundView.setPreserveRatio(true);
+        StackPane soundBtn = createSpriteBtn(String.valueOf(soundLevel), buttonSheet, 3, 0.8, () -> {
+            // Nút bấm được, có âm thanh nhưng chưa cần có chức năng đặc biệt
+        });
 
         // -------------------------------------------------------
         // NÚT MINUS và PLUS
         // -------------------------------------------------------
-        ImageView minusView = new ImageView(minusImg);
-        minusView.setFitWidth(100);
-        minusView.setPreserveRatio(true);
-
-        Button minusBtn = makeBtn(minusView, minusImg, minusHover, () -> {
+        StackPane minusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
             if (soundLevel > 0) {
                 soundLevel -= 10;
-                soundView.setImage(loadSoundImage()); // Cập nhật ảnh mức âm lượng
+                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
                 SoundManager.setMasterVolume(soundLevel / 100.0);
             }
         });
 
-        ImageView plusView = new ImageView(plusImg);
-        plusView.setFitWidth(100);
-        plusView.setPreserveRatio(true);
-
-        Button plusBtn = makeBtn(plusView, plusImg, plusHover, () -> {
+        StackPane plusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
             if (soundLevel < 100) {
                 soundLevel += 10;
-                soundView.setImage(loadSoundImage()); // Cập nhật ảnh mức âm lượng
+                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
                 SoundManager.setMasterVolume(soundLevel / 100.0);
             }
         });
@@ -101,17 +105,13 @@ public class SettingsScreen {
         // -------------------------------------------------------
         // SOUND ROW — minus | ảnh sound | plus nằm ngang
         // -------------------------------------------------------
-        HBox soundRow = new HBox(10, minusBtn, soundView, plusBtn);
+        HBox soundRow = new HBox(10, minusBtn, soundBtn, plusBtn);
         soundRow.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------
         // NÚT BACK VỀ MENU
         // -------------------------------------------------------
-        ImageView menuView = new ImageView(menuImg);
-        menuView.setFitWidth(200);
-        menuView.setPreserveRatio(true);
-
-        Button menuBtn = makeBtn(menuView, menuImg, menuHover, () -> onBack.accept(null));
+        StackPane menuBtn = createSpriteBtn("MENU", buttonSheet, 3, 0.8, () -> onBack.accept(null));
 
         // -------------------------------------------------------
         // LAYOUT TỔNG — Title → Sound Row → Back, canh giữa màn hình
@@ -182,38 +182,115 @@ public class SettingsScreen {
     }
 
     // -------------------------------------------------------
-    // HELPER: Load ảnh sound theo soundLevel hiện tại
+    // HELPER: Tạo Nút tùy chỉnh với Sprite Animation và Text
     // -------------------------------------------------------
-    private Image loadSoundImage() {
-        return loadImg("/assets/sound/sound" + soundLevel + ".png");
-    }
+    private StackPane createSpriteBtn(String btnText, Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {
+        StackPane pane = new StackPane();
+        
+        double frameW = spriteSheet.getWidth() / numFrames;
+        double frameH = spriteSheet.getHeight();
+        
+        ImageView view = new ImageView(spriteSheet);
+        view.setViewport(new Rectangle2D(0, 0, frameW, frameH));
+        
+        view.setFitWidth(frameW * scaleMultiplier);
+        view.setFitHeight(frameH * scaleMultiplier);
 
-    // -------------------------------------------------------
-    // HELPER: Tạo Button với hover effect
-    // -------------------------------------------------------
-    private Button makeBtn(ImageView view, Image normal, Image hover, Runnable action) {
-        Button btn = new Button();
-        btn.setGraphic(view);
-        btn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
-
-        btn.setOnMouseEntered(e -> {
+        pane.setPrefSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        pane.setMaxSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        
+        final Text textNode = (btnText != null) ? new Text(btnText) : null;
+        
+        if (textNode != null) {
+            if ("+".equals(btnText) || "-".equals(btnText)) {
+                textNode.setFont(Font.font("Consolas", FontWeight.BOLD, 60));
+                textNode.setFill(Color.BLACK);
+                textNode.setStroke(Color.WHITE);
+                textNode.setStrokeWidth(2.0);
+            } else {
+                Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 46);
+                if (pixelFont == null) {
+                    pixelFont = Font.font("Arial", FontWeight.BOLD, 46);
+                }
+                textNode.setFont(pixelFont);
+                textNode.setFill(Color.RED);
+                textNode.setStroke(Color.BLACK);
+                textNode.setStrokeWidth(2.5);
+            }
+        }
+        
+        if (textNode != null) {
+            pane.getChildren().addAll(view, textNode);
+        } else {
+            pane.getChildren().add(view);
+        }
+        
+        int[] currentFrame = {0};
+        Timeline[] timeline = {null};
+        
+        pane.setOnMouseEntered(e -> {
             com.hust.game.audio.SoundManager.playButtonHoverSound();
-            view.setImage(hover);
-            view.setScaleX(1.15);
-            view.setScaleY(1.15);
+            pane.setScaleX(1.10);
+            pane.setScaleY(1.10);
+            if (textNode != null) {
+                if ("+".equals(btnText) || "-".equals(btnText)) {
+                    textNode.setFill(Color.DARKGRAY);
+                    textNode.setStroke(Color.WHITE);
+                } else {
+                    textNode.setFill(Color.ORANGE);
+                    textNode.setStroke(Color.WHITE);
+                }
+            }
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = numFrames - 1 - currentFrame[0];
+            if (framesToAnimate > 0) {
+                timeline[0] = new Timeline(new KeyFrame(Duration.millis(30), evt -> {
+                    currentFrame[0]++;
+                    view.setViewport(new Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
         });
-        btn.setOnMouseExited(e -> {
-            view.setImage(normal);
-            view.setScaleX(1.0);
-            view.setScaleY(1.0);
+        
+        pane.setOnMouseExited(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+            if (textNode != null) {
+                if ("+".equals(btnText) || "-".equals(btnText)) {
+                    textNode.setFill(Color.BLACK);
+                    textNode.setStroke(Color.WHITE);
+                } else {
+                    textNode.setFill(Color.RED);
+                    textNode.setStroke(Color.BLACK);
+                }
+            }
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = currentFrame[0];
+            if (framesToAnimate > 0) {
+                timeline[0] = new Timeline(new KeyFrame(Duration.millis(50), evt -> {
+                    currentFrame[0]--;
+                    view.setViewport(new Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
         });
-
-        btn.setOnMousePressed(e -> {
+        
+        pane.setOnMousePressed(e -> {
             com.hust.game.audio.SoundManager.playButtonClickSound();
+            pane.setScaleX(0.9);
+            pane.setScaleY(0.9);
         });
-
-        btn.setOnAction(e -> action.run());
-        return btn;
+        pane.setOnMouseReleased(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+        });
+        
+        pane.setOnMouseClicked(e -> action.run());
+        pane.setCursor(Cursor.HAND);
+        
+        return pane;
     }
 
     // -------------------------------------------------------
