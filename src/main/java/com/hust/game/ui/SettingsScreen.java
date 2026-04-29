@@ -157,13 +157,19 @@ public class SettingsScreen {
                 // Cắt đúng frame từ sprite sheet bằng cách dịch sx
                 double sx = bgFrameIndex[0] * BG_FRAME_W;
 
+                // Tính toán tỷ lệ để giữ nguyên Aspect Ratio (kiểu Cover màn hình)
+                double scale = Math.max((double) GameConstants.WINDOW_WIDTH / BG_FRAME_W, (double) GameConstants.WINDOW_HEIGHT / BG_FRAME_H);
+                double drawW = BG_FRAME_W * scale;
+                double drawH = BG_FRAME_H * scale;
+                double drawX = (GameConstants.WINDOW_WIDTH - drawW) / 2.0;
+                double drawY = (GameConstants.WINDOW_HEIGHT - drawH) / 2.0;
+
                 gc.drawImage(
                     bgSheet,
                     sx, 0,                       // Nguồn: cắt từ (sx, 0)
                     BG_FRAME_W, BG_FRAME_H,      // Nguồn: kích thước 1 frame gốc
-                    0, 0,                        // Đích: góc trên trái màn hình
-                    GameConstants.WINDOW_WIDTH,  // Đích: full width
-                    GameConstants.WINDOW_HEIGHT  // Đích: full height
+                    drawX, drawY,                // Đích: căn giữa
+                    drawW, drawH                 // Đích: kích thước giữ tỷ lệ
                 );
 
                 gc.restore(); // Khôi phục globalAlpha về 1.0
