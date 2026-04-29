@@ -6,6 +6,7 @@ import java.net.URL;
 public class SoundManager {
     public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
+    public static AudioClip btnHover, btnClick;
     private static double masterVolume = 1.0; // 0.0 → 1.0
 
     public static void setMasterVolume(double volume) {
@@ -28,6 +29,8 @@ public class SoundManager {
         applyVolume(knightReady, 0.8);
         applyVolume(treeMoving, 0.4);
         applyVolume(treeAtk, 0.8);
+        applyVolume(btnHover, 0.8);
+        applyVolume(btnClick, 1.0);
     }
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
@@ -54,6 +57,8 @@ public class SoundManager {
         knightReady = loadSound("knight_ready.wav", 0.8);
         treeMoving = loadSound("tree_moving.wav", 0.4);
         treeAtk = loadSound("tree_atk.wav", 0.8);
+        btnHover = loadSound("button_hold.wav", 0.8);
+        btnClick = loadSound("button_click.wav", 1.0);
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -124,5 +129,12 @@ public class SoundManager {
     }
     public static void playTreeAtkSound() { 
         if (treeAtk != null) { treeAtk.stop(); treeAtk.play(); } 
+    }
+
+    public static void playButtonHoverSound() {
+        if (btnHover != null) { btnHover.stop(); btnHover.play(); }
+    }
+    public static void playButtonClickSound() {
+        if (btnClick != null) { btnClick.stop(); btnClick.play(); }
     }
 }

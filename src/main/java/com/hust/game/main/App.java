@@ -66,6 +66,9 @@ public class App extends Application {
     public void start(Stage stage) {
         stage.setTitle("GHOULITE");
 
+        // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
+        SoundManager.loadSounds();
+
         MenuScreen menu = new MenuScreen(
 
                 // START
@@ -230,21 +233,41 @@ public class App extends Application {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
-                    gc.setFill(isVictory ? javafx.scene.paint.Color.YELLOW : javafx.scene.paint.Color.RED);
-                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
+                    // Load font chữ pixel
+                    javafx.scene.text.Font finishFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 100);
+                    if (finishFont == null) {
+                        finishFont = new javafx.scene.text.Font("Arial", 100); // Fallback
+                    }
+                    gc.setFont(finishFont);
+                    gc.setStroke(javafx.scene.paint.Color.WHITE);
+                    gc.setLineWidth(4);
 
-                    String text = isVictory ? "VICTORY!" : "Gàaaa, Game Over!";
+                    if (isVictory) {
+                        String text = "VICTORY!";
+                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
+                        tempText.setFont(gc.getFont());
+                        double textWidth = tempText.getLayoutBounds().getWidth();
+                        double textHeight = tempText.getLayoutBounds().getHeight();
+                        double x = (WIDTH - textWidth) / 2;
+                        double y = (HEIGHT + textHeight) / 2 - 50;
 
-                    javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
-                    tempText.setFont(gc.getFont());
+                        gc.setFill(javafx.scene.paint.Color.GOLD);
+                        gc.strokeText(text, x, y); // Vẽ viền trắng
+                        gc.fillText(text, x, y);   // Vẽ chữ màu vàng gold
+                    } else { // isGameOver
+                        String text = "DEFEAT";
+                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
+                        tempText.setFont(gc.getFont());
+                        double textWidth = tempText.getLayoutBounds().getWidth();
+                        double textHeight = tempText.getLayoutBounds().getHeight();
+                        double x = (WIDTH - textWidth) / 2;
+                        double y = (HEIGHT + textHeight) / 2 - 50;
 
-                    double textWidth = tempText.getLayoutBounds().getWidth();
-                    double textHeight = tempText.getLayoutBounds().getHeight();
+                        gc.setFill(javafx.scene.paint.Color.GRAY);
+                        gc.strokeText(text, x, y); // Vẽ viền trắng
+                        gc.fillText(text, x, y);   // Vẽ chữ màu xám
+                    }
 
-                    double x = (WIDTH - textWidth) / 2;
-                    double y = (HEIGHT + textHeight) / 2 - 50;
-
-                    gc.fillText(text, x, y);
                     if (!isEndUIShown) {
                         gameLoop.stop();
 
@@ -306,8 +329,6 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
-            // Tải toàn bộ âm thanh
-            SoundManager.loadSounds();
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,

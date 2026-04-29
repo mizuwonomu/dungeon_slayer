@@ -6,13 +6,22 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.layout.HBox;
 import javafx.geometry.Pos;
 import javafx.geometry.Insets;
+import javafx.geometry.Rectangle2D;
+import javafx.scene.text.Font;
+import javafx.scene.text.FontWeight;
+import javafx.scene.text.Text;
+import javafx.scene.paint.Color;
+import javafx.animation.Timeline;
+import javafx.animation.KeyFrame;
+import javafx.util.Duration;
+import javafx.scene.Cursor;
 
 import java.util.function.Consumer;
 
@@ -63,50 +72,36 @@ public class MenuScreen {
         GraphicsContext gc = canvas.getGraphicsContext2D();
 
         // -------------------------------------------------------
-        // NÚT BẤM — 3 nút sát nhau, góc trái dưới màn hình
+        // NÚT BẤM MAIN MENU — Sử dụng sprite sheet (Animation Frame)
         // -------------------------------------------------------
-        Image startImg      = loadImg("/assets/start.png");
-        Image startHover    = loadImg("/assets/startselect.png");
-        Image settingsImg   = loadImg("/assets/setting.png");
-        Image settingsHover = loadImg("/assets/settingselect.png");
-        Image exitImg       = loadImg("/assets/exit.png");
-        Image exitHover     = loadImg("/assets/exitselect.png");
+        Image buttonSheet  = loadImg("/assets/button.png");
+        Image settingSheet = loadImg("/assets/setting.png");
 
-        ImageView startView    = new ImageView(startImg);
-        ImageView settingsView = new ImageView(settingsImg);
-        ImageView exitView     = new ImageView(exitImg);
-
-        // Kích thước nút — nhỏ gọn để vừa góc dưới trái
-        startView.setFitWidth(290);    startView.setPreserveRatio(true);
-        settingsView.setFitWidth(290); settingsView.setPreserveRatio(true);
-        exitView.setFitWidth(290);     exitView.setPreserveRatio(true);
-
-        // -------------------------------------------------------
-        // Biến phase dùng mảng để lambda có thể modify
-        // (Java yêu cầu biến trong lambda phải effectively final,
-        //  dùng mảng 1 phần tử là cách workaround phổ biến)
-        // -------------------------------------------------------
-        int[]    phase   = { hasPlayedIntro ? 1 : 0 };  // Nếu đã xem intro rồi → bỏ qua Phase 0
+        int[]    phase   = { hasPlayedIntro ? 1 : 0 };
         double[] bgAlpha = { 1.0 };
 
-        // Nút Play — khi bấm thì chuyển sang Phase 2 (fade out)
-        // Không gọi onStart ngay, chờ fade xong mới gọi trong loop
-        Button startBtn = makeBtn(startView, startImg, startHover, () -> {
+        // Nút Start
+        StackPane startBtn = createSpriteBtn("START", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 1) {
                 phase[0] = 2; // Kích hoạt fade out
             }
         });
 
-        // Nút Settings và Exit hoạt động bình thường, không cần fade
-        Button settingsBtn = makeBtn(settingsView, settingsImg, settingsHover,
-                () -> onSettings.accept(null));
-        Button exitBtn     = makeBtn(exitView, exitImg, exitHover,
-                () -> Platform.exit());
+        // Nút Exit
+        StackPane exitBtn = createSpriteBtn("EXIT", buttonSheet, 3, 1.0, Platform::exit);
 
-        // VBox: 3 nút xếp dọc, khoảng cách đều nhau giữa các nút
-        VBox btnBox = new VBox(4, startBtn, settingsBtn, exitBtn); // 8px khoảng cách
+        // Nút Settings (Đã cập nhật 3 frame và thu nhỏ 20%)
+        StackPane settingsBtn = createSpriteBtn(null, settingSheet, 3, 0.72, () -> onSettings.accept(null));
+
+        // Bố cục: Setting nằm bên phải Exit, khoảng cách 5px
+        HBox bottomRow = new HBox(5, exitBtn, settingsBtn);
+        bottomRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Bố cục: Exit nằm dưới Start (cùng x do canh trái), khoảng cách 5px
+        VBox btnBox = new VBox(5, startBtn, bottomRow);
         btnBox.setAlignment(Pos.BOTTOM_LEFT);
-        btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0); // Ẩn hoàn toàn lúc đầu — hiện ra sau Phase 0
+        
+        btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0);
 
         // -------------------------------------------------------
         // STACKPANE — canvas phía dưới, nút phía trên
@@ -115,7 +110,7 @@ public class MenuScreen {
         StackPane root = new StackPane(canvas, btnBox);
         StackPane.setAlignment(btnBox, Pos.BOTTOM_LEFT);
 
-        // Padding: cách mép dưới 30px, cách mép trái 30px
+        // Padding: cách mép dưới cao hơn một chút (60px), cách mép trái 70px
         StackPane.setMargin(btnBox, new Insets(0, 0, 20, 70));
 
         root.setStyle("-fx-background-color: black;"); // Nền đen khi background chưa load
@@ -227,26 +222,107 @@ public class MenuScreen {
     }
 
     // -------------------------------------------------------
-    // HELPER: Tạo Button với hover effect (đổi ảnh + scale nhẹ)
+    // HELPER: Tạo Nút tùy chỉnh với Sprite Animation và Text
     // -------------------------------------------------------
-    private Button makeBtn(ImageView view, Image normal, Image hover, Runnable action) {
-        Button btn = new Button();
-        btn.setGraphic(view);
-        btn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
+    private StackPane createSpriteBtn(String btnText, Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {
+        StackPane pane = new StackPane();
+        
+        // Kích thước 1 frame
+        double frameW = spriteSheet.getWidth() / numFrames;
+        double frameH = spriteSheet.getHeight();
+        
+        ImageView view = new ImageView(spriteSheet);
+        view.setViewport(new Rectangle2D(0, 0, frameW, frameH));
+        
+        view.setFitWidth(frameW * scaleMultiplier);
+        view.setFitHeight(frameH * scaleMultiplier);
 
-        btn.setOnMouseEntered(e -> {
-            view.setImage(hover);
-            view.setScaleX(1.15);
-            view.setScaleY(1.15);
+        // Trói chặt khu vực nhận diện chuột (Hitbox) vừa khít với ảnh
+        pane.setPrefSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        pane.setMaxSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        
+        final Text textNode = (btnText != null) ? new Text(btnText) : null;
+        
+        if (textNode != null) {
+            Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 56);
+            if (pixelFont == null) {
+                pixelFont = Font.font("Arial", FontWeight.BOLD, 56); // fallback nếu ko tìm thấy
+            }
+            textNode.setFont(pixelFont);
+            textNode.setFill(Color.RED);
+            textNode.setStroke(Color.BLACK);
+            textNode.setStrokeWidth(3.0); // Tăng lại độ dày viền
+        }
+        
+        if (textNode != null) {
+            pane.getChildren().addAll(view, textNode); // Text nằm đè lên hình ảnh
+        } else {
+            pane.getChildren().add(view);
+        }
+        
+        // Biến trạng thái Animation
+        int[] currentFrame = {0};
+        Timeline[] timeline = {null};
+        
+        pane.setOnMouseEntered(e -> {
+            com.hust.game.audio.SoundManager.playButtonHoverSound();
+            pane.setScaleX(1.10);
+            pane.setScaleY(1.10);
+            if (textNode != null) {
+                textNode.setFill(Color.ORANGE);
+                textNode.setStroke(Color.WHITE);
+            }
+            
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = numFrames - 1 - currentFrame[0]; // Chỉ chạy tiếp số frame còn lại
+            if (framesToAnimate > 0) {
+                timeline[0] = new Timeline(new KeyFrame(Duration.millis(20), evt -> {
+                    currentFrame[0]++;
+                    view.setViewport(new Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
         });
-        btn.setOnMouseExited(e -> {
-            view.setImage(normal);
-            view.setScaleX(1.0);
-            view.setScaleY(1.0);
+        
+        pane.setOnMouseExited(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+            if (textNode != null) {
+                textNode.setFill(Color.RED);
+                textNode.setStroke(Color.BLACK);
+            }
+            
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = currentFrame[0];
+            if (framesToAnimate > 0) { // Chạy animation giật lùi về frame 0
+                timeline[0] = new Timeline(new KeyFrame(Duration.millis(100), evt -> {
+                    currentFrame[0]--;
+                    view.setViewport(new Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
         });
-
-        btn.setOnAction(e -> action.run());
-        return btn;
+        
+        // Thu nhỏ còn 0.9 khi nhấn
+        pane.setOnMousePressed(e -> {
+            com.hust.game.audio.SoundManager.playButtonClickSound();
+            pane.setScaleX(0.9);
+            pane.setScaleY(0.9);
+        });
+        
+        // Trả về kích thước x1.0 khi nhả chuột
+        pane.setOnMouseReleased(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+        });
+        
+        // Gọi action khi click
+        pane.setOnMouseClicked(e -> action.run());
+        pane.setCursor(Cursor.HAND);
+        
+        return pane;
     }
 
     // -------------------------------------------------------

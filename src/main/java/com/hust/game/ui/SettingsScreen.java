@@ -197,6 +197,7 @@ public class SettingsScreen {
         btn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
         btn.setOnMouseEntered(e -> {
+            com.hust.game.audio.SoundManager.playButtonHoverSound();
             view.setImage(hover);
             view.setScaleX(1.15);
             view.setScaleY(1.15);
@@ -205,6 +206,10 @@ public class SettingsScreen {
             view.setImage(normal);
             view.setScaleX(1.0);
             view.setScaleY(1.0);
+        });
+
+        btn.setOnMousePressed(e -> {
+            com.hust.game.audio.SoundManager.playButtonClickSound();
         });
 
         btn.setOnAction(e -> action.run());
