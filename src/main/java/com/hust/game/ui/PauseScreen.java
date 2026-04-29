@@ -37,11 +37,12 @@ public class PauseScreen {
         title.setStroke(Color.BLACK);
         title.setStrokeWidth(3.0);
 
-        StackPane resumeBtn = createSpriteBtn("RESUME", buttonSheet, 3, 0.9, onResume);
-        StackPane menuBtn = createSpriteBtn("MAIN MENU", buttonSheet, 3, 0.9, onMenu);
+        StackPane resumeBtn = createSpriteBtn("RESUME", buttonSheet, 3, 0.7, onResume);
+        StackPane menuBtn = createSpriteBtn("MAIN MENU", buttonSheet, 3, 0.7, onMenu);
 
         VBox uiBox = new VBox(25, title, resumeBtn, menuBtn);
         uiBox.setAlignment(Pos.CENTER);
+        uiBox.setTranslateY(20);
 
         root.getChildren().add(uiBox);
         root.setPickOnBounds(true);
@@ -72,9 +73,9 @@ public class PauseScreen {
         pane.setMaxSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
 
         Text textNode = new Text(btnText);
-        Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 42);
+        Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 34);
         if (pixelFont == null) {
-            pixelFont = Font.font("Arial", FontWeight.BOLD, 42);
+            pixelFont = Font.font("Arial", FontWeight.BOLD, 34);
         }
         textNode.setFont(pixelFont);
         textNode.setFill(Color.RED);
