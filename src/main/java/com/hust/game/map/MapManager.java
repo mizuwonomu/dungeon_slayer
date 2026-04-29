@@ -9,12 +9,14 @@ import java.io.InputStreamReader;
 public class MapManager {
     public Tile[] tiles;
     public int[][] mapTileNum;
+    public int level;
 
-    public MapManager() {
+    public MapManager(int level) {
+        this.level = level;
         tiles = new Tile[TileType.values().length];
         mapTileNum = new int[GameConstants.MAX_SCREEN_ROW][GameConstants.MAX_SCREEN_COL];
         loadTiles();
-        loadMap("/assets/maps/level1.txt");
+        loadMap("/assets/maps/level" + level + ".txt");
     }
 
     public void loadTiles() {

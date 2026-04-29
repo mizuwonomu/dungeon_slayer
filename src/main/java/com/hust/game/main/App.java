@@ -12,6 +12,7 @@ import com.hust.game.enemy.Knight;
 import com.hust.game.enemy.Enemy;
 import com.hust.game.map.MapManager;
 import com.hust.game.collision.CollisionChecker;
+import com.hust.game.progression.GameManager;
 
 import com.hust.game.ui.GameFinish;
 import com.hust.game.ui.HUD;
@@ -41,6 +42,10 @@ public class App extends Application {
     private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 480; // 10 * 48
 
+    // Transition giữa level
+    private boolean isTransitioning = false;
+    private int transitionFrame = 0;
+
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
@@ -53,6 +58,7 @@ public class App extends Application {
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
     private MapManager mapManager;
     private CollisionChecker collisionChecker;
+    private GameManager gameManager;
 
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
@@ -220,10 +226,10 @@ public class App extends Application {
             @Override
             public void handle(long now) {
 
-                boolean isVictory = enemyManager.getEnemyList().isEmpty();
+                boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (!isVictory && !isGameOver && !isPaused) {
+                if (!isVictory && !isGameOver && !isTransitioning) {
                     handleInput();
                     player.update();
                     combatManager.update();
@@ -245,7 +251,7 @@ public class App extends Application {
                 }
 
                 // Draw map
-                mapManager.draw(gc);
+                gameManager.draw(gc);
 
                 obstacles.forEach(e -> e.render(gc));
 
@@ -257,8 +263,31 @@ public class App extends Application {
 
                 hud.render(gc);
 
+                // Clear level
+                if (isVictory && !isTransitioning && gameManager.getCurrentLevelIndex() < 2){
+                    isTransitioning = true;
+                    transitionFrame = 0;
+                }
+
+                if (isTransitioning){
+                    transitionFrame++;
+
+                    // draw "Level cleared"
+                    gc.setFill(javafx.scene.paint.Color.YELLOW);
+                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
+                    gc.fillText("Level cleared!", WIDTH / 2 - 150, HEIGHT / 2);
+
+                    if (transitionFrame > 120) { // ~2 sec
+                        gameManager.loadNextLevel();
+                        collisionChecker = new CollisionChecker(gameManager.getMap());
+                        combatManager.resetSkill();
+                        isTransitioning = false;
+                        isVictory = gameManager.isVictory();
+                    }
+                }
+
                 // End screen
-                if (isVictory || isGameOver) {
+                if ((isVictory && gameManager.getCurrentLevelIndex() >= 2) || isGameOver) {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -367,7 +396,6 @@ public class App extends Application {
             Image swordHit = loadImg("/assets/player/wswordhit.png");
             Image rageHit = loadImg("/assets/player/bswordhit.png");
 
-            Image wallImg = loadImg("/assets/tiles/wall.png", TILE_SIZE, TILE_SIZE);
             Image treeImg = loadImg("/assets/enemy/tree.png");
             Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
             Image slimeImg = loadImg("/assets/enemy/slime.png");
@@ -386,16 +414,18 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-            TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-            TILE_SIZE, TILE_SIZE, player);
-            // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 100, knightImg, 8,
-            // TILE_SIZE * 2, TILE_SIZE * 2,
-            // player,
-            // knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2, HEIGHT / 2 + 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
-                    player, witchSkillImg);
+            
+            gameManager = new GameManager(
+                enemyManager,
+                player,
+                treeImg, treeSkillImg,
+                slimeImg,
+                knightImg, knightSkillImg,
+                witchImg, witchSkillImg
+            );
+
+            gameManager.loadLevel(1);
+
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
 
@@ -404,8 +434,7 @@ public class App extends Application {
             e.printStackTrace();
             System.exit(1);
         }
-        mapManager = new MapManager();
-        collisionChecker = new CollisionChecker(mapManager);
+        collisionChecker = new CollisionChecker(gameManager.getMap());
         hud = new HUD(player, combatManager);
     }
 
