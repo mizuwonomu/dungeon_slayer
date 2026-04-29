@@ -141,4 +141,29 @@ public class SoundManager {
     public static void playButtonClickSound() {
         if (btnClick != null) { btnClick.stop(); btnClick.play(); }
     }
+
+    public static void stopEnemySounds() {
+        if (slimeMove != null) { slimeMove.stop(); }
+        if (knightAtk != null) { knightAtk.stop(); }
+        if (knightReady != null) { knightReady.stop(); }
+        if (treeMoving != null) { treeMoving.stop(); }
+        if (treeAtk != null) { treeAtk.stop(); }
+    }
+
+    public static void stopGameplaySounds() {
+        if (nsMiss != null) { nsMiss.stop(); }
+        if (nsHitSlime != null) { nsHitSlime.stop(); }
+        if (nsHitKnight != null) { nsHitKnight.stop(); }
+        if (nsFinalHit != null) { nsFinalHit.stop(); }
+        if (nsHitTree != null) { nsHitTree.stop(); }
+        if (playerHitS != null) { playerHitS.stop(); }
+        if (playerPowerUp != null) { playerPowerUp.stop(); }
+        if (sPowerUp != null) { sPowerUp.stop(); }
+        if (thunder != null) { thunder.stop(); }
+        if (slimeMove != null) { slimeMove.stop(); }
+        if (knightAtk != null) { knightAtk.stop(); }
+        if (knightReady != null) { knightReady.stop(); }
+        if (treeMoving != null) { treeMoving.stop(); }
+        if (treeAtk != null) { treeAtk.stop(); }
+    }
 }
