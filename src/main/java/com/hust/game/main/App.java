@@ -35,10 +35,9 @@ import java.util.List;
 
 public class App extends Application {
     // kích thước cửa sổ
-    // Cập nhật lại kích thước khớp với map level1.txt (17 cột x 13 hàng, TILE_SIZE
-    // = 48)
+    // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE = 48)
     private static final int WIDTH = 816; // 17 * 48
-    private static final int HEIGHT = 624; // 13 * 48
+    private static final int HEIGHT = 480; // 10 * 48
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
@@ -340,11 +339,11 @@ public class App extends Application {
             TILE_SIZE, TILE_SIZE, player, treeSkillImg);
             enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
             TILE_SIZE, TILE_SIZE, player);
-            // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 200, knightImg, 8,
+            // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 100, knightImg, 8,
             // TILE_SIZE * 2, TILE_SIZE * 2,
             // player,
             // knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2, HEIGHT / 2 + 200, witchImg, 25, TILE_SIZE, TILE_SIZE,
+            enemyManager.spawnEnemy("Witch", WIDTH / 2, HEIGHT / 2 + 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
                     player, witchSkillImg);
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());

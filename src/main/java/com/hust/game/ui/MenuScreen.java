@@ -90,8 +90,8 @@ public class MenuScreen {
         // Nút Exit
         StackPane exitBtn = createSpriteBtn("EXIT", buttonSheet, 3, 1.0, Platform::exit);
 
-        // Nút Settings (Đã cập nhật 3 frame và thu nhỏ 20%)
-        StackPane settingsBtn = createSpriteBtn(null, settingSheet, 3, 0.72, () -> onSettings.accept(null));
+        // Nút Settings (Thu nhỏ thêm 10%, scale = 0.65)
+        StackPane settingsBtn = createSpriteBtn(null, settingSheet, 3, 0.65, () -> onSettings.accept(null));
 
         // Bố cục: Setting nằm bên phải Exit, khoảng cách 5px
         HBox bottomRow = new HBox(5, exitBtn, settingsBtn);
@@ -195,14 +195,19 @@ public class MenuScreen {
                 // Dịch sang phải theo frameIndex để lấy đúng frame
                 double sx = bgFrameIndex[0] * BG_FRAME_W;
 
-                // Vẽ frame hiện tại, scale lên full màn hình game
+                // Tính toán tỷ lệ để giữ nguyên Aspect Ratio (kiểu Cover màn hình)
+                double scale = Math.max((double) GameConstants.WINDOW_WIDTH / BG_FRAME_W, (double) GameConstants.WINDOW_HEIGHT / BG_FRAME_H);
+                double drawW = BG_FRAME_W * scale;
+                double drawH = BG_FRAME_H * scale;
+                double drawX = (GameConstants.WINDOW_WIDTH - drawW) / 2.0;
+                double drawY = (GameConstants.WINDOW_HEIGHT - drawH) / 2.0;
+
                 gc.drawImage(
                     bgSheet,
                     sx, 0,                       // Nguồn: bắt đầu cắt từ (sx, 0)
                     BG_FRAME_W, BG_FRAME_H,      // Nguồn: kích thước 1 frame gốc
-                    0, 0,                        // Đích: vẽ từ góc trên trái màn hình
-                    GameConstants.WINDOW_WIDTH,  // Đích: kéo rộng full màn hình
-                    GameConstants.WINDOW_HEIGHT  // Đích: kéo cao full màn hình
+                    drawX, drawY,                // Đích: vẽ căn giữa màn hình
+                    drawW, drawH                 // Đích: kích thước đã scale đúng tỷ lệ
                 );
 
                 gc.restore(); // Khôi phục globalAlpha về 1.0 để không ảnh hưởng render khác
