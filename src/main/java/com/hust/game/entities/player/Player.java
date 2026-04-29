@@ -79,7 +79,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private int currentHp; // máu hiện tại
     // private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ
     // constants
-    private final int maxHp = 1000;
+    private final int maxHp = 100;
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
@@ -407,6 +407,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     public int getMaxMana() {
         return maxMana;
+    }
+    
+    public int getCurrentMana() {
+        return currentMana;
     }
 
     /** Trả về true khi máu = 0 → game over */
