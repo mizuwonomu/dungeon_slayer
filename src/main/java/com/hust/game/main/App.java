@@ -12,10 +12,12 @@ import com.hust.game.enemy.Knight;
 import com.hust.game.enemy.Enemy;
 import com.hust.game.map.MapManager;
 import com.hust.game.collision.CollisionChecker;
+import com.hust.game.progression.GameManager;
 
 import com.hust.game.ui.GameFinish;
 import com.hust.game.ui.HUD;
 import com.hust.game.ui.MenuScreen;
+import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
@@ -23,6 +25,7 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.layout.StackPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
@@ -39,6 +42,10 @@ public class App extends Application {
     private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 480; // 10 * 48
 
+    // Transition giữa level
+    private boolean isTransitioning = false;
+    private int transitionFrame = 0;
+
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
@@ -51,6 +58,7 @@ public class App extends Application {
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
     private MapManager mapManager;
     private CollisionChecker collisionChecker;
+    private GameManager gameManager;
 
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
@@ -58,6 +66,9 @@ public class App extends Application {
     private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
+
+    private boolean isPaused = false;
+    private PauseScreen pauseScreen;
 
     // ... (everything above stays EXACTLY the same)
 
@@ -178,11 +189,36 @@ public class App extends Application {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
 
-        Group root = new Group(canvas);
+        Group gameLayer = new Group(canvas);
+        StackPane root = new StackPane(gameLayer);
         Scene scene = new Scene(root);
 
-        scene.setOnKeyPressed(e -> input.add(e.getCode()));
-        scene.setOnKeyReleased(e -> input.remove(e.getCode()));
+        pauseScreen = new PauseScreen(
+            () -> setPaused(false),
+            () -> {
+                setPaused(false);
+                    if (gameLoop != null) {
+                        gameLoop.stop();
+                    }
+                showMenu(stage);
+            }
+        );
+        root.getChildren().add(pauseScreen.getRoot());
+
+        scene.setOnKeyPressed(e -> {
+            if (e.getCode() == KeyCode.ESCAPE) {
+                togglePause(stage);
+                return;
+            }
+            if (!isPaused) {
+                input.add(e.getCode());
+            }
+        });
+        scene.setOnKeyReleased(e -> {
+            if (!isPaused) {
+                input.remove(e.getCode());
+            }
+        });
 
         initializeEntities();
 
@@ -190,10 +226,10 @@ public class App extends Application {
             @Override
             public void handle(long now) {
 
-                boolean isVictory = enemyManager.getEnemyList().isEmpty();
+                boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (!isVictory && !isGameOver) {
+                if (!isVictory && !isGameOver && !isTransitioning && !isPaused) {
                     handleInput();
                     player.update();
                     combatManager.update();
@@ -207,7 +243,7 @@ public class App extends Application {
                 gc.save();
 
                 // Screen shake
-                if (screenShakeTimer > 0) {
+                if (screenShakeTimer > 0 && !isPaused) {
                     screenShakeTimer--;
                     double dx = (Math.random() - 0.5) * screenShakeAmplitude * 20;
                     double dy = (Math.random() - 0.5) * screenShakeAmplitude * 20;
@@ -215,7 +251,7 @@ public class App extends Application {
                 }
 
                 // Draw map
-                mapManager.draw(gc);
+                gameManager.draw(gc);
 
                 obstacles.forEach(e -> e.render(gc));
 
@@ -227,8 +263,31 @@ public class App extends Application {
 
                 hud.render(gc);
 
+                // Clear level
+                if (isVictory && !isTransitioning && gameManager.getCurrentLevelIndex() < 2){
+                    isTransitioning = true;
+                    transitionFrame = 0;
+                }
+
+                if (isTransitioning){
+                    transitionFrame++;
+
+                    // draw "Level cleared"
+                    gc.setFill(javafx.scene.paint.Color.YELLOW);
+                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
+                    gc.fillText("Level cleared!", WIDTH / 2 - 150, HEIGHT / 2);
+
+                    if (transitionFrame > 180) { // ~3 sec
+                        gameManager.loadNextLevel();
+                        collisionChecker = new CollisionChecker(gameManager.getMap());
+                        combatManager.resetSkill();
+                        isTransitioning = false;
+                        isVictory = gameManager.isVictory();
+                    }
+                }
+
                 // End screen
-                if (isVictory || isGameOver) {
+                if ((isVictory && gameManager.getCurrentLevelIndex() >= 2) || isGameOver) {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -296,6 +355,27 @@ public class App extends Application {
         return scene;
     }
 
+    private void togglePause(Stage stage) {
+        if (player == null || enemyManager == null || pauseScreen == null) {
+            return;
+        }
+        boolean isVictory = enemyManager.getEnemyList().isEmpty();
+        boolean isGameOver = player.isDead();
+        if (isVictory || isGameOver || isEndUIShown) {
+            return;
+        }
+        setPaused(!isPaused);
+    }
+
+    private void setPaused(boolean paused) {
+        isPaused = paused;
+        pauseScreen.setVisible(paused);
+        if (paused) {
+            input.clear();
+            SoundManager.stopGameplaySounds();
+        }
+    }
+
     private void initializeEntities() {
         try {
             Image iDown = loadImg("/assets/player/idle_down.png");
@@ -316,7 +396,6 @@ public class App extends Application {
             Image swordHit = loadImg("/assets/player/wswordhit.png");
             Image rageHit = loadImg("/assets/player/bswordhit.png");
 
-            Image wallImg = loadImg("/assets/tiles/wall.png", TILE_SIZE, TILE_SIZE);
             Image treeImg = loadImg("/assets/enemy/tree.png");
             Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
             Image slimeImg = loadImg("/assets/enemy/slime.png");
@@ -335,16 +414,18 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-            TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-            TILE_SIZE, TILE_SIZE, player);
-            // enemyManager.spawnEnemy("Knight", WIDTH / 2, HEIGHT / 2 - 100, knightImg, 8,
-            // TILE_SIZE * 2, TILE_SIZE * 2,
-            // player,
-            // knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2, HEIGHT / 2 + 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
-                    player, witchSkillImg);
+            
+            gameManager = new GameManager(
+                enemyManager,
+                player,
+                treeImg, treeSkillImg,
+                slimeImg,
+                knightImg, knightSkillImg,
+                witchImg, witchSkillImg
+            );
+
+            gameManager.loadLevel(1);
+
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
 
@@ -353,8 +434,7 @@ public class App extends Application {
             e.printStackTrace();
             System.exit(1);
         }
-        mapManager = new MapManager();
-        collisionChecker = new CollisionChecker(mapManager);
+        collisionChecker = new CollisionChecker(gameManager.getMap());
         hud = new HUD(player, combatManager);
     }
 

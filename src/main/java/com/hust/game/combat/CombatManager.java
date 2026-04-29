@@ -259,4 +259,9 @@ public class CombatManager {
 
     /** Trả về thời gian combo còn lại để áp dụng hiệu ứng mờ dần */
     public int getComboTimer() { return comboTimer; }
+
+    public void resetSkill(){
+        this.skillCooldown = 0;
+        this.skillDuration = 0;
+    }
 }
