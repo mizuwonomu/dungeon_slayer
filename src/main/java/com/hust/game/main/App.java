@@ -229,7 +229,7 @@ public class App extends Application {
                 boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (!isVictory && !isGameOver && !isTransitioning) {
+                if (!isVictory && !isGameOver && !isTransitioning && !isPaused) {
                     handleInput();
                     player.update();
                     combatManager.update();
@@ -277,7 +277,7 @@ public class App extends Application {
                     gc.setFont(new javafx.scene.text.Font("Arial", 50));
                     gc.fillText("Level cleared!", WIDTH / 2 - 150, HEIGHT / 2);
 
-                    if (transitionFrame > 180) { // ~2 sec
+                    if (transitionFrame > 180) { // ~3 sec
                         gameManager.loadNextLevel();
                         collisionChecker = new CollisionChecker(gameManager.getMap());
                         combatManager.resetSkill();
