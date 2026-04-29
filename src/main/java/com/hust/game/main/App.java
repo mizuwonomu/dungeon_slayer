@@ -17,6 +17,7 @@ import com.hust.game.progression.GameManager;
 import com.hust.game.ui.GameFinish;
 import com.hust.game.ui.HUD;
 import com.hust.game.ui.MenuScreen;
+import com.hust.game.ui.LevelClearScreen;
 import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
 import javafx.animation.AnimationTimer;
@@ -41,10 +42,6 @@ public class App extends Application {
     // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE = 48)
     private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 480; // 10 * 48
-
-    // Transition giữa level
-    private boolean isTransitioning = false;
-    private int transitionFrame = 0;
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
@@ -83,7 +80,7 @@ public class App extends Application {
 
                 // START
                 v -> {
-                    Scene gameScene = createGameScene(stage);
+                    Scene gameScene = createGameScene(stage, 1);
                     stage.setScene(gameScene);
                     gameLoop.start();
                 },
@@ -99,7 +96,7 @@ public class App extends Application {
         MenuScreen menu = new MenuScreen(
 
                 v -> {
-                    Scene gameScene = createGameScene(stage);
+                    Scene gameScene = createGameScene(stage, 1);
                     stage.setScene(gameScene);
                     gameLoop.start();
                 },
@@ -159,7 +156,7 @@ public class App extends Application {
         exitBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
         startBtn.setOnAction(e -> {
-            Scene gameScene = createGameScene(stage);
+            Scene gameScene = createGameScene(stage, 1);
             stage.setScene(gameScene);
             gameLoop.start();
         });
@@ -183,9 +180,11 @@ public class App extends Application {
 
     private GameFinish gameOverUI;
     private boolean isEndUIShown = false;
+    private boolean isLevelClearUIShown = false;
+    private LevelClearScreen levelClearScreen;
 
 
-    private Scene createGameScene(Stage stage) {
+    private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
 
@@ -220,7 +219,7 @@ public class App extends Application {
             }
         });
 
-        initializeEntities();
+        initializeEntities(startLevel);
 
         gameLoop = new AnimationTimer() {
             @Override
@@ -229,7 +228,7 @@ public class App extends Application {
                 boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (!isVictory && !isGameOver && !isTransitioning && !isPaused) {
+                if (!isVictory && !isGameOver && !isPaused) {
                     handleInput();
                     player.update();
                     combatManager.update();
@@ -264,26 +263,34 @@ public class App extends Application {
                 hud.render(gc);
 
                 // Clear level
-                if (isVictory && !isTransitioning && gameManager.getCurrentLevelIndex() < 2){
-                    isTransitioning = true;
-                    transitionFrame = 0;
-                }
-
-                if (isTransitioning){
-                    transitionFrame++;
-
-                    // draw "Level cleared"
-                    gc.setFill(javafx.scene.paint.Color.YELLOW);
-                    gc.setFont(new javafx.scene.text.Font("Arial", 50));
-                    gc.fillText("Level cleared!", WIDTH / 2 - 150, HEIGHT / 2);
-
-                    if (transitionFrame > 180) { // ~3 sec
-                        gameManager.loadNextLevel();
-                        collisionChecker = new CollisionChecker(gameManager.getMap());
-                        combatManager.resetSkill();
-                        isTransitioning = false;
-                        isVictory = gameManager.isVictory();
-                    }
+                if (isVictory && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
+                    gameLoop.stop();
+                    levelClearScreen = new LevelClearScreen(
+                            // Next level
+                            () -> {
+                                isLevelClearUIShown = false;
+                                root.getChildren().remove(levelClearScreen.getRoot());
+                                gameManager.loadNextLevel();
+                                collisionChecker = new CollisionChecker(gameManager.getMap());
+                                combatManager.resetSkill();
+                                gameLoop.start();
+                            },
+                            // Retry
+                            () -> {
+                                isLevelClearUIShown = false;
+                                Scene newGame = createGameScene(stage, gameManager.getCurrentLevelIndex());
+                                stage.setScene(newGame);
+                                gameLoop.start();
+                            },
+                            // Menu
+                            () -> {
+                                isLevelClearUIShown = false;
+                                showMenu(stage);
+                            }
+                    );
+                    levelClearScreen.setVisible(true);
+                    root.getChildren().add(levelClearScreen.getRoot());
+                    isLevelClearUIShown = true;
                 }
 
                 // End screen
@@ -334,7 +341,8 @@ public class App extends Application {
                                 // Retry
                                 () -> {
                                     isEndUIShown = false;
-                                    Scene newGame = createGameScene(stage);
+                                    int retryLevel = isVictory ? 1 : gameManager.getCurrentLevelIndex();
+                                    Scene newGame = createGameScene(stage, retryLevel);
                                     stage.setScene(newGame);
                                     gameLoop.start();
                                 },
@@ -361,7 +369,7 @@ public class App extends Application {
         }
         boolean isVictory = enemyManager.getEnemyList().isEmpty();
         boolean isGameOver = player.isDead();
-        if (isVictory || isGameOver || isEndUIShown) {
+        if (isVictory || isGameOver || isEndUIShown || isLevelClearUIShown) {
             return;
         }
         setPaused(!isPaused);
@@ -376,7 +384,7 @@ public class App extends Application {
         }
     }
 
-    private void initializeEntities() {
+    private void initializeEntities(int level) {
         try {
             Image iDown = loadImg("/assets/player/idle_down.png");
             Image iUp = loadImg("/assets/player/idle_up.png");
@@ -424,7 +432,7 @@ public class App extends Application {
                 witchImg, witchSkillImg
             );
 
-            gameManager.loadLevel(1);
+            gameManager.loadLevel(level);
 
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
