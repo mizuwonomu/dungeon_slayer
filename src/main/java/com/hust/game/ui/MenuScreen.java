@@ -32,7 +32,7 @@ public class MenuScreen {
     private static final double BG_FRAME_W     = 510.0;  // Chiều rộng 1 frame gốc (2040 / 4)
     private static final double BG_FRAME_H     = 300.0;  // Chiều cao gốc sprite sheet
     private static final int    BG_ANIM_DELAY  = 64;     // Số frame game giữa mỗi lần đổi ảnh
-
+    private static boolean hasPlayedIntro = false; //Chỉ false lần đầu tiên mở game, nếu đã từ sound button hay victory -> không load anim nữa
     // -------------------------------------------------------
     // PHASE SYSTEM
     // Phase 0: Chạy animation background, chưa hiện nút
@@ -86,7 +86,7 @@ public class MenuScreen {
         // (Java yêu cầu biến trong lambda phải effectively final,
         //  dùng mảng 1 phần tử là cách workaround phổ biến)
         // -------------------------------------------------------
-        int[]    phase   = { 0 };
+        int[]    phase   = { hasPlayedIntro ? 1 : 0 };  // Nếu đã xem intro rồi → bỏ qua Phase 0
         double[] bgAlpha = { 1.0 };
 
         // Nút Play — khi bấm thì chuyển sang Phase 2 (fade out)
@@ -106,7 +106,7 @@ public class MenuScreen {
         // VBox: 3 nút xếp dọc, khoảng cách đều nhau giữa các nút
         VBox btnBox = new VBox(4, startBtn, settingsBtn, exitBtn); // 8px khoảng cách
         btnBox.setAlignment(Pos.BOTTOM_LEFT);
-        btnBox.setOpacity(0.0); // Ẩn hoàn toàn lúc đầu — hiện ra sau Phase 0
+        btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0); // Ẩn hoàn toàn lúc đầu — hiện ra sau Phase 0
 
         // -------------------------------------------------------
         // STACKPANE — canvas phía dưới, nút phía trên
@@ -169,6 +169,7 @@ public class MenuScreen {
                         phase[0] = 1;      // Chuyển Phase 1
                         phaseTimer[0] = 0; // Reset bộ đếm
                         btnBox.setOpacity(1.0); // Hiện nút ngay lập tức (không fade in)
+                        hasPlayedIntro = true; // Đánh dấu đã xem intro rồi, lần sau bỏ qua
                     }
 
                 } else if (phase[0] == 1) {
