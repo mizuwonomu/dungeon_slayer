@@ -77,9 +77,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // HP — máu nhân vật
     // -------------------------------------------------------
     private int currentHp; // máu hiện tại
-    // private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ
-    // constants
-    private final int maxHp = 100;
+    private final int maxHp = GameConstants.PLAYER_MAX_HP; // máu tối đa lấy từ constants
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
