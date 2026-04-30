@@ -65,9 +65,9 @@ public class Level {
             TILE_SIZE, TILE_SIZE, player, treeSkillImg);
             enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
             TILE_SIZE, TILE_SIZE, player);
-            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2 + 100, treeImg, 8,
+            enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2 + 80, treeImg, 8,
             TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2 + 100, slimeImg, 8,
+            enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2 + 80, slimeImg, 8,
             TILE_SIZE, TILE_SIZE, player);
         }
         else if(lvlID == 2){
