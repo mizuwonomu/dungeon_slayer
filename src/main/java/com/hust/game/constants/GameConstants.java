@@ -16,10 +16,11 @@ public class GameConstants {
     public static final int MAX_WORLD_COL = 256; 
     public static final int MAX_WORLD_ROW = 32; 
 
+    public static final int TILE_SIZE = 48;
+
     public static final int WORLD_WIDTH = MAX_WORLD_COL * TILE_SIZE;
     public static final int WORLD_HEIGHT = MAX_WORLD_ROW * TILE_SIZE;
 
-    public static final int TILE_SIZE = 48;
     public static final int TARGET_FPS = 60;
 
     //player stats

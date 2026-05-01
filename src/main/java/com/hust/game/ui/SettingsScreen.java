@@ -111,7 +111,7 @@ public class SettingsScreen {
         // -------------------------------------------------------
         // NÚT BACK VỀ MENU
         // -------------------------------------------------------
-        StackPane menuBtn = createSpriteBtn("MENU", buttonSheet, 3, 0.8, () -> onBack.accept(null));
+        StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.8, () -> onBack.accept(null));
 
         // -------------------------------------------------------
         // LAYOUT TỔNG — Title → Sound Row → Back, canh giữa màn hình

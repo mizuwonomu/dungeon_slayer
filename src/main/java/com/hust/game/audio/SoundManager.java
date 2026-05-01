@@ -8,6 +8,7 @@ public class SoundManager {
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
     public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon;
     public static AudioClip btnHover, btnClick;
+    public static AudioClip pauseSound, unpauseSound;
     private static double masterVolume = 1.0; // 0.0 → 1.0
 
     public static double getMasterVolume() {
@@ -39,6 +40,8 @@ public class SoundManager {
         applyVolume(witchSummon, 0.8);
         applyVolume(btnHover, 0.8);
         applyVolume(btnClick, 1.0);
+        applyVolume(pauseSound, 1.0);
+        applyVolume(unpauseSound, 1.0);
     }
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
@@ -70,6 +73,9 @@ public class SoundManager {
         witchSummon = loadSound("summon.wav", 0.8);
         btnHover = loadSound("button_hold.wav", 0.8);
         btnClick = loadSound("button_click.wav", 1.0);
+        
+        pauseSound = loadSound("pause.wav", 1.0);
+        unpauseSound = loadSound("button_click.wav", 1.0); // Đổi sang dùng chung âm thanh với button click
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -77,7 +83,7 @@ public class SoundManager {
             URL url = SoundManager.class.getResource("/sounds/" + fileName);
             if (url != null) {
                 AudioClip clip = new AudioClip(url.toString());
-                clip.setVolume(baseVolume * masterVolume); // ✅ correct variable
+                clip.setVolume(baseVolume * masterVolume); // 
                 return clip;
             } else {
                 System.err.println("Không tìm thấy file âm thanh: /sounds/" + fileName);
@@ -159,6 +165,14 @@ public class SoundManager {
     }
     public static void playButtonClickSound() {
         if (btnClick != null) { btnClick.stop(); btnClick.play(); }
+    }
+
+    public static void playPauseSound() {
+        if (pauseSound != null) { pauseSound.stop(); pauseSound.play(); }
+    }
+
+    public static void playUnpauseSound() {
+        if (unpauseSound != null) { unpauseSound.stop(); unpauseSound.play(); }
     }
 
     public static void stopEnemySounds() {

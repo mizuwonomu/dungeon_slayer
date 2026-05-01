@@ -93,7 +93,7 @@ public class App extends Application {
                 },
 
                 // SETTINGS
-                v -> showSettings(stage)
+                v -> showSettings(stage, () -> showMenu(stage))
         );
 
         stage.setScene(menu.createScene());
@@ -108,15 +108,15 @@ public class App extends Application {
                     gameLoop.start();
                 },
 
-                v -> showSettings(stage)
+                v -> showSettings(stage, () -> showMenu(stage))
         );
 
         stage.setScene(menu.createScene());
     }
 
-    private void showSettings(Stage stage) {
+    private void showSettings(Stage stage, Runnable onBack) {
         SettingsScreen settings = new SettingsScreen(
-                v -> showMenu(stage)
+                v -> onBack.run()
         );
 
         stage.setScene(settings.createScene());
@@ -201,6 +201,14 @@ public class App extends Application {
 
         pauseScreen = new PauseScreen(
             () -> setPaused(false),
+            // Nút SETTINGS: Tạm tắt logic GameLoop đi để tránh hao CPU, khi quay lại (onBack) thì bật lại GameLoop
+            () -> {
+                if (gameLoop != null) gameLoop.stop();
+                showSettings(stage, () -> {
+                    stage.setScene(scene); // Khôi phục lại GameScene đang dở
+                    if (gameLoop != null) gameLoop.start();
+                });
+            },
             () -> {
                 setPaused(false);
                     if (gameLoop != null) {
@@ -209,6 +217,12 @@ public class App extends Application {
                 showMenu(stage);
             }
         );
+        
+        Image pauseBtnSheet = loadImg("/assets/pause.png");
+        StackPane pauseBtn = createSpriteBtn(pauseBtnSheet, 3, 0.5, () -> togglePause(stage)); // Thu nhỏ nút xuống 50% (còn 64x64)
+        StackPane.setAlignment(pauseBtn, javafx.geometry.Pos.TOP_RIGHT); // Căn sát góc trên bên phải
+        root.getChildren().add(pauseBtn);
+
         root.getChildren().add(pauseScreen.getRoot());
 
         scene.setOnKeyPressed(e -> {
@@ -443,8 +457,11 @@ public class App extends Application {
         isPaused = paused;
         pauseScreen.setVisible(paused);
         if (paused) {
+            com.hust.game.audio.SoundManager.playPauseSound(); // Phát âm thanh đặc biệt khi game bắt đầu Pause
             input.clear();
             SoundManager.stopGameplaySounds();
+        } else {
+            com.hust.game.audio.SoundManager.playUnpauseSound(); // Phát âm thanh khi quay lại game
         }
     }
 
@@ -698,6 +715,73 @@ public class App extends Application {
                 }
             }
         }
+    }
+
+    private StackPane createSpriteBtn(Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {
+        StackPane pane = new StackPane();
+        
+        double frameW = spriteSheet.getWidth() / numFrames;
+        double frameH = spriteSheet.getHeight();
+        
+        ImageView view = new ImageView(spriteSheet);
+        view.setViewport(new javafx.geometry.Rectangle2D(0, 0, frameW, frameH));
+        
+        view.setFitWidth(frameW * scaleMultiplier);
+        view.setFitHeight(frameH * scaleMultiplier);
+
+        pane.setPrefSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        pane.setMaxSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
+        
+        pane.getChildren().add(view);
+        
+        int[] currentFrame = {0};
+        javafx.animation.Timeline[] timeline = {null};
+        
+        pane.setOnMouseEntered(e -> {
+            com.hust.game.audio.SoundManager.playButtonHoverSound();
+            pane.setScaleX(1.10);
+            pane.setScaleY(1.10);
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = numFrames - 1 - currentFrame[0];
+            if (framesToAnimate > 0) {
+                timeline[0] = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(30), evt -> {
+                    currentFrame[0]++;
+                    view.setViewport(new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
+        });
+        
+        pane.setOnMouseExited(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+            if (timeline[0] != null) timeline[0].stop();
+            int framesToAnimate = currentFrame[0];
+            if (framesToAnimate > 0) {
+                timeline[0] = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(50), evt -> {
+                    currentFrame[0]--;
+                    view.setViewport(new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                }));
+                timeline[0].setCycleCount(framesToAnimate);
+                timeline[0].play();
+            }
+        });
+        
+        pane.setOnMousePressed(e -> {
+            // Không phát tiếng click mặc định ở đây nữa, âm thanh sẽ được phát ở hàm setPaused()
+            pane.setScaleX(0.9);
+            pane.setScaleY(0.9);
+        });
+        pane.setOnMouseReleased(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+        });
+        
+        pane.setOnMouseClicked(e -> action.run());
+        pane.setCursor(javafx.scene.Cursor.HAND);
+        
+        return pane;
     }
 
     private Image loadImg(String path) {

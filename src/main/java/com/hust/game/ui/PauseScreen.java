@@ -19,7 +19,7 @@ import javafx.util.Duration;
 public class PauseScreen {
     private final StackPane root;
 
-    public PauseScreen(Runnable onResume, Runnable onMenu) {
+    public PauseScreen(Runnable onResume, Runnable onSettings, Runnable onMenu) {
         Image buttonSheet = loadImg("/assets/button.png");
 
         root = new StackPane();
@@ -38,9 +38,10 @@ public class PauseScreen {
         title.setStrokeWidth(3.0);
 
         StackPane resumeBtn = createSpriteBtn("RESUME", buttonSheet, 3, 0.7, onResume);
+        StackPane settingsBtn = createSpriteBtn("SETTINGS", buttonSheet, 3, 0.7, onSettings);
         StackPane menuBtn = createSpriteBtn("MAIN MENU", buttonSheet, 3, 0.7, onMenu);
 
-        VBox uiBox = new VBox(25, title, resumeBtn, menuBtn);
+        VBox uiBox = new VBox(25, title, resumeBtn, settingsBtn, menuBtn);
         uiBox.setAlignment(Pos.CENTER);
         uiBox.setTranslateY(20);
 
