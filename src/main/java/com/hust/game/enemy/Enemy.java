@@ -31,6 +31,8 @@ public abstract class Enemy extends MovingEntity {
     protected int kbTimer = 0;
     protected double kbVectorX = 0;
     protected double kbVectorY = 0;
+    
+    protected boolean isActive = true; // Trạng thái hoạt động (trong màn hình)
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -41,6 +43,8 @@ public abstract class Enemy extends MovingEntity {
 
     @Override
     public void update() {
+        if (!isActive) return; // Nếu ngoài camera thì bỏ qua update (Bất động)
+
         if (flashTimer > 0)
             flashTimer--; // Giảm dần thời gian nháy đỏ
         if (attackPauseTimer > 0)
@@ -211,5 +215,13 @@ public abstract class Enemy extends MovingEntity {
     // Kiểm tra xem quái vật đã chết và chạy xong hiệu ứng nhấp nháy báo tử chưa
     public boolean isReadyToRemove() {
         return this.hp <= 0 && this.flashTimer <= 0;
+    }
+
+    public void setActive(boolean active) {
+        this.isActive = active;
+    }
+
+    public boolean isActive() {
+        return this.isActive;
     }
 }

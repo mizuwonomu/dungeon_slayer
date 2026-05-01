@@ -40,12 +40,15 @@ import java.util.List;
 public class App extends Application {
     // kích thước cửa sổ
     // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE = 48)
-    private static final int WIDTH = 816; // 17 * 48
-    private static final int HEIGHT = 480; // 10 * 48
+    private static final int WIDTH = GameConstants.WINDOW_WIDTH; 
+    private static final int HEIGHT = GameConstants.WINDOW_HEIGHT; 
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
+
+    // Độ zoom camera (1.5 = phóng to 50%)
+    private static final double ZOOM = 1.5;
 
     private GraphicsContext gc;
     private Player player;
@@ -66,6 +69,10 @@ public class App extends Application {
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
+
+    // Camera position
+    private double cameraX = 0;
+    private double cameraY = 0;
 
     // ... (everything above stays EXACTLY the same)
 
@@ -232,14 +239,35 @@ public class App extends Application {
                     handleInput();
                     player.update();
                     combatManager.update();
+                    
+                    updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
+                    
+                    // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
+                    double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
+                    for (Enemy e : enemyManager.getEnemyList()) {
+                        boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
+                                           e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                                           e.getY() + e.getRenderHeight() >= cameraY - margin &&
+                                           e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
+                        e.setActive(onScreen);
+                    }
+
                     enemyManager.updateAll();
                     checkCollisions();
                     com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
                 }
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
+                
+                // Đổ nền đen cho toàn bộ cửa sổ game để phần viền nằm ngoài map hiển thị màu đen
+                gc.setFill(javafx.scene.paint.Color.BLACK);
+                gc.fillRect(0, 0, WIDTH, HEIGHT);
 
                 gc.save();
+                
+                gc.scale(ZOOM, ZOOM); // Phóng to camera lên 50%
+                
+                gc.translate(-cameraX, -cameraY); // Dịch chuyển toạ độ bản đồ theo camera
 
                 // Screen shake
                 if (screenShakeTimer > 0 && !isPaused) {
@@ -254,11 +282,11 @@ public class App extends Application {
 
                 obstacles.forEach(e -> e.render(gc));
 
-                gc.restore();
-
                 player.render(gc);
                 enemyManager.renderAll(gc);
                 com.hust.game.ui.DamageTextManager.render(gc); // Vẽ các số sát thương (vẽ sau quái để đè lên trên cùng)
+
+                gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
 
@@ -363,6 +391,42 @@ public class App extends Application {
         return scene;
     }
 
+    private void updateCamera() {
+        if (player == null) return;
+        
+        // Tính toạ độ của người chơi trên màn hình hiện tại
+        double playerScreenX = player.getX() - cameraX;
+        double playerScreenY = player.getY() - cameraY;
+
+        // Tính toán kích thước Viewport thực tế sau khi zoom
+        double viewW = WIDTH / ZOOM;
+        double viewH = HEIGHT / ZOOM;
+
+        // Xác định vùng Deadzone (40% ở chính giữa màn hình viewport)
+        double dzWidth = viewW * 0.4;
+        double dzHeight = viewH * 0.4;
+        double dzLeft = (viewW - dzWidth) / 2.0;
+        double dzRight = dzLeft + dzWidth;
+        double dzTop = (viewH - dzHeight) / 2.0;
+        double dzBottom = dzTop + dzHeight;
+
+        // Nếu player chạm biên giới hạn Deadzone, trượt camera theo
+        if (playerScreenX < dzLeft) {
+            cameraX -= (dzLeft - playerScreenX);
+        } else if (playerScreenX + player.getRenderWidth() > dzRight) {
+            cameraX += (playerScreenX + player.getRenderWidth() - dzRight);
+        }
+        if (playerScreenY < dzTop) {
+            cameraY -= (dzTop - playerScreenY);
+        } else if (playerScreenY + player.getRenderHeight() > dzBottom) {
+            cameraY += (playerScreenY + player.getRenderHeight() - dzBottom);
+        }
+
+        // Phương án 2: Tắt giới hạn Clamp Camera
+        // Camera giờ đây sẽ luôn đi theo Player dù chạm tới góc map.
+        // Phần ngoài map không có TILE sẽ lộ ra nền đen bọc ngoài (đã vẽ bằng fillRect ở phía trên).
+    }
+
     private void togglePause(Stage stage) {
         if (player == null || enemyManager == null || pauseScreen == null) {
             return;
@@ -433,6 +497,13 @@ public class App extends Application {
             );
 
             gameManager.loadLevel(level);
+
+            // --- TEST MODE: Set vị trí spawn (4, 5) và xóa hết quái ở Level 1 ---
+            if (level == 1) {
+                player.setX(4 * GameConstants.TILE_SIZE); // Vị trí x (cột 4)
+                player.setY(5 * GameConstants.TILE_SIZE); // Vị trí y (hàng 5)
+           //     enemyManager.getEnemyList().clear(); // Xóa sạch danh sách quái
+            }
 
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
@@ -517,16 +588,36 @@ public class App extends Application {
     }
 
     private void checkCollisions() {
-        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond)
+        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond) - Xử lý trượt tường (Wall Sliding)
         double padding = 12; // Cắt bớt phần viền trong suốt của ảnh để nhân vật đi mượt hơn
+        double nextX = player.getX();
+        double nextY = player.getY();
+        double lastX = player.getLastX();
+        double lastY = player.getLastY();
+
+        // Bước 1: Thử di chuyển trục X trước
+        player.setX(nextX);
+        player.setY(lastY);
         int left = (int) (player.getX() + padding);
         int right = (int) (player.getX() + player.getRenderWidth() - padding);
         int top = (int) (player.getY() + padding);
         int bottom = (int) (player.getY() + player.getRenderHeight() - padding);
 
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-                collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
-            player.onCollision(null); // Gọi rollback vị trí nếu bị kẹt tường
+            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+            player.setX(lastX); // Chạm tường trục X -> Hủy di chuyển X
+        }
+
+        // Bước 2: Thử di chuyển trục Y trên cơ sở X đã an toàn
+        player.setY(nextY);
+        left = (int) (player.getX() + padding);
+        right = (int) (player.getX() + player.getRenderWidth() - padding);
+        top = (int) (player.getY() + padding);
+        bottom = (int) (player.getY() + player.getRenderHeight() - padding);
+
+        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+            player.setY(lastY); // Chạm tường trục Y -> Hủy di chuyển Y
         }
 
         // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)

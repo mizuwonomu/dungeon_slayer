@@ -14,7 +14,7 @@ public class MapManager {
     public MapManager(int level) {
         this.level = level;
         tiles = new Tile[TileType.values().length];
-        mapTileNum = new int[GameConstants.MAX_SCREEN_ROW][GameConstants.MAX_SCREEN_COL];
+        mapTileNum = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
         loadMap("/assets/maps/level" + level + ".txt");
     }
@@ -51,7 +51,7 @@ public class MapManager {
                 return;
             }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
-            for (int row = 0; row < GameConstants.MAX_SCREEN_ROW; row++) {
+            for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
                 String line = br.readLine();
                 if (line == null) break;
                 
@@ -60,7 +60,7 @@ public class MapManager {
                 if (line.isEmpty()) { row--; continue; } // Bỏ qua dòng trống, không tính vào row
                 
                 String[] numbers = line.split("\\s+");
-                for (int col = 0; col < GameConstants.MAX_SCREEN_COL && col < numbers.length; col++) {
+                for (int col = 0; col < GameConstants.MAX_WORLD_COL && col < numbers.length; col++) {
                     mapTileNum[row][col] = Integer.parseInt(numbers[col].trim());
                 }
             }
@@ -69,8 +69,8 @@ public class MapManager {
     }
 
     public void draw(GraphicsContext gc) {
-        for (int row = 0; row < GameConstants.MAX_SCREEN_ROW; row++) {
-            for (int col = 0; col < GameConstants.MAX_SCREEN_COL; col++) {
+        for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
+            for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
                 int tileId = mapTileNum[row][col];
                 // Tránh lỗi mảng index âm nếu load ID lỗi từ file txt
                 if (tileId >= 0 && tileId < tiles.length && tiles[tileId] != null && tiles[tileId].image != null) {

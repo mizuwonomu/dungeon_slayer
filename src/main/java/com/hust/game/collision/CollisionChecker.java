@@ -17,7 +17,7 @@ public class CollisionChecker {
         int row = nextY / GameConstants.TILE_SIZE;
 
         // Tránh lỗi index out of bounds
-        if (row < 0 || row >= GameConstants.MAX_SCREEN_ROW || col < 0 || col >= GameConstants.MAX_SCREEN_COL) {
+        if (row < 0 || row >= GameConstants.MAX_WORLD_ROW || col < 0 || col >=  GameConstants.MAX_WORLD_COL) {
             return true; // Coi như va chạm nếu ra ngoài map
         }
 

@@ -35,6 +35,8 @@ public class Tree extends Enemy {
 
     @Override
     public void update() {
+        if (!isActive) return; // Bất động khi ra ngoài camera
+
         if (isCastingSkill) {
             if (this.flashTimer > 0)
                 this.flashTimer--;

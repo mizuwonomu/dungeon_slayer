@@ -19,6 +19,8 @@ public class Slime extends Enemy {
 
     @Override
     public void update() {
+        if (!isActive) return; // Bất động khi ra ngoài camera
+
         // Lưu lại vị trí hiện tại trước khi update
         double prevX = this.x;
         double prevY = this.y;
