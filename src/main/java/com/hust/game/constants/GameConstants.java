@@ -5,12 +5,12 @@ public class GameConstants {
     }
 
     //kích thước cửa sổ chơi
-    public static final int WINDOW_WIDTH = 800;
-    public static final int WINDOW_HEIGHT = 600;
+    public static final int WINDOW_WIDTH = 816;
+    public static final int WINDOW_HEIGHT = 480;
 
     // Kích thước map (số ô)
     public static final int MAX_SCREEN_COL = 17;
-    public static final int MAX_SCREEN_ROW = 13;
+    public static final int MAX_SCREEN_ROW = 10;
 
     public static final int TILE_SIZE = 48;
     public static final int TARGET_FPS = 60;

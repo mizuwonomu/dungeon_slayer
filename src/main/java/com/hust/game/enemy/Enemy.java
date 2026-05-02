@@ -19,12 +19,18 @@ public abstract class Enemy extends MovingEntity {
     protected double moveX, moveY;
     protected int flashTimer = 0; // Bộ đếm nhấp nháy khi dính đòn
     protected int attackPauseTimer = 0; // Bộ đếm thời gian nghỉ sau khi tấn công
+    protected int hitStunTimer = 0; // Thời gian khựng lại khi bị đánh trúng
 
     // Các biến phục vụ thuật toán lách vật cản (Wall Sliding)
     protected int dodgeTimer = 0;
     protected boolean dodgeAxisX = true;
     protected double dodgeDirX = 0;
     protected double dodgeDirY = 0;
+
+    // Các biến phục vụ Knockback mượt (Smooth Knockback)
+    protected int kbTimer = 0;
+    protected double kbVectorX = 0;
+    protected double kbVectorY = 0;
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -35,68 +41,69 @@ public abstract class Enemy extends MovingEntity {
 
     @Override
     public void update() {
-        if (flashTimer > 0) flashTimer--; // Giảm dần thời gian nháy đỏ
-        if (attackPauseTimer > 0) attackPauseTimer--; // Giảm thời gian nghỉ
+        if (flashTimer > 0)
+            flashTimer--; // Giảm dần thời gian nháy đỏ
+        if (attackPauseTimer > 0)
+            attackPauseTimer--; // Giảm thời gian nghỉ
+        if (hitStunTimer > 0)
+            hitStunTimer--; // Giảm thời gian khựng
 
-        // Nếu đang chịu đòn, cạn máu, hoặc trong thời gian nghỉ sau đòn đánh -> Đứng im
-        if (flashTimer > 0 || hp <= 0 || attackPauseTimer > 0) {
-            return; // Thoát sớm, giữ nguyên lastX, lastY an toàn cũ
-        }
-
-        // Lưu vị trí cũ CHỈ KHI được phép di chuyển (Giúp knockback không bị kẹt tường)
         this.lastX = this.x;
         this.lastY = this.y;
 
-        // Không có mục tiêu -> đứng
-        if (targetPlayer == null)
-            return;
+        // --- Logic di chuyển & AI ---
+        if (kbTimer > 0) {
+            // Trạng thái: Bị đẩy lùi
+            kbTimer--;
+            this.x += kbVectorX;
+            this.y += kbVectorY;
+        } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null) {
+            // Trạng thái: AI hoạt động (đuổi theo player)
+            double playerX = targetPlayer.getX();
+            double playerY = targetPlayer.getY();
 
-        double playerX = targetPlayer.getX();
-        double playerY = targetPlayer.getY();
+            // Thuật toán nội suy tìm tọa độ Player
+            double diffX = playerX - this.x;
+            double diffY = playerY - this.y;
 
-        // Thuật toán nội suy tìm tọa độ Player
-        double diffX = playerX - this.x;
-        double diffY = playerY - this.y;
+            double distance = Math.sqrt(diffX * diffX + diffY * diffY);
 
-        double distance = Math.sqrt(diffX * diffX + diffY * diffY);
+            this.moveX = 0;
+            this.moveY = 0;
 
-        this.moveX = 0;
-        this.moveY = 0;
+            if (distance > 0) {
+                // Nếu đang trong trạng thái lách vật cản, ưu tiên đi men theo 1 trục
+                if (dodgeTimer > 0) {
+                    dodgeTimer--;
+                    this.moveX = dodgeDirX * speed;
+                    this.moveY = dodgeDirY * speed;
+                } else {
+                    this.moveX = (diffX / distance) * speed;
+                    this.moveY = (diffY / distance) * speed;
+                }
 
-        if (distance > 0) {
-            // Nếu đang trong trạng thái lách vật cản, ưu tiên đi men theo 1 trục
-            if (dodgeTimer > 0) {
-                dodgeTimer--;
-                this.moveX = dodgeDirX * speed;
-                this.moveY = dodgeDirY * speed;
-            } else {
-                this.moveX = (diffX / distance) * speed;
-                this.moveY = (diffY / distance) * speed;
+                // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
+                if (diffX < 0) {
+                    this.isFlipped = true; // Đi sang trái thì lật mặt
+                } else if (diffX > 0) {
+                    this.isFlipped = false; // Đi sang phải thì giữ nguyên
+                }
             }
-            
-            // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
-            if (diffX < 0) {
-                this.isFlipped = true;  // Đi sang trái thì lật mặt
-            } else if (diffX > 0) {
-                this.isFlipped = false; // Đi sang phải thì giữ nguyên
-            }
+            this.x += this.moveX;
+            this.y += this.moveY;
         }
+        // else: Trạng thái Chết, Nghỉ, hoặc không có mục tiêu -> Đứng im, không làm gì cả.
 
-        double nextX = this.x + this.moveX;
-        double nextY = this.y + this.moveY;
-
-        int TILE_SIZE = 48;
-
-        int nextCol = (int) (nextX / TILE_SIZE);
-        int nextRow = (int) (nextY / TILE_SIZE);
-
-        this.x = nextX;
-        this.y = nextY;
-
-        animationTimer++;
-        if (animationTimer >= animationDelay) {
-            animationTimer = 0;
-            frameIndex = (frameIndex + 1) % numFrames;
+        // --- Logic animation ---
+        // Chỉ tiếp tục chạy hoạt ảnh nếu quái vật còn sống
+        if (this.hp > 0 && hitStunTimer <= 0) {
+            animationTimer++;
+            if (animationTimer >= animationDelay) {
+                animationTimer = 0;
+                frameIndex = (frameIndex + 1) % numFrames;
+            }
+        } else if (hitStunTimer > 0) {
+            this.frameIndex = 0; // Khựng lại, ép hiển thị ở frame đầu tiên
         }
     }
 
@@ -106,9 +113,11 @@ public abstract class Enemy extends MovingEntity {
 
         // Thuật toán trượt tường (Sliding) và lách nhau
         dodgeAxisX = !dodgeAxisX; // Đổi trục di chuyển để thử lách hướng khác
-        dodgeTimer = (other == null) ? 20 : 10; // Đập tường thì trượt lâu hơn (20 frame), đụng nhau thì lách nhanh (10 frame)
+        dodgeTimer = (other == null) ? 20 : 10; // Đập tường thì trượt lâu hơn (20 frame), đụng nhau thì lách nhanh (10
+                                                // frame)
 
-        if (targetPlayer == null) return;
+        if (targetPlayer == null)
+            return;
 
         double pX = targetPlayer.getX() - this.x;
         double pY = targetPlayer.getY() - this.y;
@@ -124,41 +133,78 @@ public abstract class Enemy extends MovingEntity {
         }
     }
 
-    @Override
-    public void render(GraphicsContext gc) {
-        // Hiệu ứng nhấp nháy khi bị chém trúng
-        if (flashTimer > 0) {
-            // Cứ mỗi 7 frame thì ẩn ảnh 1 lần (Tạo ra 2 nhịp nháy trong khoảng 30 frame)
-            if ((flashTimer / 7) % 2 == 0) {
-                return; // Không vẽ ảnh ở frame này
-            }
-        }
-        super.render(gc);
+    // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
+    public double getLastX() {
+        return lastX;
     }
 
-    // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
-    public double getLastX() { return lastX; }
-    public double getLastY() { return lastY; }
-    public double getMoveX() { return moveX; }
-    public double getMoveY() { return moveY; }
+    public double getLastY() {
+        return lastY;
+    }
+
+    public double getMoveX() {
+        return moveX;
+    }
+
+    public double getMoveY() {
+        return moveY;
+    }
+
+    public int getDamage() {
+        return this.damage;
+    }
+
+    public int getHp() {
+        return this.hp;
+    }
 
     // Hàm nhận sát thương từ Player
     public void takeDamage(int amount) {
-        if (this.hp <= 0) return; // Nếu đã chết thì không nhận thêm sát thương nữa
+        if (this.hp <= 0)
+            return; // Nếu đã chết thì không nhận thêm sát thương nữa
         this.hp -= amount;
-        if (this.hp < 0) this.hp = 0;
-        this.flashTimer = 30; // Kích hoạt nhấp nháy trong 30 frames (0.5 giây)
+        
+        if (this.hp <= 0) {
+            this.hp = 0;
+            this.flashTimer = 60; // Quái chết -> Tồn tại thêm 60 frames (1 giây) để chạy hiệu ứng mờ dần
+        } else {
+            this.flashTimer = 15; // Quái còn sống -> Chỉ nháy đỏ 15 frames (~0.25 giây)
+        }
+        
+        com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.WHITE);
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        // Nếu quái vật đã chết, kích hoạt hiệu ứng mờ dần (Fade out)
+        if (this.hp <= 0) {
+            gc.save();
+            double alpha = (double) this.flashTimer / 60.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            
+            gc.setGlobalAlpha(alpha);
+            super.render(gc); // Vẽ quái vật với độ mờ giảm dần
+            gc.restore();
+        } else {
+            super.render(gc); // Quái còn sống thì vẽ bình thường
+        }
     }
 
     // Hàm xử lý đẩy lùi quái vật (Knockback)
     public void applyKnockback(com.hust.game.entities.Direction dir) {
-        double kbDistance = this.knockback * 15.0; // Khoảng cách đẩy lùi
+        this.kbTimer = 6; // Bị đẩy lùi trượt đi trong 6 frames liên tiếp
+        this.hitStunTimer = 30; // Bị khựng lại (stun) trong 0.5s (30 frame)
+        this.frameIndex = 0; // Reset về frame animation đầu tiên
+        double kbSpeed = this.knockback * 2.5; // Vận tốc đẩy mỗi frame
+        this.kbVectorX = 0;
+        this.kbVectorY = 0;
         switch (dir) {
-            case UP:    this.y -= kbDistance; break;
-            case DOWN:  this.y += kbDistance; break;
-            case LEFT:  this.x -= kbDistance; break;
-            case RIGHT: this.x += kbDistance; break;
+            case UP: this.kbVectorY = -kbSpeed; break;
+            case DOWN: this.kbVectorY = kbSpeed; break;
+            case LEFT: this.kbVectorX = -kbSpeed; break;
+            case RIGHT: this.kbVectorX = kbSpeed; break;
         }
     }
 

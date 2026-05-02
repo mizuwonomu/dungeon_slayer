@@ -29,6 +29,10 @@ public class EnemyManager {
             newEnemy = new Slime(x, y, sprite, numFrames, w, h, targetPlayer);
         } else if (enemyType.equals("Tree")) {
             newEnemy = new Tree(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
+        } else if (enemyType.equals("Knight")) {
+            newEnemy = new Knight(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
+        } else if (enemyType.equals("Witch")) {
+            newEnemy = new Witch(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite, this);
         }
 
         if (newEnemy != null) {
@@ -41,8 +45,8 @@ public class EnemyManager {
         // Dọn dẹp quái vật đã chết và nhấp nháy xong ra khỏi bản đồ
         enemyList.removeIf(Enemy::isReadyToRemove);
 
-        for (Enemy e : enemyList) {
-            e.update();
+        for (int i = 0; i < enemyList.size(); i++) {
+            enemyList.get(i).update();
         }
     }
 

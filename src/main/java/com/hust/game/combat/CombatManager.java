@@ -66,7 +66,7 @@ public class CombatManager {
             if (skillDuration <= 0) {
                 skillActive   = false;
                 skillCooldown = SKILL_COOLDOWN_FRAMES;
-                player.setRageMode(false); // về sprite bình thường
+                player.setRageMode(false, 0); // về sprite bình thường
             }
         }
 
@@ -129,9 +129,16 @@ public class CombatManager {
         }
 
         boolean hitAny = false;
+        boolean hitSlime = false;
+        boolean hitKnight = false;
+        boolean hitTree = false;
+        boolean isFinalHit = false;
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
+            // Bỏ qua nếu quái vật đã chết (đang trong trạng thái mờ dần)
+            if (enemy.getHp() <= 0) continue;
+
             // Lấy boundary của enemy (Rectangle2D)
             Rectangle2D enemyBox = enemy.getBoundary();
 
@@ -142,6 +149,39 @@ public class CombatManager {
                 // Bật hiệu ứng knockback
                 enemy.applyKnockback(player.getDirection());
                 hitAny = true; // Xác nhận đã chém trúng
+
+                // Phân loại quái vật và xác định đòn kết liễu
+                if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
+                if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
+                if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
+                
+                if (enemy.getHp() <= 0) isFinalHit = true;
+            }
+        }
+
+        // Xử lý âm thanh
+        if (skillActive) {
+            if (!hitAny) {
+                com.hust.game.audio.SoundManager.playSwordPowerUpSound(0.5); // Chém trượt
+            } else {
+                com.hust.game.audio.SoundManager.playSwordPowerUpSound(1.0); // Chém trúng
+                if (isFinalHit) {
+                    com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Phát thêm âm kết liễu
+                }
+            }
+        } else {
+            if (!hitAny) {
+                com.hust.game.audio.SoundManager.playNsMissSound(); // Chém trượt
+            } else if (isFinalHit) {
+                com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Đòn kết liễu
+            } else {
+                // Chém thường trúng quái
+                if (hitSlime) com.hust.game.audio.SoundManager.playNsHitSlimeSound();
+                if (hitKnight) com.hust.game.audio.SoundManager.playNsHitKnightSound();
+                if (hitTree) {
+                    com.hust.game.audio.SoundManager.playNsHitTreeSound();
+                    com.hust.game.audio.SoundManager.playNsMissSound();
+                } // Cây dùng chung âm thanh với Knight
             }
         }
 
@@ -150,6 +190,20 @@ public class CombatManager {
             if (comboTimer > 0) comboCount++; // Đang trong thời gian Combo -> Cộng dồn
             else comboCount = 1; // Khởi đầu Combo mới
             comboTimer = COMBO_WINDOW_FRAMES; // Reset lại đồng hồ 1 giây
+            
+            // Hiển thị chữ Combo bay lên (Tận dụng luôn DamageTextManager)
+            // Truyền `this` làm target để mỗi khi Combo tăng, số cũ sẽ biến mất nhường chỗ cho số mới
+            if (comboCount >= 3) {
+                javafx.scene.paint.Color comboColor;
+                if (comboCount == 3) {
+                    comboColor = javafx.scene.paint.Color.DEEPSKYBLUE; // Combo 3: Xanh nước biển sáng
+                } else if (comboCount == 4) {
+                    comboColor = javafx.scene.paint.Color.ORANGE; // Combo 4: Cam
+                } else {
+                    comboColor = javafx.scene.paint.Color.RED; // Combo 5 trở lên: Đỏ
+                }
+                com.hust.game.ui.DamageTextManager.addText(this, player.getX() - 10, player.getY() - 15, "Combo x" + comboCount, comboColor);
+            }
         }
 
         // Reset cooldown tấn công của player
@@ -169,16 +223,20 @@ public class CombatManager {
     public void activateSkill() {
         // Không cho dùng khi skill đang chạy hoặc còn cooldown
         if (skillActive || skillCooldown > 0) return;
-
-        if (player.getCurrentMana() <= SKILL_HP_COST) return;
+        // Sửa lỗi: Phải kiểm tra với MANA_COST và điều kiện là < (thiếu mana mới return)
+        if (player.getCurrentMana() < SKILL_MANA_COST) return;
 
         player.takeMana(SKILL_MANA_COST);
 
         // Bật skill + set duration
         skillActive   = true;
         skillDuration = SKILL_DURATION_FRAMES;
+        
+        player.setRageMode(true, skillDuration);
 
-        player.setRageMode(true);
+        // Phát âm thanh Power Up
+        com.hust.game.audio.SoundManager.playPlayerPowerUpSound();
+        com.hust.game.audio.SoundManager.playThunderSound();
 
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }
@@ -198,4 +256,12 @@ public class CombatManager {
 
     /** Trả về số đòn Combo hiện tại */
     public int getComboCount() { return comboCount; }
+
+    /** Trả về thời gian combo còn lại để áp dụng hiệu ứng mờ dần */
+    public int getComboTimer() { return comboTimer; }
+
+    public void resetSkill(){
+        this.skillCooldown = 0;
+        this.skillDuration = 0;
+    }
 }
