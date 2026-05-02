@@ -5,15 +5,17 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.util.HashMap;
+import java.util.Map;
 
 public class MapManager {
-    public Tile[] tiles;
+    public Map<Integer, Tile> tiles;
     public int[][] mapTileNum;
     public int level;
 
     public MapManager(int level) {
         this.level = level;
-        tiles = new Tile[TileType.values().length];
+        tiles = new HashMap<>();
         mapTileNum = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
         loadMap("/assets/maps/level" + level + ".txt");
@@ -28,15 +30,16 @@ public class MapManager {
     private void setup(TileType tileType) {
         try {
             int index = tileType.getId();
-            tiles[index] = new Tile();
+            Tile tile = new Tile();
             // Sử dụng chữ thường 'tiles' để tránh lỗi case-sensitive khi build bằng Maven
             java.io.InputStream is = getClass().getResourceAsStream("/assets/tiles/" + tileType.getImageName());
             if (is != null) {
-                tiles[index].image = new Image(is);
+                tile.image = new Image(is);
             } else {
                 System.err.println("Cảnh báo: Không tìm thấy ảnh " + tileType.getImageName());
             }
-            tiles[index].collision = tileType.isSolid();
+            tile.collision = tileType.isSolid();
+            tiles.put(index, tile);
         } catch (Exception e) {
             System.err.println("Lỗi load ảnh tile: " + tileType.getImageName());
             e.printStackTrace();
@@ -72,9 +75,9 @@ public class MapManager {
         for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
             for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
                 int tileId = mapTileNum[row][col];
-                // Tránh lỗi mảng index âm nếu load ID lỗi từ file txt
-                if (tileId >= 0 && tileId < tiles.length && tiles[tileId] != null && tiles[tileId].image != null) {
-                    gc.drawImage(tiles[tileId].image, col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE,
+                Tile t = tiles.get(tileId);
+                if (t != null && t.image != null) {
+                    gc.drawImage(t.image, col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE,
                                  GameConstants.TILE_SIZE, GameConstants.TILE_SIZE);
                 }
             }

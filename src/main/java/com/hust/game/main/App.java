@@ -93,9 +93,9 @@ public class App extends Application {
         MenuScreen menu = new MenuScreen(
 
                 // START
-                v -> {
+                level -> {
                     stopMenuMusic();
-                    Scene gameScene = createGameScene(stage, 1);
+                    Scene gameScene = createGameScene(stage, level);
                     stage.setScene(gameScene);
                     gameLoop.start();
                 },
@@ -112,9 +112,9 @@ public class App extends Application {
         playMenuMusic();
         MenuScreen menu = new MenuScreen(
 
-                v -> {
+                level -> {
                     stopMenuMusic();
-                    Scene gameScene = createGameScene(stage, 1);
+                    Scene gameScene = createGameScene(stage, level);
                     stage.setScene(gameScene);
                     gameLoop.start();
                 },
@@ -207,9 +207,21 @@ public class App extends Application {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
         
-        // Đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
-        gc.setFill(javafx.scene.paint.Color.BLACK);
-        gc.fillRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        Image tempBackScreen = null;
+        try {
+            tempBackScreen = loadImg("/assets/back_screen.png");
+        } catch (Exception e) {
+            System.out.println("Không tìm thấy ảnh back_screen.png");
+        }
+        final Image backScreenImg = tempBackScreen;
+
+        // Đổ hình nền hoặc đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
+        if (backScreenImg != null) {
+            gc.drawImage(backScreenImg, 0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        } else {
+            gc.setFill(javafx.scene.paint.Color.BLACK);
+            gc.fillRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        }
 
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
@@ -300,9 +312,13 @@ public class App extends Application {
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
                 
-                // Đổ nền đen cho toàn bộ cửa sổ game để phần viền nằm ngoài map hiển thị màu đen
-                gc.setFill(javafx.scene.paint.Color.BLACK);
-                gc.fillRect(0, 0, WIDTH, HEIGHT);
+                // Đổ nền cho toàn bộ cửa sổ game để phần viền nằm ngoài map hiển thị ảnh
+                if (backScreenImg != null) {
+                    gc.drawImage(backScreenImg, 0, 0, WIDTH, HEIGHT);
+                } else {
+                    gc.setFill(javafx.scene.paint.Color.BLACK);
+                    gc.fillRect(0, 0, WIDTH, HEIGHT);
+                }
 
                 gc.save();
                 
@@ -326,6 +342,7 @@ public class App extends Application {
                 player.render(gc);
                 enemyManager.renderAll(gc);
                 com.hust.game.ui.DamageTextManager.render(gc); // Vẽ các số sát thương (vẽ sau quái để đè lên trên cùng)
+                combatManager.renderCrits(gc); // Vẽ text CRIT đè lên trên cùng
 
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
@@ -966,11 +983,13 @@ public class App extends Application {
                 gc.restore();
 
                 // Xử lý vẽ quả bóng Loading Ball và Hints
-                if (loadingTimer[0] >= 540) {
-                    gc.setGlobalAlpha(Math.max(0.0, bgAlpha[0] / 0.3));
-                } else {
-                    gc.setGlobalAlpha(1.0);
+                double loadingAlpha = 1.0;
+                if (loadingTimer[0] < 60) {
+                    loadingAlpha = loadingTimer[0] / 60.0;
+                } else if (loadingTimer[0] >= 540) {
+                    loadingAlpha = Math.max(0.0, bgAlpha[0] / 0.3);
                 }
+                gc.setGlobalAlpha(loadingAlpha);
 
                 double ballW = 80, ballH = 80, spacing = 20;
                 double startX = WIDTH - 50 - (4 * ballW + 3 * spacing);
@@ -1005,6 +1024,14 @@ public class App extends Application {
                 // Khi chạy xong 540 + x frame (đã tối đen) -> Hoàn tất Scene
                 if (loadingTimer[0] > 540 && bgAlpha[0] <= 0) {
                     this.stop();
+                    
+                    // Xoá nền Map cũ của Scene trước khi đẩy lại vào Stage để tránh chớp nháy khung hình
+                    if (App.this.gc != null) {
+                        App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
+                        App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
+                        App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
+                    }
+
                     stage.setScene(nextScene);
                     onLoaded.run();
                 }

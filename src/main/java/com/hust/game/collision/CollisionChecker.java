@@ -23,10 +23,10 @@ public class CollisionChecker {
 
         int tileId = mapM.mapTileNum[row][col];
 
-        // Kiểm tra tileId hợp lệ để tránh crash nếu map file có lỗi
-        if (tileId < 0 || tileId >= mapM.tiles.length || mapM.tiles[tileId] == null) {
+        com.hust.game.map.Tile tile = mapM.tiles.get(tileId);
+        if (tile == null) {
             return true;
         }
-        return mapM.tiles[tileId].collision; // Trả về true nếu là Pond hoặc Wall
+        return tile.collision; // Trả về true nếu là Pond hoặc Wall
     }
 }

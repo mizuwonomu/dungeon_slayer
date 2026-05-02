@@ -30,7 +30,7 @@ public class MenuScreen {
     // -------------------------------------------------------
     // CALLBACK — gọi khi người dùng bấm nút
     // -------------------------------------------------------
-    private final Consumer<Void> onStart;
+    private final Consumer<Integer> onStart;
     private final Consumer<Void> onSettings;
 
     // -------------------------------------------------------
@@ -47,8 +47,9 @@ public class MenuScreen {
     // Phase 0: Chạy animation background, chưa hiện nút
     //          Thời gian = BG_ANIM_DELAY * BG_NUM_FRAMES (chạy đúng 1 vòng)
     // Phase 1: Hiện nút bình thường, background vẫn chạy animation
-    // Phase 2: Người dùng bấm Play → background fade out dần
-    //          Khi alpha xuống đủ thấp → chuyển scene
+    // Phase 2: Người dùng bấm Play → Chuyển sang Menu chọn Level
+    // Phase 3: Người dùng chọn Level → background fade out dần
+    //          Khi alpha xuống đủ thấp → chuyển scene vào game
     // -------------------------------------------------------
     // Thời gian Phase 0: đủ để chạy đúng 1 vòng animation (4 frame x 64 delay)
     private static final int    PHASE0_DURATION = BG_ANIM_DELAY * BG_NUM_FRAMES;
@@ -59,7 +60,7 @@ public class MenuScreen {
     // Ngưỡng alpha để chuyển scene (gần như trong suốt hoàn toàn)
     private static final double FADE_THRESHOLD  = 0.05;
 
-    public MenuScreen(Consumer<Void> onStart, Consumer<Void> onSettings) {
+    public MenuScreen(Consumer<Integer> onStart, Consumer<Void> onSettings) {
         this.onStart    = onStart;
         this.onSettings = onSettings;
     }
@@ -91,13 +92,35 @@ public class MenuScreen {
         String[] selectedHint = { "" };
         int[] hintIndex = { 0 };
         int[] hintTimer = { 0 };
+        int[] selectedLevel = { 1 };
 
         // Nút Start
         StackPane startBtn = createSpriteBtn("START", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 1) {
-                phase[0] = 2; // Kích hoạt fade out
+                phase[0] = 2; // Chuyển sang menu chọn level
+            }
+        });
+        
+        // Nút Chọn Level
+        StackPane lvl1Btn = createSpriteBtn("LEVEL 1", buttonSheet, 3, 1.0, () -> {
+            if (phase[0] == 2) {
+                phase[0] = 3;
+                selectedLevel[0] = 1;
                 hintIndex[0] = (int) (Math.random() * hints.length);
                 selectedHint[0] = hints[hintIndex[0]];
+            }
+        });
+        StackPane lvl2Btn = createSpriteBtn("LEVEL 2", buttonSheet, 3, 1.0, () -> {
+            if (phase[0] == 2) {
+                phase[0] = 3;
+                selectedLevel[0] = 2;
+                hintIndex[0] = (int) (Math.random() * hints.length);
+                selectedHint[0] = hints[hintIndex[0]];
+            }
+        });
+        StackPane backBtn = createSpriteBtn("BACK", buttonSheet, 3, 1.0, () -> {
+            if (phase[0] == 2) {
+                phase[0] = 1; // Quay lại menu chính
             }
         });
 
@@ -118,21 +141,32 @@ public class MenuScreen {
         btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0);
         btnBox.setMouseTransparent(!hasPlayedIntro); // Fix lỗi: chưa hiện nút đã bấm được
 
+        HBox levelRow = new HBox(60, lvl1Btn, lvl2Btn);
+        levelRow.setAlignment(Pos.CENTER);
+        levelRow.setVisible(false);
+        levelRow.setMouseTransparent(true);
+        
+        backBtn.setVisible(false);
+        backBtn.setMouseTransparent(true);
+
         // -------------------------------------------------------
         // STACKPANE — canvas phía dưới, nút phía trên
         // StackPane.setAlignment đặt btnBox dính góc dưới trái
         // -------------------------------------------------------
-        StackPane root = new StackPane(canvas, btnBox);
+        StackPane root = new StackPane(canvas, btnBox, levelRow, backBtn);
         StackPane.setAlignment(btnBox, Pos.BOTTOM_LEFT);
+        StackPane.setAlignment(levelRow, Pos.CENTER);
+        StackPane.setAlignment(backBtn, Pos.BOTTOM_CENTER);
 
-        // Padding: cách mép dưới cao hơn một chút (60px), cách mép trái 70px
+        // Padding
         StackPane.setMargin(btnBox, new Insets(0, 0, 20, 70));
+        StackPane.setMargin(backBtn, new Insets(0, 0, 50, 0));
 
         root.setStyle("-fx-background-color: black;"); // Nền đen khi background chưa load
 
         // Thêm sự kiện click chuột để đổi hint khi đang ở màn hình loading
         root.setOnMouseClicked(e -> {
-            if (phase[0] == 2) {
+            if (phase[0] == 3) {
                 hintTimer[0] = 0; // Reset lại thời gian chờ
                 hintIndex[0] = (hintIndex[0] + 1) % hints.length;
                 selectedHint[0] = hints[hintIndex[0]];
@@ -197,16 +231,44 @@ public class MenuScreen {
                         phaseTimer[0] = 0; // Reset bộ đếm
                         btnBox.setOpacity(1.0); // Hiện nút ngay lập tức (không fade in)
                         btnBox.setMouseTransparent(false); // Cho phép thao tác
+                        levelRow.setVisible(false);
+                        backBtn.setVisible(false);
                         hasPlayedIntro = true; // Đánh dấu đã xem intro rồi, lần sau bỏ qua
                     }
 
                 } else if (phase[0] == 1) {
                     // PHASE 1: Menu bình thường, nút hiển thị, background vẫn chạy
-                    bgAlpha[0] = 1.0; // Giữ background rõ nét, chờ người dùng bấm
+                    if (bgAlpha[0] < 1.0) {
+                        bgAlpha[0] += FADE_SPEED;
+                        if (bgAlpha[0] > 1.0) bgAlpha[0] = 1.0; // Fade sáng lại nếu từ Phase 2 (Back)
+                    }
+                    btnBox.setVisible(true);
+                    btnBox.setMouseTransparent(false);
+                    levelRow.setVisible(false);
+                    levelRow.setMouseTransparent(true);
+                    backBtn.setVisible(false);
+                    backBtn.setMouseTransparent(true);
 
                 } else if (phase[0] == 2) {
-                    // PHASE 2: Bấm Play → nút biến mất, fade out background, chạy loading
+                    // PHASE 2: Người chơi chọn Level
+                    if (bgAlpha[0] > 0.3) {
+                        bgAlpha[0] -= FADE_SPEED;
+                        if (bgAlpha[0] < 0.3) bgAlpha[0] = 0.3; // Mờ dần tới 0.3 (giống Setting)
+                    }
+                    btnBox.setVisible(false); 
+                    btnBox.setMouseTransparent(true);
+                    levelRow.setVisible(true);
+                    levelRow.setMouseTransparent(false);
+                    backBtn.setVisible(true);
+                    backBtn.setMouseTransparent(false);
+                    
+                } else if (phase[0] == 3) {
+                    // PHASE 3: Đã chọn Level, bắt đầu fade out và chuyển cảnh
                     btnBox.setVisible(false); // Nút biến mất ngay lập tức
+                    levelRow.setVisible(false);
+                    levelRow.setMouseTransparent(true);
+                    backBtn.setVisible(false);
+                    backBtn.setMouseTransparent(true);
                     
                     loadingTimer[0]++;
                     hintTimer[0]++;
@@ -230,7 +292,7 @@ public class MenuScreen {
                         if (bgAlpha[0] <= 0) {
                             bgAlpha[0] = 0;
                             menuLoopHolder[0].stop(); // Dừng loop menu trước
-                            onStart.accept(null);      // Gọi callback chuyển scene
+                            onStart.accept(selectedLevel[0]); // Gọi callback chuyển scene kèm level đã chọn
                             return;                    // Thoát handle() để không vẽ thêm
                         }
                     }
@@ -261,14 +323,16 @@ public class MenuScreen {
 
                 gc.restore(); // Khôi phục globalAlpha về 1.0 để không ảnh hưởng render khác
                 
-                // --- Vẽ 4 quả bóng Loading khi vào Phase 2 ---
-                if (phase[0] == 2) {
-                // Fade bóng loading đi cùng background lúc chuyển sang đen tuyền
-                if (loadingTimer[0] >= 540) {
-                    gc.setGlobalAlpha(Math.max(0.0, bgAlpha[0] / 0.3));
-                } else {
-                    gc.setGlobalAlpha(1.0);
-                }
+                // --- Vẽ 4 quả bóng Loading khi vào Phase 3 ---
+                if (phase[0] == 3) {
+                    // Từ từ hiện bóng loading và text khi bắt đầu (60 frames đầu), fade out lúc chuyển sang đen tuyền
+                    double loadingAlpha = 1.0;
+                    if (loadingTimer[0] < 60) {
+                        loadingAlpha = loadingTimer[0] / 60.0;
+                    } else if (loadingTimer[0] >= 540) {
+                        loadingAlpha = Math.max(0.0, bgAlpha[0] / 0.3);
+                    }
+                    gc.setGlobalAlpha(loadingAlpha);
 
                     double ballW = 80;
                     double ballH = 80;

@@ -6,6 +6,7 @@ import com.hust.game.entities.player.PlayerCombat;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * CombatManager - trung gian xử lý combat giữa Player và Enemy.
@@ -47,6 +48,22 @@ public class CombatManager {
     private int comboCount = 0;
     private int comboTimer = 0;
     private static final int COMBO_WINDOW_FRAMES = 60; // 1 giây (60 fps)
+
+    // -------------------------------------------------------
+    // CRIT TEXT SYSTEM (Hiệu ứng sát thương chí mạng)
+    // -------------------------------------------------------
+    private class CritText {
+        double x, y;
+        String text;
+        javafx.scene.paint.Color color;
+        double sizeMultiplier;
+        int timer = 60; // Tồn tại 1 giây
+
+        public CritText(double x, double y, String text, javafx.scene.paint.Color color, double sizeMultiplier) {
+            this.x = x; this.y = y; this.text = text; this.color = color; this.sizeMultiplier = sizeMultiplier;
+        }
+    }
+    private List<CritText> critTexts = new ArrayList<>();
 
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
@@ -98,10 +115,18 @@ public class CombatManager {
         // Kiểm tra cooldown tấn công — nếu chưa hết thì bỏ qua
         if (!player.canAttack()) return 0;
 
+        // Tính tỷ lệ Crit dựa trên Combo (Max 75% ở Combo 5)
+        int[] critChances = {5, 20, 35, 50, 65, 75};
+        int currentChance = critChances[Math.min(5, comboCount)];
+        boolean isCrit = (Math.random() * 100) < currentChance;
+
         // Tính damage thực tế — nhân đôi nếu skill đang bật
         int actualDamage = player.getAttackDamage();
         if (skillActive) {
             actualDamage *= SKILL_DAMAGE_MULTIPLIER;
+        }
+        if (isCrit) {
+            actualDamage *= 2; // Chí mạng x2 sát thương tổng
         }
 
         // Kích hoạt Animation chém và vẽ hiệu ứng
@@ -156,6 +181,26 @@ public class CombatManager {
                 if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
                 
                 if (enemy.getHp() <= 0) isFinalHit = true;
+
+                // Tính toạ độ hiển thị text ngay trên đầu quái vật
+                double textX = enemy.getX() + enemy.getRenderWidth() / 2 - 15;
+                double textY = enemy.getY();
+                // Thêm Text CRIT nếu chém chí mạng, hoặc phủ màu Cyan nếu đang cuồng nộ
+                if (isCrit) {
+                    javafx.scene.paint.Color critColor = skillActive ? javafx.scene.paint.Color.CYAN : javafx.scene.paint.Color.RED;
+                    double sizeMult = skillActive ? 2.0 : 1.5;
+                    String text = "CRIT DAMAGE!\n-" + actualDamage;
+                    critTexts.add(new CritText(textX - 20, textY - 20, text, critColor, sizeMult));
+                    
+                    // Ghi đè số sát thương trắng mặc định sinh ra từ hàm takeDamage bằng chuỗi rỗng (tàng hình)
+                    com.hust.game.ui.DamageTextManager.addText(enemy, 0, 0, "", javafx.scene.paint.Color.TRANSPARENT);
+                } else if (skillActive) {
+                    String text = "-" + actualDamage;
+                    critTexts.add(new CritText(textX, textY, text, javafx.scene.paint.Color.CYAN, 1.0));
+                    
+                    // Ghi đè số sát thương trắng mặc định sinh ra từ hàm takeDamage bằng chuỗi rỗng (tàng hình)
+                    com.hust.game.ui.DamageTextManager.addText(enemy, 0, 0, "", javafx.scene.paint.Color.TRANSPARENT);
+                }
             }
         }
 
@@ -241,6 +286,33 @@ public class CombatManager {
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }
 
+    /**
+     * Vẽ các số Crit và hiệu ứng Cuồng nộ đè lên giao diện
+     */
+    public void renderCrits(javafx.scene.canvas.GraphicsContext gc) {
+        javafx.scene.text.Font baseFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 16);
+        if (baseFont == null) baseFont = new javafx.scene.text.Font("Arial", 16);
+        
+        for (int i = critTexts.size() - 1; i >= 0; i--) {
+            CritText ct = critTexts.get(i);
+            gc.setFont(javafx.scene.text.Font.font(baseFont.getFamily(), javafx.scene.text.FontWeight.BOLD, 16 * ct.sizeMultiplier));
+            gc.setFill(ct.color);
+            gc.setStroke(javafx.scene.paint.Color.WHITE);
+            gc.setLineWidth(1.5);
+            
+            String[] lines = ct.text.split("\n");
+            double currentY = ct.y;
+            for (String line : lines) {
+                gc.strokeText(line, ct.x, currentY);
+                gc.fillText(line, ct.x, currentY);
+                currentY += 18 * ct.sizeMultiplier; // Giãn dòng theo kích thước
+            }
+            
+            ct.y -= 0.5; // Chữ bay lên từ từ
+            ct.timer--;
+            if (ct.timer <= 0) critTexts.remove(i);
+        }
+    }
     // -------------------------------------------------------
     // GETTER cho HUD — Member C dùng để hiển thị trạng thái skill
     // -------------------------------------------------------

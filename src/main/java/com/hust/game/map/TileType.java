@@ -1,7 +1,7 @@
 package com.hust.game.map;
 
 public enum TileType {
-    GROUND_1(0, "ground_1.png", false),
+    GROUND_1(-1, "ground_1.png", false),
     GROUND_2(1, "ground_2.png", false),
     ROAD_1(2, "road_1.png", false),
     ROAD_2(3, "road_2.png", false),

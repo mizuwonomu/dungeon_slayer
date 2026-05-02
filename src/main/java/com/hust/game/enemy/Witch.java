@@ -102,14 +102,14 @@ public class Witch extends Enemy {
             if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0) knightCount++;
         }
 
-        // Giới hạn y cho Knight không bị dính vào viền tường (Tile=48, Knight=96)
-        double safeY = Math.max(48, Math.min(this.y, App.getGameHeight() - 144));
+        // Giới hạn y cho Knight không bị dính vào viền tường Level 2 (Phòng cao 480)
+        double safeY = Math.max(96, Math.min(this.y, 480 - 144));
 
         if (knightCount == 0) {
-            double safeX = Math.max(48, this.x - 80);
+            double safeX = Math.max(96, this.x - 80);
             enemyManager.spawnEnemy("Knight", safeX, safeY, knightIdle, 8, 96, 96, targetPlayer, knightAtk);
         } else if (knightCount == 1) {
-            double safeX = Math.min(App.getGameWidth() - 144, this.x + 80);
+            double safeX = Math.min(816 - 144, this.x + 80); // Phòng rộng 816
             enemyManager.spawnEnemy("Knight", safeX, safeY, knightIdle, 8, 96, 96, targetPlayer, knightAtk);
         }
     }
@@ -140,12 +140,18 @@ public class Witch extends Enemy {
         // 1. CƠ CHẾ DỊCH CHUYỂN (Chỉ kích hoạt 1 lần khi HP <= 50%)
         if (this.hp <= this.maxHp / 2 && !hasTeleported) {
             hasTeleported = true;
-            if (targetPlayer.getX() < App.getGameWidth() / 2) {
-                this.x = App.getGameWidth() - 150;
+            
+            // Kích thước phòng Level 2 là 816x480. Dịch chuyển trong vùng an toàn (x: 100->650, y: 200)
+            if (targetPlayer.getX() < 400) {
+                this.x = 650;
             } else {
                 this.x = 100;
             }
-            this.y = App.getGameHeight() / 2 - 50;
+            this.y = 200;
+            
+            // Cập nhật lastX, lastY để cơ chế chống kẹt tường không đẩy ngược Witch về chỗ cũ
+            this.lastX = this.x;
+            this.lastY = this.y;
             return;
         }
 
