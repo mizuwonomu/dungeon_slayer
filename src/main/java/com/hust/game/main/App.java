@@ -77,17 +77,24 @@ public class App extends Application {
 
     // ... (everything above stays EXACTLY the same)
 
+    private javafx.scene.media.MediaPlayer menuMusicPlayer;
+    private javafx.scene.media.MediaPlayer inGameMusicPlayer;
+    private static App instance;
+
     @Override
     public void start(Stage stage) {
+        instance = this;
         stage.setTitle("GHOULITE");
 
         // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
         SoundManager.loadSounds();
+        playMenuMusic();
 
         MenuScreen menu = new MenuScreen(
 
                 // START
                 v -> {
+                    stopMenuMusic();
                     Scene gameScene = createGameScene(stage, 1);
                     stage.setScene(gameScene);
                     gameLoop.start();
@@ -101,9 +108,12 @@ public class App extends Application {
         stage.show();
     }
     private void showMenu(Stage stage) {
+        stopInGameMusic();
+        playMenuMusic();
         MenuScreen menu = new MenuScreen(
 
                 v -> {
+                    stopMenuMusic();
                     Scene gameScene = createGameScene(stage, 1);
                     stage.setScene(gameScene);
                     gameLoop.start();
@@ -164,6 +174,7 @@ public class App extends Application {
         exitBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
         startBtn.setOnAction(e -> {
+            stopMenuMusic();
             Scene gameScene = createGameScene(stage, 1);
             stage.setScene(gameScene);
             gameLoop.start();
@@ -249,6 +260,7 @@ public class App extends Application {
         });
 
         initializeEntities(startLevel);
+        playInGameMusic(startLevel);
         
         fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
@@ -335,10 +347,15 @@ public class App extends Application {
                             () -> {
                                 isLevelClearUIShown = false;
                                 root.getChildren().remove(levelClearScreen.getRoot());
-                                gameManager.loadNextLevel();
-                                collisionChecker = new CollisionChecker(gameManager.getMap());
-                                combatManager.resetSkill();
-                                gameLoop.start();
+                                showLoadingScreen(stage, scene, () -> {
+                                    gameManager.loadNextLevel();
+                                    collisionChecker = new CollisionChecker(gameManager.getMap());
+                                    combatManager.resetSkill();
+                                    input.clear(); // Xóa các phím đang đè để tránh kẹt nút
+                                    fadeInTimer = 120; // Kích hoạt lại hiệu ứng mờ dần sáng lên khi vào màn mới
+                                    playInGameMusic(gameManager.getCurrentLevelIndex());
+                                    gameLoop.start();
+                                });
                             },
                             // Retry
                             () -> {
@@ -805,6 +822,197 @@ public class App extends Application {
         pane.setCursor(javafx.scene.Cursor.HAND);
         
         return pane;
+    }
+
+    private void playMenuMusic() {
+        if (menuMusicPlayer == null) {
+            try {
+                java.net.URL url = getClass().getResource("/sounds/background_music.mp3");
+                if (url != null) {
+                    javafx.scene.media.Media media = new javafx.scene.media.Media(url.toExternalForm());
+                    menuMusicPlayer = new javafx.scene.media.MediaPlayer(media);
+                    menuMusicPlayer.setCycleCount(javafx.scene.media.MediaPlayer.INDEFINITE); // Lặp vô hạn
+                    menuMusicPlayer.setVolume(SoundManager.getBgmVolume());
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi load nhạc menu: " + e.getMessage());
+            }
+        }
+        if (menuMusicPlayer != null && menuMusicPlayer.getStatus() != javafx.scene.media.MediaPlayer.Status.PLAYING) {
+            menuMusicPlayer.play();
+        }
+    }
+
+    private void stopMenuMusic() {
+        if (menuMusicPlayer != null) {
+            menuMusicPlayer.stop();
+        }
+    }
+
+    private void playInGameMusic(int level) {
+        stopInGameMusic();
+        if (level == 1) {
+            try {
+                java.net.URL url = getClass().getResource("/sounds/Music_lvl_1.mp3");
+                if (url != null) {
+                    javafx.scene.media.Media media = new javafx.scene.media.Media(url.toExternalForm());
+                    inGameMusicPlayer = new javafx.scene.media.MediaPlayer(media);
+                    inGameMusicPlayer.setCycleCount(javafx.scene.media.MediaPlayer.INDEFINITE); // Lặp vô hạn
+                    inGameMusicPlayer.setVolume(0.7 * SoundManager.getBgmVolume()); // Âm lượng 0.7 mặc định nhân với setting
+                    inGameMusicPlayer.play();
+                }
+            } catch (Exception e) {
+                System.err.println("Lỗi load nhạc in-game: " + e.getMessage());
+            }
+        }
+    }
+
+    private void stopInGameMusic() {
+        if (inGameMusicPlayer != null) {
+            inGameMusicPlayer.stop();
+            inGameMusicPlayer.dispose();
+            inGameMusicPlayer = null;
+        }
+    }
+
+    public static void updateBgmVolume(double vol) {
+        if (instance != null) {
+            if (instance.menuMusicPlayer != null) {
+                instance.menuMusicPlayer.setVolume(vol);
+            }
+            if (instance.inGameMusicPlayer != null) {
+                instance.inGameMusicPlayer.setVolume(0.7 * vol);
+            }
+        }
+    }
+
+    private void showLoadingScreen(Stage stage, Scene nextScene, Runnable onLoaded) {
+        StackPane root = new StackPane();
+        root.setStyle("-fx-background-color: black;");
+        Canvas canvas = new Canvas(WIDTH, HEIGHT);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        root.getChildren().add(canvas);
+        Scene loadingScene = new Scene(root, WIDTH, HEIGHT);
+
+        Image bgSheet = loadImg("/assets/menu_background.png");
+        Image loadingBallSheet = loadImg("/assets/loading_ball.png");
+
+        javafx.scene.text.Font hintFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
+        if (hintFont == null) {
+            hintFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 28);
+        }
+        final javafx.scene.text.Font finalHintFont = hintFont;
+
+        String[] hints = {
+            "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
+            "Sử dụng cuồng nộ có thể x2 sát thương đó!",
+            "Phát triển bởi nhóm 27 Ộ Ô Pi!",
+            "Slime là sinh vật chạm vào thôi là mất máu!",
+            "Cái cây có tầm đánh y như player! Cẩn thận!",
+            "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
+        };
+        int[] hintIndex = { (int) (Math.random() * hints.length) };
+        String[] selectedHint = { hints[hintIndex[0]] };
+
+        int[] loadingTimer = { 0 };
+        int[] hintTimer = { 0 };
+        double[] bgAlpha = { 0.0 };
+
+        root.setOnMouseClicked(e -> {
+            hintTimer[0] = 0;
+            hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+            selectedHint[0] = hints[hintIndex[0]];
+        });
+
+        AnimationTimer loadingLoop = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                loadingTimer[0]++;
+                hintTimer[0]++;
+
+                // Random chữ sau mỗi 5 giây giống ngoài menu
+                if (hintTimer[0] >= 300) {
+                    hintTimer[0] = 0;
+                    hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+                    selectedHint[0] = hints[hintIndex[0]];
+                }
+
+                // Hiệu ứng mờ dần (Fade In - Fade Out)
+                if (loadingTimer[0] < 30) {
+                    bgAlpha[0] += 0.01;
+                    if (bgAlpha[0] > 0.3) bgAlpha[0] = 0.3; // Nền mờ 0.3 để không bị chói
+                } else if (loadingTimer[0] > 540) {
+                    bgAlpha[0] -= 0.02;
+                    if (bgAlpha[0] < 0) bgAlpha[0] = 0;
+                }
+
+                gc.clearRect(0, 0, WIDTH, HEIGHT);
+                gc.setFill(javafx.scene.paint.Color.BLACK);
+                gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+                gc.save();
+                gc.setGlobalAlpha(bgAlpha[0]);
+
+                int bgFrameIndex = (loadingTimer[0] / 64) % 4;
+                double sx = bgFrameIndex * 1838.0;
+
+                double scale = Math.max((double) WIDTH / 1838.0, (double) HEIGHT / 1079.0);
+                double drawW = 1838.0 * scale;
+                double drawH = 1079.0 * scale;
+                double drawX = (WIDTH - drawW) / 2.0;
+                double drawY = (HEIGHT - drawH) / 2.0;
+
+                gc.drawImage(bgSheet, sx, 0, 1838.0, 1079.0, drawX, drawY, drawW, drawH);
+                gc.restore();
+
+                // Xử lý vẽ quả bóng Loading Ball và Hints
+                if (loadingTimer[0] >= 540) {
+                    gc.setGlobalAlpha(Math.max(0.0, bgAlpha[0] / 0.3));
+                } else {
+                    gc.setGlobalAlpha(1.0);
+                }
+
+                double ballW = 80, ballH = 80, spacing = 20;
+                double startX = WIDTH - 50 - (4 * ballW + 3 * spacing);
+                double startY = HEIGHT - 50 - ballH;
+
+                int t = loadingTimer[0];
+                int b1 = (t < 60) ? (t / 15) : 4;
+                int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
+                int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
+                int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
+
+                int[] ballFrames = {b1, b2, b3, b4};
+
+                for (int i = 0; i < 4; i++) {
+                    double drawBallX = startX + i * (ballW + spacing);
+                    double frameX = Math.min(4, ballFrames[i]) * 160.0;
+                    gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
+                }
+
+                gc.setFont(finalHintFont);
+                gc.setFill(javafx.scene.paint.Color.WHITE);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+                double textCenterX = (20 + (startX + 20)) / 2.0;
+                double textCenterY = startY + ballH / 2.0;
+                gc.fillText(selectedHint[0], textCenterX, textCenterY);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+                
+                gc.setGlobalAlpha(1.0);
+
+                // Khi chạy xong 540 + x frame (đã tối đen) -> Hoàn tất Scene
+                if (loadingTimer[0] > 540 && bgAlpha[0] <= 0) {
+                    this.stop();
+                    stage.setScene(nextScene);
+                    onLoaded.run();
+                }
+            }
+        };
+
+        loadingLoop.start();
+        stage.setScene(loadingScene);
     }
 
     private Image loadImg(String path) {

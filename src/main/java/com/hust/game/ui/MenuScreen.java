@@ -82,7 +82,11 @@ public class MenuScreen {
 
         String[] hints = {
             "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
-            "Sử dụng cuồng nộ có thể x2 sát thương đó!"
+            "Sử dụng cuồng nộ có thể x2 sát thương đó!",
+            "Phát triển bởi nhóm 27 Ộ Ô Pi!",
+            "Slime là sinh vật chạm vào thôi là mất máu!",
+            "Cái cây có tầm đánh y như player! Cẩn thận!",
+            "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
         };
         String[] selectedHint = { "" };
         int[] hintIndex = { 0 };

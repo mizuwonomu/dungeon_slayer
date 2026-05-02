@@ -9,14 +9,23 @@ public class SoundManager {
     public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon;
     public static AudioClip btnHover, btnClick;
     public static AudioClip pauseSound, unpauseSound;
-    private static double masterVolume = 1.0; // 0.0 → 1.0
+    private static double sfxVolume = 1.0; // Âm lượng hiệu ứng
+    private static double bgmVolume = 1.0; // Âm lượng nhạc nền
 
-    public static double getMasterVolume() {
-        return masterVolume;
+    public static double getSfxVolume() {
+        return sfxVolume;
     }
 
-    public static void setMasterVolume(double volume) {
-        masterVolume = volume;
+    public static double getBgmVolume() {
+        return bgmVolume;
+    }
+
+    public static void setBgmVolume(double volume) {
+        bgmVolume = volume;
+    }
+
+    public static void setSfxVolume(double volume) {
+        sfxVolume = volume;
 
         // Apply to all loaded clips
         applyVolume(nsMiss, 1.0);
@@ -46,7 +55,7 @@ public class SoundManager {
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
         if (clip != null) {
-            clip.setVolume(baseVolume * masterVolume);
+            clip.setVolume(baseVolume * sfxVolume);
         }
     }
 
@@ -83,7 +92,7 @@ public class SoundManager {
             URL url = SoundManager.class.getResource("/sounds/" + fileName);
             if (url != null) {
                 AudioClip clip = new AudioClip(url.toString());
-                clip.setVolume(baseVolume * masterVolume); // 
+                clip.setVolume(baseVolume * sfxVolume); // 
                 return clip;
             } else {
                 System.err.println("Không tìm thấy file âm thanh: /sounds/" + fileName);

@@ -42,12 +42,14 @@ public class SettingsScreen {
     // -------------------------------------------------------
     // SOUND LEVEL — bước nhảy 10, từ 0 đến 100
     // -------------------------------------------------------
-    private int soundLevel;
+    private int bgmLevel;
+    private int sfxLevel;
 
     public SettingsScreen(Consumer<Void> onBack) {
         this.onBack = onBack;
         // Đồng bộ mức âm lượng hiện tại khi mở cài đặt
-        this.soundLevel = (int) Math.round(SoundManager.getMasterVolume() * 100);
+        this.bgmLevel = (int) Math.round(SoundManager.getBgmVolume() * 100);
+        this.sfxLevel = (int) Math.round(SoundManager.getSfxVolume() * 100);
     }
 
     public Scene createScene() {
@@ -76,37 +78,76 @@ public class SettingsScreen {
         title.setStroke(Color.BLACK);
         title.setStrokeWidth(2.0);
 
-        // -------------------------------------------------------
-        // SOUND BUTTON — Thay thế ảnh thành dạng button hiển thị số
-        // -------------------------------------------------------
-        StackPane soundBtn = createSpriteBtn(String.valueOf(soundLevel), buttonSheet, 3, 0.8, () -> {
-            // Nút bấm được, có âm thanh nhưng chưa cần có chức năng đặc biệt
-        });
+        Font labelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 36);
+        if (labelFont == null) {
+            labelFont = Font.font("Arial", FontWeight.BOLD, 36);
+        }
 
         // -------------------------------------------------------
-        // NÚT MINUS và PLUS
+        // BACKGROUND MUSIC ROW (NHẠC NỀN)
         // -------------------------------------------------------
-        StackPane minusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
-            if (soundLevel > 0) {
-                soundLevel -= 10;
-                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
-                SoundManager.setMasterVolume(soundLevel / 100.0);
+        javafx.scene.text.Text bgmLabel = new javafx.scene.text.Text("Nhạc nền");
+        bgmLabel.setFont(labelFont);
+        bgmLabel.setFill(Color.WHITE);
+        bgmLabel.setStroke(Color.BLACK);
+        bgmLabel.setStrokeWidth(1.5);
+
+        StackPane bgmBtn = createSpriteBtn(String.valueOf(bgmLevel), buttonSheet, 3, 0.8, () -> {});
+
+        StackPane bgmMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
+            if (bgmLevel > 0) {
+                bgmLevel -= 10;
+                ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
+                SoundManager.setBgmVolume(bgmLevel / 100.0);
+                com.hust.game.main.App.updateBgmVolume(bgmLevel / 100.0);
             }
         });
 
-        StackPane plusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
-            if (soundLevel < 100) {
-                soundLevel += 10;
-                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
-                SoundManager.setMasterVolume(soundLevel / 100.0);
+        StackPane bgmPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
+            if (bgmLevel < 100) {
+                bgmLevel += 10;
+                ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
+                SoundManager.setBgmVolume(bgmLevel / 100.0);
+                com.hust.game.main.App.updateBgmVolume(bgmLevel / 100.0);
             }
         });
 
+        HBox bgmRow = new HBox(10, bgmMinusBtn, bgmBtn, bgmPlusBtn);
+        bgmRow.setAlignment(Pos.CENTER);
+        VBox bgmBox = new VBox(5, bgmLabel, bgmRow);
+        bgmBox.setAlignment(Pos.CENTER);
+
         // -------------------------------------------------------
-        // SOUND ROW — minus | ảnh sound | plus nằm ngang
+        // SFX ROW (HIỆU ỨNG)
         // -------------------------------------------------------
-        HBox soundRow = new HBox(10, minusBtn, soundBtn, plusBtn);
-        soundRow.setAlignment(Pos.CENTER);
+        javafx.scene.text.Text sfxLabel = new javafx.scene.text.Text("Hiệu ứng");
+        sfxLabel.setFont(labelFont);
+        sfxLabel.setFill(Color.WHITE);
+        sfxLabel.setStroke(Color.BLACK);
+        sfxLabel.setStrokeWidth(1.5);
+
+        StackPane sfxBtn = createSpriteBtn(String.valueOf(sfxLevel), buttonSheet, 3, 0.8, () -> {});
+
+        StackPane sfxMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
+            if (sfxLevel > 0) {
+                sfxLevel -= 10;
+                ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
+                SoundManager.setSfxVolume(sfxLevel / 100.0);
+            }
+        });
+
+        StackPane sfxPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
+            if (sfxLevel < 100) {
+                sfxLevel += 10;
+                ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
+                SoundManager.setSfxVolume(sfxLevel / 100.0);
+            }
+        });
+
+        HBox sfxRow = new HBox(10, sfxMinusBtn, sfxBtn, sfxPlusBtn);
+        sfxRow.setAlignment(Pos.CENTER);
+        VBox sfxBox = new VBox(5, sfxLabel, sfxRow);
+        sfxBox.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------
         // NÚT BACK VỀ MENU
@@ -116,7 +157,7 @@ public class SettingsScreen {
         // -------------------------------------------------------
         // LAYOUT TỔNG — Title → Sound Row → Back, canh giữa màn hình
         // -------------------------------------------------------
-        VBox uiBox = new VBox(30, title, soundRow, menuBtn);
+        VBox uiBox = new VBox(20, title, bgmBox, sfxBox, menuBtn);
         uiBox.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------

@@ -86,7 +86,7 @@ public class Tree extends Enemy {
                     this.frameIndex = 0;
 
                     // Chỉ gây sát thương nếu Player không kịp né
-                    if (this.intersects(targetPlayer)) {
+                    if (isInAttackRange()) {
                         targetPlayer.takeDamage(this.damage);
                     }
                 } else {
@@ -99,7 +99,7 @@ public class Tree extends Enemy {
         if (skillCoolDown > 0) {
             skillCoolDown--;
         }
-        if (this.intersects(targetPlayer)) {
+        if (isInAttackRange()) {
             if (skillCoolDown <= 0) {
                 castSkill();
                 skillCoolDown = SKILL_TIMING;
@@ -116,6 +116,18 @@ public class Tree extends Enemy {
    //     if (this.animationTimer == 0 && this.frameIndex == 0 && (this.moveX != 0 || this.moveY != 0)) {
      //       com.hust.game.audio.SoundManager.playTreeMovingSound();
      //   }
+    }
+
+    private boolean isInAttackRange() {
+        double attackRange = 30.0; // Tầm đánh mở rộng ra bằng với Player
+        javafx.geometry.Rectangle2D treeBox = this.getBoundary();
+        javafx.geometry.Rectangle2D attackBox = new javafx.geometry.Rectangle2D(
+            treeBox.getMinX() - attackRange,
+            treeBox.getMinY() - attackRange,
+            treeBox.getWidth() + attackRange * 2,
+            treeBox.getHeight() + attackRange * 2
+        );
+        return attackBox.intersects(targetPlayer.getBoundary());
     }
 
     private void castSkill() {
