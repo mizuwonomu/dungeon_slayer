@@ -35,11 +35,11 @@ public class MenuScreen {
 
     // -------------------------------------------------------
     // ANIMATION BACKGROUND
-    // Sprite sheet 4 frame nằm ngang, mỗi frame 510x300
+    // Sprite sheet 4 frame nằm ngang, mỗi frame 1838x1079
     // -------------------------------------------------------
     private static final int    BG_NUM_FRAMES  = 4;      // Tổng số frame sprite sheet
-    private static final double BG_FRAME_W     = 510.0;  // Chiều rộng 1 frame gốc (2040 / 4)
-    private static final double BG_FRAME_H     = 300.0;  // Chiều cao gốc sprite sheet
+    private static final double BG_FRAME_W     = 1838.0; // Chiều rộng 1 frame gốc (7352 / 4)
+    private static final double BG_FRAME_H     = 1079.0; // Chiều cao gốc sprite sheet
     private static final int    BG_ANIM_DELAY  = 64;     // Số frame game giữa mỗi lần đổi ảnh
     private static boolean hasPlayedIntro = false; //Chỉ false lần đầu tiên mở game, nếu đã từ sound button hay victory -> không load anim nữa
     // -------------------------------------------------------
@@ -80,10 +80,20 @@ public class MenuScreen {
         int[]    phase   = { hasPlayedIntro ? 1 : 0 };
         double[] bgAlpha = { 1.0 };
 
+        String[] hints = {
+            "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
+            "Sử dụng cuồng nộ có thể x2 sát thương đó!"
+        };
+        String[] selectedHint = { "" };
+        int[] hintIndex = { 0 };
+        int[] hintTimer = { 0 };
+
         // Nút Start
         StackPane startBtn = createSpriteBtn("START", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 1) {
                 phase[0] = 2; // Kích hoạt fade out
+                hintIndex[0] = (int) (Math.random() * hints.length);
+                selectedHint[0] = hints[hintIndex[0]];
             }
         });
 
@@ -102,6 +112,7 @@ public class MenuScreen {
         btnBox.setAlignment(Pos.BOTTOM_LEFT);
         
         btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0);
+        btnBox.setMouseTransparent(!hasPlayedIntro); // Fix lỗi: chưa hiện nút đã bấm được
 
         // -------------------------------------------------------
         // STACKPANE — canvas phía dưới, nút phía trên
@@ -115,11 +126,27 @@ public class MenuScreen {
 
         root.setStyle("-fx-background-color: black;"); // Nền đen khi background chưa load
 
+        // Thêm sự kiện click chuột để đổi hint khi đang ở màn hình loading
+        root.setOnMouseClicked(e -> {
+            if (phase[0] == 2) {
+                hintTimer[0] = 0; // Reset lại thời gian chờ
+                hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+                selectedHint[0] = hints[hintIndex[0]];
+            }
+        });
+
         // -------------------------------------------------------
         // LOAD SPRITE SHEET BACKGROUND
         // Đặt file vào: src/main/resources/assets/menu_bg.png
         // -------------------------------------------------------
         Image bgSheet = loadImg("/assets/menu_background.png");
+        Image loadingBallSheet = loadImg("/assets/loading_ball.png");
+
+        Font hintFont = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
+        if (hintFont == null) {
+            hintFont = Font.font("Arial", FontWeight.BOLD, 28);
+        }
+        final Font finalHintFont = hintFont;
 
         // -------------------------------------------------------
         // BIẾN TRẠNG THÁI ANIMATION
@@ -127,6 +154,7 @@ public class MenuScreen {
         int[] bgFrameIndex = { 0 }; // Frame hiện tại của background (0 → 3)
         int[] bgAnimTimer  = { 0 }; // Đếm frame game để biết lúc nào đổi ảnh
         int[] phaseTimer   = { 0 }; // Đếm tổng frame đã trôi qua trong phase hiện tại
+        int[] loadingTimer = { 0 }; // Đếm thời gian cho animation loading
 
         // -------------------------------------------------------
         // ANIMATION TIMER — "game loop" của menu, chạy mỗi frame (~60fps)
@@ -164,6 +192,7 @@ public class MenuScreen {
                         phase[0] = 1;      // Chuyển Phase 1
                         phaseTimer[0] = 0; // Reset bộ đếm
                         btnBox.setOpacity(1.0); // Hiện nút ngay lập tức (không fade in)
+                        btnBox.setMouseTransparent(false); // Cho phép thao tác
                         hasPlayedIntro = true; // Đánh dấu đã xem intro rồi, lần sau bỏ qua
                     }
 
@@ -172,18 +201,34 @@ public class MenuScreen {
                     bgAlpha[0] = 1.0; // Giữ background rõ nét, chờ người dùng bấm
 
                 } else if (phase[0] == 2) {
-                    // PHASE 2: Người dùng bấm Play → fade out background dần dần
-                    // Mỗi frame giảm alpha đi FADE_SPEED
-                    bgAlpha[0] -= FADE_SPEED;
+                    // PHASE 2: Bấm Play → nút biến mất, fade out background, chạy loading
+                    btnBox.setVisible(false); // Nút biến mất ngay lập tức
+                    
+                    loadingTimer[0]++;
+                    hintTimer[0]++;
 
-                    // Nút mờ dần theo cùng tốc độ với background
-                    btnBox.setOpacity(Math.max(0.0, bgAlpha[0]));
+                    // Tự động chuyển dòng hint tiếp theo sau mỗi 5s (300 frames ở 60 FPS)
+                    if (hintTimer[0] >= 300) {
+                        hintTimer[0] = 0; // Reset timer
+                        hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+                        selectedHint[0] = hints[hintIndex[0]];
+                    }
 
-                    // Khi alpha đủ thấp → chuyển sang game
-                    if (bgAlpha[0] <= FADE_THRESHOLD) {
-                        menuLoopHolder[0].stop(); // Dừng loop menu trước
-                        onStart.accept(null);      // Gọi callback chuyển scene
-                        return;                    // Thoát handle() để không vẽ thêm
+                    if (loadingTimer[0] < 540) {
+                        // Đang load bóng: giảm độ sáng về 0.3 giống Setting để vẫn nhìn thấy mờ mờ
+                        if (bgAlpha[0] > 0.3) {
+                            bgAlpha[0] -= FADE_SPEED;
+                            if (bgAlpha[0] < 0.3) bgAlpha[0] = 0.3;
+                        }
+                    } else {
+                        // Chờ nửa giây sau khi bóng load xong (510 + 30 = 540) -> Tối hẳn về đen
+                        bgAlpha[0] -= FADE_SPEED;
+                        if (bgAlpha[0] <= 0) {
+                            bgAlpha[0] = 0;
+                            menuLoopHolder[0].stop(); // Dừng loop menu trước
+                            onStart.accept(null);      // Gọi callback chuyển scene
+                            return;                    // Thoát handle() để không vẽ thêm
+                        }
                     }
                 }
 
@@ -211,6 +256,54 @@ public class MenuScreen {
                 );
 
                 gc.restore(); // Khôi phục globalAlpha về 1.0 để không ảnh hưởng render khác
+                
+                // --- Vẽ 4 quả bóng Loading khi vào Phase 2 ---
+                if (phase[0] == 2) {
+                // Fade bóng loading đi cùng background lúc chuyển sang đen tuyền
+                if (loadingTimer[0] >= 540) {
+                    gc.setGlobalAlpha(Math.max(0.0, bgAlpha[0] / 0.3));
+                } else {
+                    gc.setGlobalAlpha(1.0);
+                }
+
+                    double ballW = 80;
+                    double ballH = 80;
+                    double spacing = 20;
+                    double startX = GameConstants.WINDOW_WIDTH - 50 - (4 * ballW + 3 * spacing);
+                    double startY = GameConstants.WINDOW_HEIGHT - 50 - ballH;
+                    
+                    int t = loadingTimer[0];
+                    
+                    // Giả lập Game Tải:
+                    // Quả 1 & 2 chạy tuần tự trong 2s (mỗi quả 1s ~ 60 frames)
+                    int b1 = (t < 60) ? (t / 15) : 4;
+                    int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
+                    // Quả 3 xong trong 2s (60 * 2 = 120 frames)
+                    int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
+                    // Quả 4 tới frame 3 (index 2) trong 1s, nghỉ 3s, chạy hết trong 0.5s
+                    int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
+                    
+                    int[] ballFrames = {b1, b2, b3, b4};
+                    
+                    for (int i = 0; i < 4; i++) {
+                        double drawBallX = startX + i * (ballW + spacing);
+                        double frameX = Math.min(4, ballFrames[i]) * 160.0; // kích thước 1 frame = 800/5 = 160
+                        gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
+                    }
+
+                    // Vẽ Text Hướng dẫn/Mẹo
+                    gc.setFont(finalHintFont);
+                    gc.setFill(javafx.scene.paint.Color.WHITE);
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                    gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+                    double textCenterX = (20 + (startX + 20)) / 2.0;
+                    double textCenterY = startY + ballH / 2.0; // Căn dọc ngang hàng với quả bóng
+                    gc.fillText(selectedHint[0], textCenterX, textCenterY);
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                    gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+
+                gc.setGlobalAlpha(1.0); // Reset alpha
+                }
             }
         };
 

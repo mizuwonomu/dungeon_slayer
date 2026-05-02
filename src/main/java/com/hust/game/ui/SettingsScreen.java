@@ -32,8 +32,8 @@ public class SettingsScreen {
     // BACKGROUND — dùng lại sprite sheet của menu
     // -------------------------------------------------------
     private static final int    BG_NUM_FRAMES = 4;
-    private static final double BG_FRAME_W    = 510.0;
-    private static final double BG_FRAME_H    = 300.0;
+    private static final double BG_FRAME_W    = 1838.0;
+    private static final double BG_FRAME_H    = 1079.0;
     private static final int    BG_ANIM_DELAY = 64;
 
     // Độ mờ cố định của background (0.0 = đen hoàn toàn, 1.0 = rõ hoàn toàn)

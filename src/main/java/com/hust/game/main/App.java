@@ -73,6 +73,7 @@ public class App extends Application {
     // Camera position
     private double cameraX = 0;
     private double cameraY = 0;
+    private int fadeInTimer = 0; // Bộ đếm thời gian fade-in khi vào màn (120 frame = 2s)
 
     // ... (everything above stays EXACTLY the same)
 
@@ -194,9 +195,14 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
+        
+        // Đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
+        gc.setFill(javafx.scene.paint.Color.BLACK);
+        gc.fillRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
 
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
+        root.setStyle("-fx-background-color: black;"); // Đảm bảo toàn bộ khung viền cũng hiển thị đen 
         Scene scene = new Scene(root);
 
         pauseScreen = new PauseScreen(
@@ -226,6 +232,7 @@ public class App extends Application {
         root.getChildren().add(pauseScreen.getRoot());
 
         scene.setOnKeyPressed(e -> {
+            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
             if (e.getCode() == KeyCode.ESCAPE) {
                 togglePause(stage);
                 return;
@@ -235,12 +242,15 @@ public class App extends Application {
             }
         });
         scene.setOnKeyReleased(e -> {
+            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
             if (!isPaused) {
                 input.remove(e.getCode());
             }
         });
 
         initializeEntities(startLevel);
+        
+        fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
         gameLoop = new AnimationTimer() {
             @Override
@@ -249,7 +259,12 @@ public class App extends Application {
                 boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (!isVictory && !isGameOver && !isPaused) {
+                if (fadeInTimer > 0) {
+                    fadeInTimer--;
+                    updateCamera(); // Chỉ tính toán camera theo người chơi, bỏ qua logic game
+                    pauseBtn.setMouseTransparent(true); // Khóa tương tác nút Pause
+                } else if (!isVictory && !isGameOver && !isPaused) {
+                    pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     handleInput();
                     player.update();
                     combatManager.update();
@@ -303,6 +318,14 @@ public class App extends Application {
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
+
+                // --- VẼ HIỆU ỨNG FADE-IN TỪ ĐEN SANG GAME ---
+                if (fadeInTimer > 0) {
+                    gc.setFill(javafx.scene.paint.Color.BLACK);
+                    gc.setGlobalAlpha((double) fadeInTimer / 120.0);
+                    gc.fillRect(0, 0, WIDTH, HEIGHT);
+                    gc.setGlobalAlpha(1.0);
+                }
 
                 // Clear level
                 if (isVictory && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
