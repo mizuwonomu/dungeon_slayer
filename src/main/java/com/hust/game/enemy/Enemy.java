@@ -33,6 +33,8 @@ public abstract class Enemy extends MovingEntity {
     protected double kbVectorY = 0;
     
     protected boolean isActive = true; // Trạng thái hoạt động (trong màn hình)
+    protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
+    protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -61,7 +63,7 @@ public abstract class Enemy extends MovingEntity {
             kbTimer--;
             this.x += kbVectorX;
             this.y += kbVectorY;
-        } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null) {
+        } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null && !isImmobile) {
             // Trạng thái: AI hoạt động (đuổi theo player)
             double playerX = targetPlayer.getX();
             double playerY = targetPlayer.getY();
@@ -223,5 +225,13 @@ public abstract class Enemy extends MovingEntity {
 
     public boolean isActive() {
         return this.isActive;
+    }
+
+    public void setImmobile(boolean immobile) {
+        this.isImmobile = immobile;
+    }
+
+    public void setHarmless(boolean harmless) {
+        this.isHarmless = harmless;
     }
 }

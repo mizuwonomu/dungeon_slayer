@@ -61,7 +61,7 @@ public class Slime extends Enemy {
             damageTick--;
         }
         // Chỉ tấn công nếu đang không trong cooldown nhỏ sau đòn đánh
-        if (this.intersects(targetPlayer) && damageTick <= 0) {
+        if (!this.isHarmless && this.intersects(targetPlayer) && damageTick <= 0) {
             targetPlayer.takeDamage(this.damage);
             damageTick = 30; // Cooldown 0.5s để tránh gây damage mỗi frame
         }

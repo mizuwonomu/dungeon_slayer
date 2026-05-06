@@ -7,15 +7,19 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MapManager {
     public Map<Integer, Tile> tiles;
     public int[][] mapTileNum;
     public int level;
+    public List<int[]> gatePositions;
 
     public MapManager(int level) {
         this.level = level;
         tiles = new HashMap<>();
+        gatePositions = new ArrayList<>();
         mapTileNum = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
         loadMap("/assets/maps/level" + level + ".txt");
@@ -64,7 +68,12 @@ public class MapManager {
                 
                 String[] numbers = line.split("\\s+");
                 for (int col = 0; col < GameConstants.MAX_WORLD_COL && col < numbers.length; col++) {
-                    mapTileNum[row][col] = Integer.parseInt(numbers[col].trim());
+                    int val = Integer.parseInt(numbers[col].trim());
+                    if (val == -100) {
+                        gatePositions.add(new int[]{col, row});
+                        val = 1; // Đổi thành nền đất để có thể đi qua sau khi cổng mở
+                    }
+                    mapTileNum[row][col] = val;
                 }
             }
             br.close();

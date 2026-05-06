@@ -438,9 +438,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         attackCooldown = ATTACK_COOLDOWN_MAX;
     }
 
-    public void reset(){
-        this.x = 408;
-        this.y = 200;
+    public void reset(double startX, double startY){
+        this.x = startX;
+        this.y = startY;
 
         this.currentHp = maxHp;
         this.currentMana = maxMana;

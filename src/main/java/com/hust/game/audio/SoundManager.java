@@ -6,8 +6,9 @@ import java.net.URL;
 public class SoundManager {
     public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
-    public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon;
+    public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon, witchDmgTaken, witchDied;
     public static AudioClip btnHover, btnClick;
+    public static AudioClip gateBurn;
     public static AudioClip pauseSound, unpauseSound;
     private static double sfxVolume = 1.0; // Âm lượng hiệu ứng
     private static double bgmVolume = 1.0; // Âm lượng nhạc nền
@@ -47,6 +48,9 @@ public class SoundManager {
         applyVolume(witchCircleFollow, 0.8);
         applyVolume(witchCircleExplode, 1.0);
         applyVolume(witchSummon, 0.8);
+        applyVolume(witchDmgTaken, 1.0);
+        applyVolume(witchDied, 1.0);
+        applyVolume(gateBurn, 1.0);
         applyVolume(btnHover, 0.8);
         applyVolume(btnClick, 1.0);
         applyVolume(pauseSound, 1.0);
@@ -80,6 +84,9 @@ public class SoundManager {
         witchCircleFollow = loadSound("witch_circle_folow.wav", 0.8);
         witchCircleExplode = loadSound("witch_circle_explore.wav", 1.0);
         witchSummon = loadSound("summon.wav", 0.8);
+        witchDmgTaken = loadSound("witch_dmg_taken.wav", 1.0);
+        witchDied = loadSound("witch_died.wav", 1.0);
+        gateBurn = loadSound("gate_burn.wav", 1.0);
         btnHover = loadSound("button_hold.wav", 0.8);
         btnClick = loadSound("button_click.wav", 1.0);
         
@@ -169,6 +176,18 @@ public class SoundManager {
         if (witchSummon != null) { witchSummon.stop(); witchSummon.play(); }
     }
 
+    public static void playWitchDmgTakenSound() {
+        if (witchDmgTaken != null) { witchDmgTaken.stop(); witchDmgTaken.play(); }
+    }
+
+    public static void playWitchDiedSound() {
+        if (witchDied != null) { witchDied.stop(); witchDied.play(); }
+    }
+
+    public static void playGateBurnSound() {
+        if (gateBurn != null) { gateBurn.stop(); gateBurn.play(); }
+    }
+
     public static void playButtonHoverSound() {
         if (btnHover != null) { btnHover.stop(); btnHover.play(); }
     }
@@ -207,5 +226,8 @@ public class SoundManager {
         if (knightReady != null) { knightReady.stop(); }
         if (treeMoving != null) { treeMoving.stop(); }
         if (treeAtk != null) { treeAtk.stop(); }
+        if (witchDmgTaken != null) { witchDmgTaken.stop(); }
+        if (witchDied != null) { witchDied.stop(); }
+        if (gateBurn != null) { gateBurn.stop(); }
     }
 }

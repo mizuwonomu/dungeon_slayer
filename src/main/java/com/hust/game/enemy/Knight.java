@@ -81,7 +81,7 @@ public class Knight extends Enemy {
                 this.isFlipped = false;
             }
 
-            if (dashCooldownTimer == 0) {
+            if (dashCooldownTimer == 0 && !this.isImmobile) {
                 double diffX = targetPlayer.getX() - this.x;
                 double diffY = targetPlayer.getY() - this.y;
 

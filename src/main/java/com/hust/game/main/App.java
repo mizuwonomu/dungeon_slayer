@@ -13,11 +13,13 @@ import com.hust.game.enemy.Enemy;
 import com.hust.game.map.MapManager;
 import com.hust.game.collision.CollisionChecker;
 import com.hust.game.progression.GameManager;
+import com.hust.game.progression.TutorialManager;
 
 import com.hust.game.ui.GameFinish;
 import com.hust.game.ui.HUD;
 import com.hust.game.ui.MenuScreen;
 import com.hust.game.ui.LevelClearScreen;
+import com.hust.game.ui.TutorialCompleteScreen;
 import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
 import javafx.animation.AnimationTimer;
@@ -59,6 +61,7 @@ public class App extends Application {
     private MapManager mapManager;
     private CollisionChecker collisionChecker;
     private GameManager gameManager;
+    private TutorialManager tutorialManager;
 
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
@@ -201,6 +204,8 @@ public class App extends Application {
     private boolean isEndUIShown = false;
     private boolean isLevelClearUIShown = false;
     private LevelClearScreen levelClearScreen;
+    private boolean isTutorialClearUIShown = false;
+    private TutorialCompleteScreen tutorialClearScreen;
 
 
     private Scene createGameScene(Stage stage, int startLevel) {
@@ -290,8 +295,14 @@ public class App extends Application {
                 } else if (!isVictory && !isGameOver && !isPaused) {
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     handleInput();
+                    
+                    if (tutorialManager != null) {
+                        tutorialManager.update(player, input);
+                    }
+
                     player.update();
                     combatManager.update();
+                    gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
                     
                     updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
                     
@@ -347,6 +358,10 @@ public class App extends Application {
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
+                
+                if (tutorialManager != null) {
+                    tutorialManager.render(gc);
+                }
 
                 // --- VẼ HIỆU ỨNG FADE-IN TỪ ĐEN SANG GAME ---
                 if (fadeInTimer > 0) {
@@ -356,8 +371,37 @@ public class App extends Application {
                     gc.setGlobalAlpha(1.0);
                 }
 
+                // Tutorial clear
+                if (isVictory && gameManager.getCurrentLevelIndex() == 0 && !isTutorialClearUIShown) {
+                    gameLoop.stop();
+                    tutorialClearScreen = new TutorialCompleteScreen(
+                            // Bấm Start Level 1
+                            () -> {
+                                isTutorialClearUIShown = false;
+                                root.getChildren().remove(tutorialClearScreen.getRoot());
+                                showLoadingScreen(stage, scene, () -> {
+                                    gameManager.loadLevel(1);
+                                    collisionChecker = new CollisionChecker(gameManager.getMap());
+                                    combatManager.resetSkill();
+                                    input.clear(); // Chống kẹt nút
+                                    fadeInTimer = 120;
+                                    playInGameMusic(1);
+                                    gameLoop.start();
+                                });
+                            },
+                            // Về Menu
+                            () -> {
+                                isTutorialClearUIShown = false;
+                                showMenu(stage);
+                            }
+                    );
+                    tutorialClearScreen.setVisible(true);
+                    root.getChildren().add(tutorialClearScreen.getRoot());
+                    isTutorialClearUIShown = true;
+                }
+
                 // Clear level
-                if (isVictory && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
+                if (isVictory && gameManager.getCurrentLevelIndex() > 0 && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
                     gameLoop.stop();
                     levelClearScreen = new LevelClearScreen(
                             // Next level
@@ -504,7 +548,7 @@ public class App extends Application {
         }
         boolean isVictory = enemyManager.getEnemyList().isEmpty();
         boolean isGameOver = player.isDead();
-        if (isVictory || isGameOver || isEndUIShown || isLevelClearUIShown) {
+        if (isVictory || isGameOver || isEndUIShown || isLevelClearUIShown || isTutorialClearUIShown) {
             return;
         }
         setPaused(!isPaused);
@@ -572,11 +616,10 @@ public class App extends Application {
 
             gameManager.loadLevel(level);
 
-            // --- TEST MODE: Set vị trí spawn (4, 5) và xóa hết quái ở Level 1 ---
-            if (level == 1) {
-                player.setX(4 * GameConstants.TILE_SIZE); // Vị trí x (cột 4)
-                player.setY(5 * GameConstants.TILE_SIZE); // Vị trí y (hàng 5)
-           //     enemyManager.getEnemyList().clear(); // Xóa sạch danh sách quái
+            if (level == 0) {
+                tutorialManager = new TutorialManager();
+            } else {
+                tutorialManager = null;
             }
 
             // tạo combat manager
@@ -744,6 +787,24 @@ public class App extends Application {
                         collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
                     enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
                 }
+
+                // KIỂM TRA VA CHẠM CỦA QUÁI VẬT VỚI CỬA (GATE)
+                if (gameManager.getGates() != null) {
+                    for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                        if (gate.isSolid() && enemy.intersects(gate)) {
+                            enemy.onCollision(gate); // Nếu cửa chưa mở -> Quái vật bị dội ngược lại
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Kiểm tra va chạm với Gate (Cửa màn Tutorial)
+        if (gameManager.getGates() != null) {
+            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                if (gate.isSolid() && player.intersects(gate)) {
+                    player.onCollision(gate);
+                }
             }
         }
 
@@ -868,14 +929,25 @@ public class App extends Application {
 
     private void playInGameMusic(int level) {
         stopInGameMusic();
-        if (level == 1) {
+        String musicPath = "";
+        double volMultiplier = 1.0;
+        
+        if (level == 0) {
+            musicPath = "/sounds/tutorial.mp3";
+            volMultiplier = 0.5;
+        } else if (level == 1) {
+            musicPath = "/sounds/Music_lvl_1.mp3";
+            volMultiplier = 0.7;
+        }
+
+        if (!musicPath.isEmpty()) {
             try {
-                java.net.URL url = getClass().getResource("/sounds/Music_lvl_1.mp3");
+                java.net.URL url = getClass().getResource(musicPath);
                 if (url != null) {
                     javafx.scene.media.Media media = new javafx.scene.media.Media(url.toExternalForm());
                     inGameMusicPlayer = new javafx.scene.media.MediaPlayer(media);
                     inGameMusicPlayer.setCycleCount(javafx.scene.media.MediaPlayer.INDEFINITE); // Lặp vô hạn
-                    inGameMusicPlayer.setVolume(0.7 * SoundManager.getBgmVolume()); // Âm lượng 0.7 mặc định nhân với setting
+                    inGameMusicPlayer.setVolume(volMultiplier * SoundManager.getBgmVolume());
                     inGameMusicPlayer.play();
                 }
             } catch (Exception e) {
@@ -898,7 +970,8 @@ public class App extends Application {
                 instance.menuMusicPlayer.setVolume(vol);
             }
             if (instance.inGameMusicPlayer != null) {
-                instance.inGameMusicPlayer.setVolume(0.7 * vol);
+                double multiplier = (instance.gameManager != null && instance.gameManager.getCurrentLevelIndex() == 0) ? 0.5 : 0.7;
+                instance.inGameMusicPlayer.setVolume(multiplier * vol);
             }
         }
     }

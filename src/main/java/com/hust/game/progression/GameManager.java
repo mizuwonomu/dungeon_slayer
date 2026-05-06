@@ -5,6 +5,8 @@ import com.hust.game.entities.player.Player;
 import com.hust.game.map.MapManager;
 
 import javafx.scene.canvas.GraphicsContext;
+import java.util.List;
+import com.hust.game.entities.environment.Gate;
 
 import javafx.scene.image.Image;
 
@@ -54,7 +56,12 @@ public class GameManager {
             witchImg, witchSkillImg
         );
 
-        player.reset();
+        // Đặt lại chỉ số và toạ độ người chơi theo level
+        if (lvlID == 0 || lvlID == 1) {
+            player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 5 * com.hust.game.constants.GameConstants.TILE_SIZE);
+        } else {
+            player.reset(408, 200); // Tọa độ mặc định của Level 2
+        }
 
         currentLevel.init();
     }
@@ -72,6 +79,12 @@ public class GameManager {
 
         loadLevel(currentLevelIndex);
     }
+    
+    public void update() {
+        if (currentLevel != null) {
+            currentLevel.update();
+        }
+    }
 
     public void draw(GraphicsContext gc) {
         if (currentLevel != null) {
@@ -83,4 +96,7 @@ public class GameManager {
         return currentLevel.getMap();
     }
 
+    public List<Gate> getGates() {
+        return currentLevel != null ? currentLevel.getGates() : null;
+    }
 }

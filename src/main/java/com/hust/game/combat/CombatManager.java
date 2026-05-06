@@ -157,6 +157,8 @@ public class CombatManager {
         boolean hitSlime = false;
         boolean hitKnight = false;
         boolean hitTree = false;
+        boolean hitWitch = false;
+        boolean isWitchDead = false;
         boolean isFinalHit = false;
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
@@ -179,8 +181,12 @@ public class CombatManager {
                 if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
                 if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
                 if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
+                if (enemy instanceof com.hust.game.enemy.Witch) hitWitch = true;
                 
-                if (enemy.getHp() <= 0) isFinalHit = true;
+                if (enemy.getHp() <= 0) {
+                    isFinalHit = true;
+                    if (enemy instanceof com.hust.game.enemy.Witch) isWitchDead = true;
+                }
 
                 // Tính toạ độ hiển thị text ngay trên đầu quái vật
                 double textX = enemy.getX() + enemy.getRenderWidth() / 2 - 15;
@@ -210,13 +216,20 @@ public class CombatManager {
                 com.hust.game.audio.SoundManager.playSwordPowerUpSound(0.5); // Chém trượt
             } else {
                 com.hust.game.audio.SoundManager.playSwordPowerUpSound(1.0); // Chém trúng
-                if (isFinalHit) {
+                if (isWitchDead) {
+                    com.hust.game.audio.SoundManager.playWitchDiedSound(); // Phát âm kết liễu phù thủy
+                } else if (isFinalHit) {
                     com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Phát thêm âm kết liễu
+                }
+                if (hitWitch && !isWitchDead) {
+                    com.hust.game.audio.SoundManager.playWitchDmgTakenSound(); // Âm thanh phù thủy nhận dmg
                 }
             }
         } else {
             if (!hitAny) {
                 com.hust.game.audio.SoundManager.playNsMissSound(); // Chém trượt
+            } else if (isWitchDead) {
+                com.hust.game.audio.SoundManager.playWitchDiedSound(); // Đòn kết liễu phù thủy thay âm mặc định
             } else if (isFinalHit) {
                 com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Đòn kết liễu
             } else {
@@ -227,6 +240,9 @@ public class CombatManager {
                     com.hust.game.audio.SoundManager.playNsHitTreeSound();
                     com.hust.game.audio.SoundManager.playNsMissSound();
                 } // Cây dùng chung âm thanh với Knight
+                if (hitWitch) {
+                    com.hust.game.audio.SoundManager.playWitchDmgTakenSound();
+                }
             }
         }
 
