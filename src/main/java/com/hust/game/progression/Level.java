@@ -13,7 +13,6 @@ import com.hust.game.entities.environment.Gate;
 import com.hust.game.entities.item.HealthPotion;
 import com.hust.game.entities.item.ManaPotion;
 
-
 public class Level {
 
     private static final int WIDTH = 816; // 17 * 48
@@ -22,7 +21,7 @@ public class Level {
 
     private List<HealthPotion> healthPotions = new ArrayList<>();
     private List<ManaPotion> manaPotions = new ArrayList<>();
-    
+
     private int lvlID;
 
     private EnemyManager enemyManager;
@@ -36,7 +35,7 @@ public class Level {
     Image knightSkillImg;
     Image witchImg;
     Image witchSkillImg;
-    
+
     Image healthPotionImg;
     Image manaPotionImg;
 
@@ -44,13 +43,13 @@ public class Level {
     private Image gateImg;
 
     public Level(int lvlID,
-                 EnemyManager enemyManager,
-                 Player player,
-                 Image treeImg, Image treeSkillImg,
-                 Image slimeImg,
-                 Image knightImg, Image knightSkillImg,
-                 Image witchImg, Image witchSkillImg,
-                 Image healthPotionImg, Image manaPotionImg) {
+            EnemyManager enemyManager,
+            Player player,
+            Image treeImg, Image treeSkillImg,
+            Image slimeImg,
+            Image knightImg, Image knightSkillImg,
+            Image witchImg, Image witchSkillImg,
+            Image healthPotionImg, Image manaPotionImg) {
 
         this.lvlID = lvlID;
         this.enemyManager = enemyManager;
@@ -68,7 +67,7 @@ public class Level {
         this.manaPotionImg = manaPotionImg;
 
         map = new MapManager(lvlID);
-        
+
         try {
             gateImg = new Image(getClass().getResourceAsStream("/assets/tiles/gate.png"));
         } catch (Exception e) {
@@ -78,14 +77,49 @@ public class Level {
 
     private void spawnItems() {
         if (lvlID == 1) {
-            healthPotions.add(new HealthPotion(5 * TILE_SIZE, 5 * TILE_SIZE, healthPotionImg));
-            manaPotions.add(new ManaPotion(8 * TILE_SIZE, 5 * TILE_SIZE, manaPotionImg));
+            List<int[]> validTiles = new ArrayList<>();
+            // Duyệt qua toàn bộ map để tìm các ô không có va chạm (đi qua được)
+            for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
+                for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
+                    int tileId = map.mapTileNum[row][col];
+                    com.hust.game.map.Tile t = map.tiles.get(tileId);
+                    if (t != null && !t.collision) {
+                        validTiles.add(new int[] { col, row });
+                    }
+                }
+            }
+
+            // Trộn ngẫu nhiên danh sách các ô hợp lệ
+            java.util.Collections.shuffle(validTiles);
+
+            int numHealth = 50;
+            int numMana = 50;
+
+            // Lấy 10 ô đầu tiên từ danh sách đã trộn để spawn
+            for (int i = 0; i < validTiles.size(); i++) {
+                int col = validTiles.get(i)[0];
+                int row = validTiles.get(i)[1];
+
+                // Loại trừ những vị trí gần cửa spawn player (ví dụ col < 5, row < 5) nếu muốn
+                // an toàn, nhưng tạm thời cứ spawn ngẫu nhiên
+
+                if (numHealth > 0) {
+                    healthPotions.add(new HealthPotion(col * TILE_SIZE, row * TILE_SIZE, healthPotionImg));
+                    numHealth--;
+                } else if (numMana > 0) {
+                    manaPotions.add(new ManaPotion(col * TILE_SIZE, row * TILE_SIZE, manaPotionImg));
+                    numMana--;
+                } else {
+                    break;
+                }
+            }
         } else if (lvlID == 2) {
             healthPotions.add(new HealthPotion(10 * TILE_SIZE, 8 * TILE_SIZE, healthPotionImg));
             manaPotions.add(new ManaPotion(12 * TILE_SIZE, 8 * TILE_SIZE, manaPotionImg));
         }
     }
-    public void init(){
+
+    public void init() {
         spawnEnemy();
         spawnGates();
         spawnItems();
@@ -97,23 +131,25 @@ public class Level {
             gate.render(gc);
         }
     }
-    
+
     public void update() {
         for (Gate gate : gates) {
             gate.update();
         }
-        
+
         // Logic mở cổng Tutorial
         if (lvlID == 0) {
             List<Enemy> enemies = enemyManager.getEnemyList();
             boolean slimeDead = true;
             boolean knightDead = true;
-            
+
             for (Enemy e : enemies) {
-                if (e instanceof Slime && e.getHp() > 0) slimeDead = false;
-                if (e instanceof Knight && e.getHp() > 0) knightDead = false;
+                if (e instanceof Slime && e.getHp() > 0)
+                    slimeDead = false;
+                if (e instanceof Knight && e.getHp() > 0)
+                    knightDead = false;
             }
-            
+
             for (Gate g : gates) {
                 if (g.getX() < 20 * TILE_SIZE) {
                     g.open(); // Cổng đầu tiên (nếu có) luôn mở sẵn
@@ -123,7 +159,7 @@ public class Level {
                     g.open(); // Cổng qua phòng cuối mở khi Knight chết
                 }
             }
-            
+
             // Đánh thức quái vật ở phòng cuối (Tree) khi cổng phòng 4 được mở (Knight chết)
             if (knightDead) {
                 for (Enemy e : enemies) {
@@ -135,7 +171,7 @@ public class Level {
             }
         }
     }
-    
+
     private void spawnGates() {
         if (gateImg != null) {
             for (int[] pos : map.gatePositions) {
@@ -149,46 +185,56 @@ public class Level {
         return gates;
     }
 
-    public List<HealthPotion> getHealthPotions() { return healthPotions; }
-    public List<ManaPotion> getManaPotion() { return manaPotions; }
+    public List<HealthPotion> getHealthPotions() {
+        return healthPotions;
+    }
 
-    void spawnEnemy(){
+    public List<ManaPotion> getManaPotion() {
+        return manaPotions;
+    }
+
+    void spawnEnemy() {
         if (lvlID == 0) {
             // Phòng 2: Slime bất động
             enemyManager.spawnEnemy("Slime", 20 * TILE_SIZE, 6 * TILE_SIZE, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
             // Phòng 3: Knight bất động
-            enemyManager.spawnEnemy("Knight", 37 * TILE_SIZE, 5 * TILE_SIZE, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, player, knightSkillImg);
+            enemyManager.spawnEnemy("Knight", 37 * TILE_SIZE, 5 * TILE_SIZE, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2,
+                    player, knightSkillImg);
             // Phòng 4: 3 Tree bình thường
-            enemyManager.spawnEnemy("Tree", 52 * TILE_SIZE, 3 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Tree", 54 * TILE_SIZE, 5 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Tree", 52 * TILE_SIZE, 7 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            
+            enemyManager.spawnEnemy("Tree", 52 * TILE_SIZE, 3 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player,
+                    treeSkillImg);
+            enemyManager.spawnEnemy("Tree", 54 * TILE_SIZE, 5 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player,
+                    treeSkillImg);
+            enemyManager.spawnEnemy("Tree", 52 * TILE_SIZE, 7 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player,
+                    treeSkillImg);
+
             for (Enemy e : enemyManager.getEnemyList()) {
                 // Khóa toàn bộ quái vật ban đầu (Bao gồm cả Tree ở phòng cuối)
                 e.setImmobile(true);
                 e.setHarmless(true);
             }
-        } else if(lvlID == 1){
+        } else if (lvlID == 1) {
             enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2, treeImg, 8,
-            TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+                    TILE_SIZE, TILE_SIZE, player, treeSkillImg);
             enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2, slimeImg, 8,
-            TILE_SIZE, TILE_SIZE, player);
+                    TILE_SIZE, TILE_SIZE, player);
             enemyManager.spawnEnemy("Tree", WIDTH / 2 + 100, HEIGHT / 2 + 80, treeImg, 8,
-            TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+                    TILE_SIZE, TILE_SIZE, player, treeSkillImg);
             enemyManager.spawnEnemy("Slime", WIDTH / 2 - 100, HEIGHT / 2 + 80, slimeImg, 8,
-            TILE_SIZE, TILE_SIZE, player);
-        }
-        else if(lvlID == 2){
-            enemyManager.spawnEnemy("Knight", WIDTH / 2 - 200, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
-                                    player, knightSkillImg);
-            enemyManager.spawnEnemy("Knight", WIDTH / 2 + 50 , HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
-                                    player, knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 250 , HEIGHT / 2 , witchImg, 25, TILE_SIZE, TILE_SIZE,
-                                    player, witchSkillImg);
+                    TILE_SIZE, TILE_SIZE, player);
+        } else if (lvlID == 2) {
+            enemyManager.spawnEnemy("Knight", WIDTH / 2 - 200, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2,
+                    TILE_SIZE * 2,
+                    player, knightSkillImg);
+            enemyManager.spawnEnemy("Knight", WIDTH / 2 + 50, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2,
+                    TILE_SIZE * 2,
+                    player, knightSkillImg);
+            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 250, HEIGHT / 2, witchImg, 25, TILE_SIZE, TILE_SIZE,
+                    player, witchSkillImg);
         }
     }
 
-    boolean isVictory(){
+    boolean isVictory() {
         return enemyManager.getEnemyList().isEmpty();
     }
 
