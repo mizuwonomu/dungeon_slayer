@@ -43,9 +43,10 @@ import java.util.List;
 
 public class App extends Application {
     // kích thước cửa sổ
-    // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE = 48)
-    private static final int WIDTH = GameConstants.WINDOW_WIDTH; 
-    private static final int HEIGHT = GameConstants.WINDOW_HEIGHT; 
+    // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE =
+    // 48)
+    private static final int WIDTH = GameConstants.WINDOW_WIDTH;
+    private static final int HEIGHT = GameConstants.WINDOW_HEIGHT;
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
@@ -92,7 +93,8 @@ public class App extends Application {
     public void start(Stage stage) {
         instance = this;
         stage.setTitle("GHOULITE");
-        // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
+        // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng
+        // được tiếng click/hover
         SoundManager.loadSounds();
         playMenuMusic();
 
@@ -107,12 +109,12 @@ public class App extends Application {
                 },
 
                 // SETTINGS
-                v -> showSettings(stage, () -> showMenu(stage))
-        );
+                v -> showSettings(stage, () -> showMenu(stage)));
 
         stage.setScene(menu.createScene());
         stage.show();
     }
+
     private void showMenu(Stage stage) {
         stopInGameMusic();
         playMenuMusic();
@@ -125,19 +127,18 @@ public class App extends Application {
                     gameLoop.start();
                 },
 
-                v -> showSettings(stage, () -> showMenu(stage))
-        );
+                v -> showSettings(stage, () -> showMenu(stage)));
 
         stage.setScene(menu.createScene());
     }
 
     private void showSettings(Stage stage, Runnable onBack) {
         SettingsScreen settings = new SettingsScreen(
-                v -> onBack.run()
-        );
+                v -> onBack.run());
 
         stage.setScene(settings.createScene());
     }
+
     private Scene createMenuScene(Stage stage) {
         Image startImg = loadImg("/assets/start.png");
         Image exitImg = loadImg("/assets/exit.png");
@@ -210,11 +211,10 @@ public class App extends Application {
     private boolean isTutorialClearUIShown = false;
     private TutorialCompleteScreen tutorialClearScreen;
 
-
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
-        
+
         Image tempBackScreen = null;
         try {
             tempBackScreen = loadImg("/assets/back_screen.png");
@@ -223,7 +223,8 @@ public class App extends Application {
         }
         final Image backScreenImg = tempBackScreen;
 
-        // Đổ hình nền hoặc đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
+        // Đổ hình nền hoặc đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu
+        // tiên
         if (backScreenImg != null) {
             gc.drawImage(backScreenImg, 0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         } else {
@@ -233,37 +234,41 @@ public class App extends Application {
 
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
-        root.setStyle("-fx-background-color: black;"); // Đảm bảo toàn bộ khung viền cũng hiển thị đen 
+        root.setStyle("-fx-background-color: black;"); // Đảm bảo toàn bộ khung viền cũng hiển thị đen
         Scene scene = new Scene(root);
 
         pauseScreen = new PauseScreen(
-            () -> setPaused(false),
-            // Nút SETTINGS: Tạm tắt logic GameLoop đi để tránh hao CPU, khi quay lại (onBack) thì bật lại GameLoop
-            () -> {
-                if (gameLoop != null) gameLoop.stop();
-                showSettings(stage, () -> {
-                    stage.setScene(scene); // Khôi phục lại GameScene đang dở
-                    if (gameLoop != null) gameLoop.start();
-                });
-            },
-            () -> {
-                setPaused(false);
+                () -> setPaused(false),
+                // Nút SETTINGS: Tạm tắt logic GameLoop đi để tránh hao CPU, khi quay lại
+                // (onBack) thì bật lại GameLoop
+                () -> {
+                    if (gameLoop != null)
+                        gameLoop.stop();
+                    showSettings(stage, () -> {
+                        stage.setScene(scene); // Khôi phục lại GameScene đang dở
+                        if (gameLoop != null)
+                            gameLoop.start();
+                    });
+                },
+                () -> {
+                    setPaused(false);
                     if (gameLoop != null) {
                         gameLoop.stop();
                     }
-                showMenu(stage);
-            }
-        );
-        
+                    showMenu(stage);
+                });
+
         Image pauseBtnSheet = loadImg("/assets/pause.png");
-        StackPane pauseBtn = createSpriteBtn(pauseBtnSheet, 3, 0.5, () -> togglePause(stage)); // Thu nhỏ nút xuống 50% (còn 64x64)
+        StackPane pauseBtn = createSpriteBtn(pauseBtnSheet, 3, 0.5, () -> togglePause(stage)); // Thu nhỏ nút xuống 50%
+                                                                                               // (còn 64x64)
         StackPane.setAlignment(pauseBtn, javafx.geometry.Pos.TOP_RIGHT); // Căn sát góc trên bên phải
         root.getChildren().add(pauseBtn);
 
         root.getChildren().add(pauseScreen.getRoot());
 
         scene.setOnKeyPressed(e -> {
-            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
+            if (fadeInTimer > 0)
+                return; // Khoá input khi đang chuyển cảnh
             if (e.getCode() == KeyCode.ESCAPE) {
                 togglePause(stage);
                 return;
@@ -273,7 +278,8 @@ public class App extends Application {
             }
         });
         scene.setOnKeyReleased(e -> {
-            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
+            if (fadeInTimer > 0)
+                return; // Khoá input khi đang chuyển cảnh
             if (!isPaused) {
                 input.remove(e.getCode());
             }
@@ -281,7 +287,7 @@ public class App extends Application {
 
         initializeEntities(startLevel);
         playInGameMusic(startLevel);
-        
+
         fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
         gameLoop = new AnimationTimer() {
@@ -298,28 +304,30 @@ public class App extends Application {
                 } else if (!isVictory && !isGameOver && !isPaused) {
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     handleInput();
-                    
+
                     if (tutorialManager != null) {
                         tutorialManager.update(player, input);
                     }
 
                     // Thêm vào chỗ update các entity
-                    for (HealthPotion p : gameManager.getHealthPotions()) p.update();
-                    for (ManaPotion p : gameManager.getManaPotions()) p.update();
+                    for (HealthPotion p : gameManager.getHealthPotions())
+                        p.update();
+                    for (ManaPotion p : gameManager.getManaPotions())
+                        p.update();
 
                     player.update();
                     combatManager.update();
                     gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
-                    
+
                     updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
-                    
+
                     // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
                     double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
                     for (Enemy e : enemyManager.getEnemyList()) {
                         boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
-                                           e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
-                                           e.getY() + e.getRenderHeight() >= cameraY - margin &&
-                                           e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
+                                e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                                e.getY() + e.getRenderHeight() >= cameraY - margin &&
+                                e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
                         e.setActive(onScreen);
                     }
 
@@ -329,7 +337,7 @@ public class App extends Application {
                 }
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
-                
+
                 // Đổ nền cho toàn bộ cửa sổ game để phần viền nằm ngoài map hiển thị ảnh
                 if (backScreenImg != null) {
                     gc.drawImage(backScreenImg, 0, 0, WIDTH, HEIGHT);
@@ -339,9 +347,9 @@ public class App extends Application {
                 }
 
                 gc.save();
-                
+
                 gc.scale(ZOOM, ZOOM); // Phóng to camera lên 50%
-                
+
                 gc.translate(-cameraX, -cameraY); // Dịch chuyển toạ độ bản đồ theo camera
 
                 // Screen shake
@@ -357,6 +365,11 @@ public class App extends Application {
 
                 obstacles.forEach(e -> e.render(gc));
 
+                for (HealthPotion p : gameManager.getHealthPotions())
+                    p.render(gc);
+                for (ManaPotion p : gameManager.getManaPotions())
+                    p.render(gc);
+
                 player.render(gc);
                 enemyManager.renderAll(gc);
                 com.hust.game.ui.DamageTextManager.render(gc); // Vẽ các số sát thương (vẽ sau quái để đè lên trên cùng)
@@ -365,7 +378,7 @@ public class App extends Application {
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
-                
+
                 if (tutorialManager != null) {
                     tutorialManager.render(gc);
                 }
@@ -400,15 +413,15 @@ public class App extends Application {
                             () -> {
                                 isTutorialClearUIShown = false;
                                 showMenu(stage);
-                            }
-                    );
+                            });
                     tutorialClearScreen.setVisible(true);
                     root.getChildren().add(tutorialClearScreen.getRoot());
                     isTutorialClearUIShown = true;
                 }
 
                 // Clear level
-                if (isVictory && gameManager.getCurrentLevelIndex() > 0 && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
+                if (isVictory && gameManager.getCurrentLevelIndex() > 0 && gameManager.getCurrentLevelIndex() < 2
+                        && !isLevelClearUIShown) {
                     gameLoop.stop();
                     levelClearScreen = new LevelClearScreen(
                             // Next level
@@ -436,8 +449,7 @@ public class App extends Application {
                             () -> {
                                 isLevelClearUIShown = false;
                                 showMenu(stage);
-                            }
-                    );
+                            });
                     levelClearScreen.setVisible(true);
                     root.getChildren().add(levelClearScreen.getRoot());
                     isLevelClearUIShown = true;
@@ -449,7 +461,8 @@ public class App extends Application {
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
                     // Load font chữ pixel
-                    javafx.scene.text.Font finishFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 100);
+                    javafx.scene.text.Font finishFont = javafx.scene.text.Font
+                            .loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 100);
                     if (finishFont == null) {
                         finishFont = new javafx.scene.text.Font("Arial", 100); // Fallback
                     }
@@ -468,7 +481,7 @@ public class App extends Application {
 
                         gc.setFill(javafx.scene.paint.Color.GOLD);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
-                        gc.fillText(text, x, y);   // Vẽ chữ màu vàng gold
+                        gc.fillText(text, x, y); // Vẽ chữ màu vàng gold
                     } else { // isGameOver
                         String text = "DEFEAT";
                         javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
@@ -480,7 +493,7 @@ public class App extends Application {
 
                         gc.setFill(javafx.scene.paint.Color.GRAY);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
-                        gc.fillText(text, x, y);   // Vẽ chữ màu xám
+                        gc.fillText(text, x, y); // Vẽ chữ màu xám
                     }
 
                     if (!isEndUIShown) {
@@ -514,8 +527,9 @@ public class App extends Application {
     }
 
     private void updateCamera() {
-        if (player == null) return;
-        
+        if (player == null)
+            return;
+
         // Tính toạ độ của người chơi trên màn hình hiện tại
         double playerScreenX = player.getX() - cameraX;
         double playerScreenY = player.getY() - cameraY;
@@ -546,7 +560,8 @@ public class App extends Application {
 
         // Phương án 2: Tắt giới hạn Clamp Camera
         // Camera giờ đây sẽ luôn đi theo Player dù chạm tới góc map.
-        // Phần ngoài map không có TILE sẽ lộ ra nền đen bọc ngoài (đã vẽ bằng fillRect ở phía trên).
+        // Phần ngoài map không có TILE sẽ lộ ra nền đen bọc ngoài (đã vẽ bằng fillRect
+        // ở phía trên).
     }
 
     private void togglePause(Stage stage) {
@@ -605,7 +620,7 @@ public class App extends Application {
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
             Image healthPotionImg = loadImg("/assets/items/health_potion.png");
-            Image manaPotionImg = loadImg("/assets/items/health_potion.png");
+            Image manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
@@ -614,16 +629,15 @@ public class App extends Application {
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
-            
+
             gameManager = new GameManager(
-                enemyManager,
-                player,
-                treeImg, treeSkillImg,
-                slimeImg,
-                knightImg, knightSkillImg,
-                witchImg, witchSkillImg,
-                healthPotionImg, manaPotionImg
-            );
+                    enemyManager,
+                    player,
+                    treeImg, treeSkillImg,
+                    slimeImg,
+                    knightImg, knightSkillImg,
+                    witchImg, witchSkillImg,
+                    healthPotionImg, manaPotionImg);
 
             gameManager.loadLevel(level);
 
@@ -652,23 +666,31 @@ public class App extends Application {
 
         // Khóa di chuyển khi đang chém để animation hiển thị rõ ràng và uy lực hơn
         if (!player.isAttacking()) {
-            boolean up    = input.contains(KeyCode.W) || input.contains(KeyCode.UP);
-            boolean down  = input.contains(KeyCode.S) || input.contains(KeyCode.DOWN);
-            boolean left  = input.contains(KeyCode.A) || input.contains(KeyCode.LEFT);
+            boolean up = input.contains(KeyCode.W) || input.contains(KeyCode.UP);
+            boolean down = input.contains(KeyCode.S) || input.contains(KeyCode.DOWN);
+            boolean left = input.contains(KeyCode.A) || input.contains(KeyCode.LEFT);
             boolean right = input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT);
 
             // Xử lý direction — ưu tiên trục đơn, đi chéo thì giữ direction cũ
-            if      (up && !down && !left && !right) player.setDirection(Direction.UP);
-            else if (down && !up && !left && !right) player.setDirection(Direction.DOWN);
-            else if (left && !right && !up && !down) player.setDirection(Direction.LEFT);
-            else if (right && !left && !up && !down) player.setDirection(Direction.RIGHT);
+            if (up && !down && !left && !right)
+                player.setDirection(Direction.UP);
+            else if (down && !up && !left && !right)
+                player.setDirection(Direction.DOWN);
+            else if (left && !right && !up && !down)
+                player.setDirection(Direction.LEFT);
+            else if (right && !left && !up && !down)
+                player.setDirection(Direction.RIGHT);
 
             // Di chuyển độc lập từng trục
             double dx = 0, dy = 0;
-            if (up)    dy -= 1;
-            if (down)  dy += 1;
-            if (left)  dx -= 1;
-            if (right) dx += 1;
+            if (up)
+                dy -= 1;
+            if (down)
+                dy += 1;
+            if (left)
+                dx -= 1;
+            if (right)
+                dx += 1;
 
             // Normalize vector chéo để tốc độ không bị nhanh hơn
             if (dx != 0 && dy != 0) {
@@ -677,8 +699,10 @@ public class App extends Application {
             }
 
             // Apply movement
-            if (dx != 0) player.setX(player.getX() + dx * GameConstants.PLAYER_SPEED);
-            if (dy != 0) player.setY(player.getY() + dy * GameConstants.PLAYER_SPEED);
+            if (dx != 0)
+                player.setX(player.getX() + dx * GameConstants.PLAYER_SPEED);
+            if (dy != 0)
+                player.setY(player.getY() + dy * GameConstants.PLAYER_SPEED);
 
             isAnyKeyPressed = (up || down || left || right);
         }
@@ -716,7 +740,8 @@ public class App extends Application {
     }
 
     private void checkCollisions() {
-        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond) - Xử lý trượt tường (Wall Sliding)
+        // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond) - Xử lý trượt tường (Wall
+        // Sliding)
         double padding = 12; // Cắt bớt phần viền trong suốt của ảnh để nhân vật đi mượt hơn
         double nextX = player.getX();
         double nextY = player.getY();
@@ -732,7 +757,7 @@ public class App extends Application {
         int bottom = (int) (player.getY() + player.getRenderHeight() - padding);
 
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+                collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
             player.setX(lastX); // Chạm tường trục X -> Hủy di chuyển X
         }
 
@@ -744,7 +769,7 @@ public class App extends Application {
         bottom = (int) (player.getY() + player.getRenderHeight() - padding);
 
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+                collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
             player.setY(lastY); // Chạm tường trục Y -> Hủy di chuyển Y
         }
 
@@ -809,7 +834,7 @@ public class App extends Application {
                 }
             }
         }
-        
+
         // Kiểm tra va chạm với Gate (Cửa màn Tutorial)
         if (gameManager.getGates() != null) {
             for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
@@ -845,74 +870,81 @@ public class App extends Application {
             }
         }
 
-        for (HealthPotion p : healthPotions) {
+        for (HealthPotion p : gameManager.getHealthPotions()) {
             if (p.isInRange(player) && player.intersects(p)) {
                 p.onAutoPickUp(player);
             }
         }
-        healthPotions.removeIf(HealthPotion::isConsumed);
+        gameManager.getHealthPotions().removeIf(HealthPotion::isConsumed);
 
-        for (ManaPotion m : manaPotions) {
+        for (ManaPotion m : gameManager.getManaPotions()) {
             if (m.isInRange(player) && player.intersects(m)) {
                 m.onAutoPickUp(player);
             }
         }
-        manaPotions.removeIf(ManaPotion::isConsumed);
+        gameManager.getManaPotions().removeIf(ManaPotion::isConsumed);
     }
 
     private StackPane createSpriteBtn(Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {
         StackPane pane = new StackPane();
-        
+
         double frameW = spriteSheet.getWidth() / numFrames;
         double frameH = spriteSheet.getHeight();
-        
+
         ImageView view = new ImageView(spriteSheet);
         view.setViewport(new javafx.geometry.Rectangle2D(0, 0, frameW, frameH));
-        
+
         view.setFitWidth(frameW * scaleMultiplier);
         view.setFitHeight(frameH * scaleMultiplier);
 
         pane.setPrefSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
         pane.setMaxSize(frameW * scaleMultiplier, frameH * scaleMultiplier);
-        
+
         pane.getChildren().add(view);
-        
-        int[] currentFrame = {0};
-        javafx.animation.Timeline[] timeline = {null};
-        
+
+        int[] currentFrame = { 0 };
+        javafx.animation.Timeline[] timeline = { null };
+
         pane.setOnMouseEntered(e -> {
             com.hust.game.audio.SoundManager.playButtonHoverSound();
             pane.setScaleX(1.10);
             pane.setScaleY(1.10);
-            if (timeline[0] != null) timeline[0].stop();
+            if (timeline[0] != null)
+                timeline[0].stop();
             int framesToAnimate = numFrames - 1 - currentFrame[0];
             if (framesToAnimate > 0) {
-                timeline[0] = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(30), evt -> {
-                    currentFrame[0]++;
-                    view.setViewport(new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
-                }));
+                timeline[0] = new javafx.animation.Timeline(
+                        new javafx.animation.KeyFrame(javafx.util.Duration.millis(30), evt -> {
+                            currentFrame[0]++;
+                            view.setViewport(
+                                    new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                        }));
                 timeline[0].setCycleCount(framesToAnimate);
                 timeline[0].play();
             }
         });
-        
+
         pane.setOnMouseExited(e -> {
             pane.setScaleX(1.0);
             pane.setScaleY(1.0);
-            if (timeline[0] != null) timeline[0].stop();
+            if (timeline[0] != null)
+                timeline[0].stop();
             int framesToAnimate = currentFrame[0];
             if (framesToAnimate > 0) {
-                timeline[0] = new javafx.animation.Timeline(new javafx.animation.KeyFrame(javafx.util.Duration.millis(50), evt -> {
-                    currentFrame[0]--;
-                    view.setViewport(new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
-                }));
+                timeline[0] = new javafx.animation.Timeline(
+                        new javafx.animation.KeyFrame(javafx.util.Duration.millis(50), evt -> {
+                            currentFrame[0]--;
+                            view.setViewport(
+                                    new javafx.geometry.Rectangle2D(currentFrame[0] * frameW, 0, frameW, frameH));
+                        }));
                 timeline[0].setCycleCount(framesToAnimate);
                 timeline[0].play();
             }
         });
-        
+
         pane.setOnMousePressed(e -> {
-            // Không phát tiếng click mặc định ở đây nữa, âm thanh sẽ được phát ở hàm setPaused()
+            // Không phát tiếng click mặc định ở đây nữa, âm thanh sẽ được phát ở hàm
+            // setPaused()
             pane.setScaleX(0.9);
             pane.setScaleY(0.9);
         });
@@ -920,10 +952,10 @@ public class App extends Application {
             pane.setScaleX(1.0);
             pane.setScaleY(1.0);
         });
-        
+
         pane.setOnMouseClicked(e -> action.run());
         pane.setCursor(javafx.scene.Cursor.HAND);
-        
+
         return pane;
     }
 
@@ -956,7 +988,7 @@ public class App extends Application {
         stopInGameMusic();
         String musicPath = "";
         double volMultiplier = 1.0;
-        
+
         if (level == 0) {
             musicPath = "/sounds/tutorial.mp3";
             volMultiplier = 0.5;
@@ -995,7 +1027,9 @@ public class App extends Application {
                 instance.menuMusicPlayer.setVolume(vol);
             }
             if (instance.inGameMusicPlayer != null) {
-                double multiplier = (instance.gameManager != null && instance.gameManager.getCurrentLevelIndex() == 0) ? 0.5 : 0.7;
+                double multiplier = (instance.gameManager != null && instance.gameManager.getCurrentLevelIndex() == 0)
+                        ? 0.5
+                        : 0.7;
                 instance.inGameMusicPlayer.setVolume(multiplier * vol);
             }
         }
@@ -1012,19 +1046,20 @@ public class App extends Application {
         Image bgSheet = loadImg("/assets/menu_background.png");
         Image loadingBallSheet = loadImg("/assets/loading_ball.png");
 
-        javafx.scene.text.Font hintFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
+        javafx.scene.text.Font hintFont = javafx.scene.text.Font
+                .loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
         if (hintFont == null) {
             hintFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 28);
         }
         final javafx.scene.text.Font finalHintFont = hintFont;
 
         String[] hints = {
-            "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
-            "Sử dụng cuồng nộ có thể x2 sát thương đó!",
-            "Phát triển bởi nhóm 27 Ộ Ô Pi!",
-            "Slime là sinh vật chạm vào thôi là mất máu!",
-            "Cái cây có tầm đánh y như player! Cẩn thận!",
-            "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
+                "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
+                "Sử dụng cuồng nộ có thể x2 sát thương đó!",
+                "Phát triển bởi nhóm 27 Ộ Ô Pi!",
+                "Slime là sinh vật chạm vào thôi là mất máu!",
+                "Cái cây có tầm đánh y như player! Cẩn thận!",
+                "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
         };
         int[] hintIndex = { (int) (Math.random() * hints.length) };
         String[] selectedHint = { hints[hintIndex[0]] };
@@ -1055,10 +1090,12 @@ public class App extends Application {
                 // Hiệu ứng mờ dần (Fade In - Fade Out)
                 if (loadingTimer[0] < 30) {
                     bgAlpha[0] += 0.01;
-                    if (bgAlpha[0] > 0.3) bgAlpha[0] = 0.3; // Nền mờ 0.3 để không bị chói
+                    if (bgAlpha[0] > 0.3)
+                        bgAlpha[0] = 0.3; // Nền mờ 0.3 để không bị chói
                 } else if (loadingTimer[0] > 540) {
                     bgAlpha[0] -= 0.02;
-                    if (bgAlpha[0] < 0) bgAlpha[0] = 0;
+                    if (bgAlpha[0] < 0)
+                        bgAlpha[0] = 0;
                 }
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
@@ -1099,7 +1136,7 @@ public class App extends Application {
                 int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
                 int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
 
-                int[] ballFrames = {b1, b2, b3, b4};
+                int[] ballFrames = { b1, b2, b3, b4 };
 
                 for (int i = 0; i < 4; i++) {
                     double drawBallX = startX + i * (ballW + spacing);
@@ -1116,14 +1153,15 @@ public class App extends Application {
                 gc.fillText(selectedHint[0], textCenterX, textCenterY);
                 gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
                 gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
-                
+
                 gc.setGlobalAlpha(1.0);
 
                 // Khi chạy xong 540 + x frame (đã tối đen) -> Hoàn tất Scene
                 if (loadingTimer[0] > 540 && bgAlpha[0] <= 0) {
                     this.stop();
-                    
-                    // Xoá nền Map cũ của Scene trước khi đẩy lại vào Stage để tránh chớp nháy khung hình
+
+                    // Xoá nền Map cũ của Scene trước khi đẩy lại vào Stage để tránh chớp nháy khung
+                    // hình
                     if (App.this.gc != null) {
                         App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
                         App.this.gc.setFill(javafx.scene.paint.Color.BLACK);

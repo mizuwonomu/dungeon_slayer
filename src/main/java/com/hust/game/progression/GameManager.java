@@ -47,6 +47,8 @@ public class GameManager {
         this.knightSkillImg = knightSkillImg;
         this.witchImg = witchImg;
         this.witchSkillImg = witchSkillImg;
+        this.healthPotionImg = healthPotionImg;
+        this.manaPotionImg = manaPotionImg;
     }
 
     public void loadLevel(int lvlID){
