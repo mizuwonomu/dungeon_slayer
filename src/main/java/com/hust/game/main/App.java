@@ -3,6 +3,8 @@ package com.hust.game.main;
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.item.HealthPotion;
+import com.hust.game.entities.item.ManaPotion;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
@@ -62,6 +64,8 @@ public class App extends Application {
     private CollisionChecker collisionChecker;
     private GameManager gameManager;
     private TutorialManager tutorialManager;
+    private List<HealthPotion> healthPotions = new ArrayList<>();
+    private List<ManaPotion> manaPotions = new ArrayList<>();
 
     // dùng set để lưu những phím đang được giữ để di chuyển chéo
     private Set<KeyCode> input = new HashSet<>();
@@ -88,7 +92,6 @@ public class App extends Application {
     public void start(Stage stage) {
         instance = this;
         stage.setTitle("GHOULITE");
-
         // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
         SoundManager.loadSounds();
         playMenuMusic();
@@ -299,6 +302,10 @@ public class App extends Application {
                     if (tutorialManager != null) {
                         tutorialManager.update(player, input);
                     }
+
+                    // Thêm vào chỗ update các entity
+                    for (HealthPotion p : gameManager.getHealthPotions()) p.update();
+                    for (ManaPotion p : gameManager.getManaPotions()) p.update();
 
                     player.update();
                     combatManager.update();
@@ -597,6 +604,9 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            Image healthPotionImg = loadImg("/assets/items/health_potion.png");
+            Image manaPotionImg = loadImg("/assets/items/health_potion.png");
+
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
@@ -611,7 +621,8 @@ public class App extends Application {
                 treeImg, treeSkillImg,
                 slimeImg,
                 knightImg, knightSkillImg,
-                witchImg, witchSkillImg
+                witchImg, witchSkillImg,
+                healthPotionImg, manaPotionImg
             );
 
             gameManager.loadLevel(level);
@@ -833,6 +844,20 @@ public class App extends Application {
                 }
             }
         }
+
+        for (HealthPotion p : healthPotions) {
+            if (p.isInRange(player) && player.intersects(p)) {
+                p.onAutoPickUp(player);
+            }
+        }
+        healthPotions.removeIf(HealthPotion::isConsumed);
+
+        for (ManaPotion m : manaPotions) {
+            if (m.isInRange(player) && player.intersects(m)) {
+                m.onAutoPickUp(player);
+            }
+        }
+        manaPotions.removeIf(ManaPotion::isConsumed);
     }
 
     private StackPane createSpriteBtn(Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {

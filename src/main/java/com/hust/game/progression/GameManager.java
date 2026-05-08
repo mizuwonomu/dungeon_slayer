@@ -7,6 +7,8 @@ import com.hust.game.map.MapManager;
 import javafx.scene.canvas.GraphicsContext;
 import java.util.List;
 import com.hust.game.entities.environment.Gate;
+import com.hust.game.entities.item.HealthPotion;
+import com.hust.game.entities.item.ManaPotion;
 
 import javafx.scene.image.Image;
 
@@ -27,7 +29,8 @@ public class GameManager {
 
     public GameManager(EnemyManager enemyManager, Player player, Image treeImg,
             Image treeSkillImg, Image slimeImg, Image knightImg, Image knightSkillImg, Image witchImg,
-            Image witchSkillImg) {
+            Image witchSkillImg, Image healthPotionImg, 
+            Image manaPotionImg) {
 
         this.currentLevelIndex = 1;
 
@@ -98,5 +101,13 @@ public class GameManager {
 
     public List<Gate> getGates() {
         return currentLevel != null ? currentLevel.getGates() : null;
+    }
+
+    public List<HealthPotion> getHealthPotions() {
+        return currentLevel.getHealthPotions();
+    }
+    
+    public List<ManaPotion> getManaPotions() {
+        return currentLevel.getManaPotion();
     }
 }

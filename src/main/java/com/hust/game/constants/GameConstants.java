@@ -33,4 +33,8 @@ public class GameConstants {
     // Enemy (Member B tham chiếu)
     public static final double ENEMY_SPEED = 1.5;
     public static final int    ENEMY_MAX_HP = 50;
+
+    // Lượng máu và mana hồi
+    public static final int POTION_HEAL_AMOUNT = 20;
+    public static final int POTION_MANA_AMOUNT = 10;
 }

@@ -393,6 +393,16 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         currentMana = Math.max(0, currentMana - amount);
     }
 
+    // Hồi máu — ngược với takeDamage
+    public void heal(int amount) {
+        currentHp = Math.min(maxHp, currentHp + amount);
+    }
+
+    // Hồi mana — ngược với takeMana
+    public void restoreMana(int amount) {
+        currentMana = Math.min(maxMana, currentMana + amount);
+    }
+    
     @Override
     public int getCurrentHp() {
         return currentHp;

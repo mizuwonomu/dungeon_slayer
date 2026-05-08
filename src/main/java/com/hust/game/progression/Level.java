@@ -10,6 +10,8 @@ import javafx.scene.image.Image;
 import java.util.ArrayList;
 import java.util.List;
 import com.hust.game.entities.environment.Gate;
+import com.hust.game.entities.item.HealthPotion;
+import com.hust.game.entities.item.ManaPotion;
 
 
 public class Level {
@@ -18,6 +20,9 @@ public class Level {
     private static final int HEIGHT = 624; // 13 * 48
     private static final int TILE_SIZE = GameConstants.TILE_SIZE;
 
+    private List<HealthPotion> healthPotions = new ArrayList<>();
+    private List<ManaPotion> manaPotions = new ArrayList<>();
+    
     private int lvlID;
 
     private EnemyManager enemyManager;
@@ -32,6 +37,9 @@ public class Level {
     Image witchImg;
     Image witchSkillImg;
     
+    Image healthPotionImg;
+    Image manaPotionImg;
+
     private List<Gate> gates = new ArrayList<>();
     private Image gateImg;
 
@@ -63,9 +71,20 @@ public class Level {
             System.err.println("Không tìm thấy gate.png");
         }
     }
+
+    private void spawnItems() {
+        if (lvlID == 1) {
+            healthPotions.add(new HealthPotion(5 * TILE_SIZE, 5 * TILE_SIZE, healthPotionImg));
+            manaPotions.add(new ManaPotion(8 * TILE_SIZE, 5 * TILE_SIZE, manaPotionImg));
+        } else if (lvlID == 2) {
+            healthPotions.add(new HealthPotion(10 * TILE_SIZE, 8 * TILE_SIZE, healthPotionImg));
+            manaPotions.add(new ManaPotion(12 * TILE_SIZE, 8 * TILE_SIZE, manaPotionImg));
+        }
+    }
     public void init(){
         spawnEnemy();
         spawnGates();
+        spawnItems();
     }
 
     void draw(GraphicsContext gc) {
@@ -125,6 +144,9 @@ public class Level {
     public List<Gate> getGates() {
         return gates;
     }
+
+    public List<HealthPotion> getHealthPotions() { return healthPotions; }
+    public List<ManaPotion> getManaPotion() { return manaPotions; }
 
     void spawnEnemy(){
         if (lvlID == 0) {
