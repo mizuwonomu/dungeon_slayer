@@ -128,9 +128,10 @@ public class Witch extends Enemy {
 
         // Bổ sung Knockback cho Phù thủy để tự nhiên hơn khi bị đánh trúng
         if (this.kbTimer > 0) {
+            double multiplier = this.kbTimer / 3.5;
             this.kbTimer--;
-            this.x += kbVectorX;
-            this.y += kbVectorY;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
         }
 
         if (this.hp <= 0) {
@@ -237,7 +238,7 @@ public class Witch extends Enemy {
                 double cDiffX = (targetPlayer.getX() + targetPlayer.getRenderWidth() / 2) - (circleX + 48);
                 double cDiffY = (targetPlayer.getY() + targetPlayer.getRenderHeight() / 2) - (circleY + 48);
                 if (Math.sqrt(cDiffX * cDiffX + cDiffY * cDiffY) <= 60) {
-                    targetPlayer.takeDamage(this.damage);
+                    targetPlayer.takeDamage(this.damage, circleX + 48, circleY + 48); // Đẩy lùi tính từ tâm vòng lửa
                 }
             } else if (circleTimer > 230) {
                 resetToIdle();
@@ -304,7 +305,7 @@ public class Witch extends Enemy {
 
         // Nếu đụng trúng Player -> Trừ máu Player bằng damage của Witch
         if (other instanceof Player) {
-            ((Player) other).takeDamage(this.damage);
+            ((Player) other).takeDamage(this.damage, this);
         }
     }
 }

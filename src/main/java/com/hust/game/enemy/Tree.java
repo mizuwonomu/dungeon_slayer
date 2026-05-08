@@ -14,6 +14,7 @@ public class Tree extends Enemy {
     private int skillAnimTimer = 0;
     private int skillFrameIndex = 0;
     private final int SKILL_NUM_FRAMES = 8;
+    private boolean hasDealtSkillDamage = false;
 
     public Tree(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer, Image skillSprite) {
@@ -49,9 +50,10 @@ public class Tree extends Enemy {
             this.lastX = this.x;
             this.lastY = this.y;
             if (this.kbTimer > 0) {
+                double multiplier = this.kbTimer / 3.5;
                 this.kbTimer--;
-                this.x += kbVectorX;
-                this.y += kbVectorY;
+                this.x += kbVectorX * multiplier;
+                this.y += kbVectorY * multiplier;
             }
 
             // Chết khi đang cast skill -> giữ nguyên frame hiện tại và không làm gì nữa
@@ -78,17 +80,20 @@ public class Tree extends Enemy {
                     com.hust.game.audio.SoundManager.playTreeAtkSound();
                 }
 
+                // Tính sát thương vào frame thứ 5 (index 4) thay vì đợi hoạt ảnh kết thúc
+                if (skillFrameIndex == 4 && !hasDealtSkillDamage) {
+                    if (isInAttackRange()) {
+                        targetPlayer.takeDamage(this.damage, this);
+                    }
+                    hasDealtSkillDamage = true;
+                }
+
                 if (skillFrameIndex >= SKILL_NUM_FRAMES) {
                     isCastingSkill = false;
                     this.spriteSheet = normalSprite;
                     this.frameWidth = normalSprite.getWidth() / this.numFrames;
                     this.frameHeight = normalSprite.getHeight();
                     this.frameIndex = 0;
-
-                    // Chỉ gây sát thương nếu Player không kịp né
-                    if (isInAttackRange()) {
-                        targetPlayer.takeDamage(this.damage);
-                    }
                 } else {
                     this.frameIndex = skillFrameIndex;
                 }
@@ -137,13 +142,14 @@ public class Tree extends Enemy {
             isCastingSkill = true;
             skillFrameIndex = 0;
             skillAnimTimer = 0;
+            hasDealtSkillDamage = false;
 
             this.spriteSheet = skillSprite;
             this.frameWidth = skillSprite.getWidth() / SKILL_NUM_FRAMES;
             this.frameHeight = skillSprite.getHeight();
             this.frameIndex = 0;
         } else {
-            targetPlayer.takeDamage(this.damage);
+            targetPlayer.takeDamage(this.damage, this);
         }
     }
 

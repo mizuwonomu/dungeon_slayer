@@ -127,6 +127,14 @@ public class MenuScreen {
                 selectedHint[0] = hints[hintIndex[0]];
             }
         });
+        StackPane lvl3Btn = createSpriteBtn("BOSS", buttonSheet, 3, 1.0, () -> {
+            if (phase[0] == 2) {
+                phase[0] = 3;
+                selectedLevel[0] = 3;
+                hintIndex[0] = (int) (Math.random() * hints.length);
+                selectedHint[0] = hints[hintIndex[0]];
+            }
+        });
         StackPane backBtn = createSpriteBtn("BACK", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 2) {
                 phase[0] = 1; // Quay lại menu chính
@@ -150,7 +158,7 @@ public class MenuScreen {
         btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0);
         btnBox.setMouseTransparent(!hasPlayedIntro); // Fix lỗi: chưa hiện nút đã bấm được
 
-        HBox levelRow = new HBox(40, tutorialBtn, lvl1Btn, lvl2Btn);
+        HBox levelRow = new HBox(40, tutorialBtn, lvl1Btn, lvl2Btn, lvl3Btn);
         levelRow.setAlignment(Pos.CENTER);
         levelRow.setVisible(false);
         levelRow.setMouseTransparent(true);

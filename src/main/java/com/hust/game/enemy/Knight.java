@@ -46,9 +46,10 @@ public class Knight extends Enemy {
         this.lastX = this.x;
         this.lastY = this.y;
         if (this.kbTimer > 0) {
+            double multiplier = this.kbTimer / 3.5;
             this.kbTimer--;
-            this.x += kbVectorX;
-            this.y += kbVectorY;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
         }
 
         // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
@@ -162,4 +163,12 @@ public class Knight extends Enemy {
         super.applyKnockback(dir);
     }
 
+    @Override
+    public Rectangle2D getCollisionBoundary() {
+        double w = renderWidth * 0.4;
+        double h = renderHeight * 0.2;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
+    }
 }

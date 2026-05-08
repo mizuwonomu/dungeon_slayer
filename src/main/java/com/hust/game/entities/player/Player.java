@@ -52,6 +52,29 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private boolean isAttacking = false;
     private AttackEffect attackEffect;
 
+    // Trạng thái đâm/chọc
+    private boolean isThrusting = false;
+    private int thrustTimer = 0;
+
+    // Trạng thái lướt (Dash)
+    private boolean isDashing = false;
+    private int dashTimer = 0;
+    private int dashCooldown = 0;
+    private static final int DASH_DURATION = 15; // Lướt nhanh trong 15 frames (~0.25s)
+    private static final int DASH_COOLDOWN_MAX = 45; // Hồi chiêu 0.75s
+    private double dashVectorX = 0;
+    private double dashVectorY = 0;
+
+    // Trạng thái giật lùi khi chém (Recoil)
+    private int recoilTimer = 0;
+    private double recoilVectorX = 0;
+    private double recoilVectorY = 0;
+
+    // Trạng thái bị knockback khi nhận sát thương
+    private int kbTimer = 0;
+    private double kbVectorX = 0;
+    private double kbVectorY = 0;
+
     // -------------------------------------------------------
     // COLLISION ROLLBACK
     // Trước mỗi frame di chuyển, lưu lại vị trí cũ.
@@ -87,7 +110,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // mới được tấn công lại → tránh spam attack.
     // -------------------------------------------------------
     private int attackCooldown = 0; 
-    private static final int ATTACK_COOLDOWN_MAX = (8 * 4); // 8 frames attack delay giữa các lần đánh
+    private static final int ATTACK_COOLDOWN_MAX = (8 * 2); // Giảm thời gian chờ xuống còn một nửa (16 frames)
     private final int attackDamage = 20; // sát thương mỗi đòn
 
     // -------------------------------------------------------
@@ -142,7 +165,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // tránh hiện tượng nhảy frame giữa chừng khi đổi hướng.
     // -------------------------------------------------------
     private void updateSpriteSheet() {
-        if (isAttacking) {
+        if (isAttacking || isThrusting) {
             this.spriteSheet = switch (direction) {
                 case UP -> combatUp;
                 case DOWN -> combatDown;
@@ -225,10 +248,19 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         if (flashTimer > 0)
             flashTimer--; // Giảm dần thời gian nháy đỏ
 
-        if (isAttacking) {
+        if (isThrusting) {
+            thrustTimer--;
+            if (thrustTimer <= 0) {
+                isThrusting = false;
+                frameIndex = 0;
+                if (attackEffect != null) attackEffect.setActive(false);
+                updateSpriteSheet(); 
+            }
+            if (attackEffect != null) attackEffect.update();
+        } else if (isAttacking) {
             animationTimer++;
-            // Animation chém diễn ra nhanh hơn đi bộ
-            if (animationTimer >= 4) {
+            // Tăng tốc độ chém lên gấp đôi: chỉ mất 2 frame game để chuyển 1 frame ảnh
+            if (animationTimer >= 2) {
                 animationTimer = 0;
                 frameIndex++;
                 if (frameIndex >= 8) { // Kết thúc 8 frame chém
@@ -254,6 +286,31 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         if (attackCooldown > 0)
             attackCooldown--;
             
+        // Cập nhật trạng thái lướt
+        if (dashCooldown > 0) dashCooldown--;
+        if (isDashing) {
+            dashTimer--;
+            if (dashTimer <= 0) {
+                isDashing = false;
+            }
+        }
+
+        // Cập nhật giật lùi (Recoil)
+        if (recoilTimer > 0) {
+            double multiplier = recoilTimer / 3.0; // Từ 5 đến 1, tổng multiplier = 5.0 (Quãng đường không đổi)
+            recoilTimer--;
+            this.x += recoilVectorX * multiplier;
+            this.y += recoilVectorY * multiplier;
+        }
+            
+        // Cập nhật Knockback khi bị thương
+        if (kbTimer > 0) {
+            double multiplier = kbTimer / 3.5; // Từ 6 đến 1, tổng multiplier = 6.0 (Quãng đường không đổi)
+            kbTimer--;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
+        }
+
         // Cập nhật hiệu ứng hào quang cuồng nộ
         if (isRageActive) {
             if (rageTimer > 0) rageTimer--;
@@ -345,18 +402,72 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             gc.drawImage(thunderImg, tx, 0, tw, th, thunderX, thunderY, thunderRenderWidth, thunderRenderHeight);
         }
 
-        if (isAttacking && attackEffect != null) {
+        if ((isAttacking || isThrusting) && attackEffect != null) {
             attackEffect.render(gc); // Vẽ hiệu ứng kiếm đè lên
         }
     }
 
-    public void triggerAttackVisuals() {
-        isAttacking = true;
-        frameIndex = 0;
-        animationTimer = 0;
-        updateSpriteSheet();
-        if (attackEffect != null)
-            attackEffect.trigger();
+    public void triggerAttackVisuals(boolean isThrust) {
+        if (isThrust) {
+            isThrusting = true;
+            thrustTimer = 18; // Kéo dài 0.3s cho đòn chọc
+            frameIndex = 0;
+            updateSpriteSheet();
+            if (attackEffect != null) attackEffect.trigger(true);
+        } else {
+            isAttacking = true;
+            frameIndex = 0;
+            animationTimer = 0;
+            updateSpriteSheet();
+            if (attackEffect != null) attackEffect.trigger(false);
+        }
+    }
+
+    public boolean canDash() {
+        return dashCooldown <= 0 && !isDashing && !isAttacking;
+    }
+
+    public void startDash(double dx, double dy) {
+        isDashing = true;
+        dashTimer = DASH_DURATION;
+        dashCooldown = DASH_COOLDOWN_MAX;
+        
+        // Nếu không bấm phím hướng nào mà vẫn ấn SHIFT -> lướt theo hướng mặt hiện tại
+        if (dx == 0 && dy == 0) {
+            switch (direction) {
+                case UP: dy = -1; break;
+                case DOWN: dy = 1; break;
+                case LEFT: dx = -1; break;
+                case RIGHT: dx = 1; break;
+            }
+        } else {
+            // Chuẩn hóa vector di chuyển chéo
+            double length = Math.sqrt(dx * dx + dy * dy);
+            dx /= length;
+            dy /= length;
+        }
+        
+        double dashSpeedMultiplier = 3.5; // Tốc độ lướt gấp 3.5 lần đi bộ
+        dashVectorX = dx * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
+        dashVectorY = dy * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
+    }
+
+    public boolean isDashing() { return isDashing; }
+    public double getDashVectorX() { return dashVectorX; }
+    public double getDashVectorY() { return dashVectorY; }
+
+    // Đẩy lùi nhẹ khi chém trúng mục tiêu (Recoil)
+    public void applyRecoil(double distance) {
+        this.recoilTimer = 5; // Dội lùi từ từ trong 5 frames
+        double speed = distance / 5.0;
+        this.recoilVectorX = 0;
+        this.recoilVectorY = 0;
+        switch (direction) {
+            case UP: this.recoilVectorY = speed; break;
+            case DOWN: this.recoilVectorY = -speed; break;
+            case LEFT: this.recoilVectorX = speed; break;
+            case RIGHT: this.recoilVectorX = -speed; break;
+        }
     }
 
     // -------------------------------------------------------
@@ -377,9 +488,17 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // DAMAGEABLE — nhận sát thương (Member C dùng)
     // -------------------------------------------------------
 
-    /** Trừ máu, không cho xuống dưới 0 */
     @Override
     public void takeDamage(int amount) {
+        takeDamage(amount, this.x, this.y); // Nếu không có nguồn, giật lùi tại chỗ
+    }
+
+    public void takeDamage(int amount, BaseEntity source) {
+        takeDamage(amount, source.getX() + source.getRenderWidth() / 2.0, source.getY() + source.getRenderHeight() / 2.0);
+    }
+
+    /** Trừ máu, bật tử và tính toán góc giật lùi */
+    public void takeDamage(int amount, double srcX, double srcY) {
         if (flashTimer > 0)
             return; // Nếu đang trong trạng thái nháy đỏ -> Bất tử (Miễn nhiễm sát thương)
         currentHp = Math.max(0, currentHp - amount);
@@ -387,6 +506,20 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount,
                 javafx.scene.paint.Color.RED);
         com.hust.game.audio.SoundManager.playPlayerHitSound(); // Phát âm thanh bị thương
+        com.hust.game.main.App.triggerScreenShake(10, 0.5); // Giảm độ rung màn hình khi nhận sát thương
+
+        // Áp dụng knockback đẩy lùi khỏi nguồn sát thương
+        this.kbTimer = 6; // Bị giật lùi trong 6 frames liên tiếp
+        double pCenterX = this.x + this.renderWidth / 2.0;
+        double pCenterY = this.y + this.renderHeight / 2.0;
+        double diffX = pCenterX - srcX;
+        double diffY = pCenterY - srcY;
+        double dist = Math.sqrt(diffX * diffX + diffY * diffY);
+        if (dist == 0) { diffX = 1; dist = 1; } // Tránh lỗi chia cho 0
+        
+        double kbSpeed = 6.0; // Lực đẩy lùi
+        this.kbVectorX = (diffX / dist) * kbSpeed;
+        this.kbVectorY = (diffY / dist) * kbSpeed;
     }
 
     public void takeMana(int amount) {
@@ -429,7 +562,11 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     /** Chỉ cho tấn công khi cooldown đã về 0 */
     @Override
     public boolean canAttack() {
-        return attackCooldown == 0;
+        return attackCooldown == 0 && !isDashing && !isThrusting; // Không được chém khi đang lướt/chọc
+    }
+
+    public void resetAttackCooldown(int cooldown) {
+        attackCooldown = cooldown;
     }
 
     /** Gọi sau khi tấn công để bắt đầu đếm cooldown */

@@ -9,6 +9,7 @@ public class AttackEffect extends BaseEntity {
     private boolean active = false;
     private Player player;
     private double rotation = 0;
+    private boolean isThrusting = false;
 
     // Thêm 2 field
     private final Image normalSprite; // sprite kiếm thường
@@ -22,8 +23,9 @@ public class AttackEffect extends BaseEntity {
         this.rageSprite = rageSprite;
     }
 
-    public void trigger() {
+    public void trigger(boolean isThrust) {
         this.active = true;
+        this.isThrusting = isThrust;
         this.frameIndex = 0;
     }
 
@@ -48,38 +50,59 @@ public class AttackEffect extends BaseEntity {
         double pw = player.getRenderWidth();
         double ph = player.getRenderHeight();
 
-        // 2. Logic lật/xoay theo hướng (mặc định ảnh hướng sang phải)
+        // 2. Logic lật/xoay theo hướng
+        double baseX = 0, baseY = 0;
         switch (dir) {
             case UP:
-                x = px + (pw / 2) - (renderWidth / 2);
-                y = py - renderHeight + 35; // Tăng offset để sát vào player
+                baseX = px + (pw / 2) - (renderWidth / 2);
+                baseY = py - renderHeight + 35;
                 rotation = -90; // Xoay lên trên
                 this.isFlipped = false;
                 break;
             case DOWN:
-                x = px + (pw / 2) - (renderWidth / 2);
-                y = py + ph - 35; // Sát vào player
+                baseX = px + (pw / 2) - (renderWidth / 2);
+                baseY = py + ph - 35; // Sát vào player
                 rotation = 90; // Xoay xuống dưới
                 this.isFlipped = false;
                 break;
             case LEFT:
-                x = px - renderWidth + 35; // Sát vào player
-                y = py + (ph / 2) - (renderHeight / 2);
+                baseX = px - renderWidth + 35; // Sát vào player
+                baseY = py + (ph / 2) - (renderHeight / 2);
                 rotation = 0; // Giữ nguyên góc quay
                 this.isFlipped = true; // Chỉ lật ảnh ngang (mirror)
                 break;
             case RIGHT:
             default:
-                x = px + pw - 35; // Sát vào player
-                y = py + (ph / 2) - (renderHeight / 2);
+                baseX = px + pw - 35; // Sát vào player
+                baseY = py + (ph / 2) - (renderHeight / 2);
                 rotation = 0; // Giữ nguyên
                 this.isFlipped = false;
                 break;
         }
         
-        // Frame của AttackEffect được đồng bộ trực tiếp từ frameIndex của Player
-        // để đảm bảo vung kiếm khớp với tay nhân vật
-        this.frameIndex = player.getFrameIndex();
+        if (isThrusting) {
+            int tTimer = player.getThrustTimer();
+            int phase = 18 - tTimer; // Khung hình chạy từ 0 đến 17
+            int cycle = phase % 6; // Lặp lại 3 nhịp (mỗi nhịp 6 khung hình)
+            // Tính toán khoảng cách chọc (Thò ra và thụt vào)
+            double offset = 0;
+            if (cycle == 0 || cycle == 5) offset = 10;
+            else if (cycle == 1 || cycle == 4) offset = 25;
+            else offset = 40; // Điểm chọc xa nhất
+
+            switch (dir) {
+                case UP: baseY -= offset; break;
+                case DOWN: baseY += offset; break;
+                case LEFT: baseX -= offset; break;
+                case RIGHT: baseX += offset; break;
+            }
+            this.frameIndex = 0; // Luôn dùng frame đầu tiên của kiếm để chọc
+        } else {
+            this.frameIndex = player.getFrameIndex();
+        }
+
+        this.x = baseX;
+        this.y = baseY;
     }
 
     @Override

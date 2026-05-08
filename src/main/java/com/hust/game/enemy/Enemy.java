@@ -36,6 +36,8 @@ public abstract class Enemy extends MovingEntity {
     protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
     protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
 
+    private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
+
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer) {
@@ -60,9 +62,10 @@ public abstract class Enemy extends MovingEntity {
         // --- Logic di chuyển & AI ---
         if (kbTimer > 0) {
             // Trạng thái: Bị đẩy lùi
+            double multiplier = kbTimer / 3.5; // Giảm tốc dần đều, bắt đầu nhanh và chậm dần
             kbTimer--;
-            this.x += kbVectorX;
-            this.y += kbVectorY;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
         } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null && !isImmobile) {
             // Trạng thái: AI hoạt động (đuổi theo player)
             double playerX = targetPlayer.getX();
@@ -174,7 +177,7 @@ public abstract class Enemy extends MovingEntity {
             this.hp = 0;
             this.flashTimer = 60; // Quái chết -> Tồn tại thêm 60 frames (1 giây) để chạy hiệu ứng mờ dần
         } else {
-            this.flashTimer = 15; // Quái còn sống -> Chỉ nháy đỏ 15 frames (~0.25 giây)
+            this.flashTimer = 6; // Quái còn sống -> Chỉ nháy trắng 6 frames (~0.1 giây)
         }
         
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.WHITE);
@@ -191,10 +194,23 @@ public abstract class Enemy extends MovingEntity {
             if (alpha > 1) alpha = 1;
             
             gc.setGlobalAlpha(alpha);
+            
+            // Chớp trắng trong 6 frame đầu tiên khi vừa nhận đòn kết liễu (flashTimer từ 55 đến 60)
+            if (this.flashTimer > 54) {
+                gc.setEffect(WHITE_EFFECT);
+            }
             super.render(gc); // Vẽ quái vật với độ mờ giảm dần
             gc.restore();
         } else {
-            super.render(gc); // Quái còn sống thì vẽ bình thường
+            // Quái còn sống và đang bị thương -> Chớp trắng
+            if (this.flashTimer > 0) {
+                gc.save();
+                gc.setEffect(WHITE_EFFECT);
+                super.render(gc);
+                gc.restore();
+            } else {
+                super.render(gc); // Vẽ bình thường
+            }
         }
     }
 

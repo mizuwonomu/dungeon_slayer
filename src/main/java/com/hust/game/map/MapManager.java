@@ -15,14 +15,19 @@ public class MapManager {
     public int[][] mapTileNum;
     public int level;
     public List<int[]> gatePositions;
+    public List<com.hust.game.entities.base.BaseEntity> mapEntities; // Danh sách các vật thể cứng trên Map
 
     public MapManager(int level) {
         this.level = level;
         tiles = new HashMap<>();
         gatePositions = new ArrayList<>();
+        mapEntities = new ArrayList<>();
         mapTileNum = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
-        loadMap("/assets/maps/level" + level + ".txt");
+        
+        // Tái sử dụng map Level 2 cho màn Final Boss (Level 3)
+        String mapPath = (level == 3) ? "/assets/maps/level2.txt" : "/assets/maps/level" + level + ".txt";
+        loadMap(mapPath);
     }
 
     public void loadTiles() {
@@ -77,6 +82,22 @@ public class MapManager {
                 }
             }
             br.close();
+            
+            // Tạo các Entity tĩnh từ những ô map có va chạm (Tường, Cây...) để xếp chồng 3D
+            mapEntities.clear();
+            for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
+                for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
+                    int tileId = mapTileNum[row][col];
+                    Tile t = tiles.get(tileId);
+                    if (t != null && t.collision && t.image != null) {
+                        mapEntities.add(new com.hust.game.entities.base.StaticEntity(
+                                col * GameConstants.TILE_SIZE,
+                                row * GameConstants.TILE_SIZE,
+                                t.image, 1,
+                                GameConstants.TILE_SIZE, GameConstants.TILE_SIZE));
+                    }
+                }
+            }
         } catch (Exception e) { e.printStackTrace(); }
     }
 
@@ -85,7 +106,8 @@ public class MapManager {
             for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
                 int tileId = mapTileNum[row][col];
                 Tile t = tiles.get(tileId);
-                if (t != null && t.image != null) {
+                // Chỉ vẽ nền đất ở dưới (t.collision == false). Tường sẽ được bốc ra vẽ chung với Player ở App.java
+                if (t != null && !t.collision && t.image != null) {
                     gc.drawImage(t.image, col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE,
                                  GameConstants.TILE_SIZE, GameConstants.TILE_SIZE);
                 }

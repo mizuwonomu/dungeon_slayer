@@ -69,6 +69,7 @@ public class App extends Application {
     private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
+    private int hitStopTimer = 0;
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
@@ -83,6 +84,13 @@ public class App extends Application {
     private javafx.scene.media.MediaPlayer menuMusicPlayer;
     private javafx.scene.media.MediaPlayer inGameMusicPlayer;
     private static App instance;
+
+    public static void triggerScreenShake(int timer, double amplitude) {
+        if (instance != null) {
+            instance.screenShakeTimer = timer;
+            instance.screenShakeAmplitude = amplitude;
+        }
+    }
 
     @Override
     public void start(Stage stage) {
@@ -294,31 +302,48 @@ public class App extends Application {
                     pauseBtn.setMouseTransparent(true); // Khóa tương tác nút Pause
                 } else if (!isVictory && !isGameOver && !isPaused) {
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
-                    handleInput();
                     
-                    if (tutorialManager != null) {
-                        tutorialManager.update(player, input);
-                    }
+                    // Cơ chế Hit Stop: Đóng băng toàn bộ hoạt động (trừ việc vẽ ra hình)
+                    if (hitStopTimer > 0) {
+                        hitStopTimer--;
+                    } else {
+                        handleInput();
+                        
+                        int stopFrames = combatManager.consumeHitStopFrames();
+                        if (stopFrames > 0) {
+                            hitStopTimer = stopFrames;
+                        }
+                        
+                        int sTimer = combatManager.consumeShakeTimer();
+                        if (sTimer > 0) {
+                            screenShakeTimer = sTimer;
+                            screenShakeAmplitude = combatManager.consumeShakeAmplitude();
+                        }
+                        
+                        if (tutorialManager != null) {
+                            tutorialManager.update(player, input);
+                        }
 
-                    player.update();
-                    combatManager.update();
-                    gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
-                    
-                    updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
-                    
-                    // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
-                    double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
-                    for (Enemy e : enemyManager.getEnemyList()) {
-                        boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
-                                           e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
-                                           e.getY() + e.getRenderHeight() >= cameraY - margin &&
-                                           e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
-                        e.setActive(onScreen);
-                    }
+                        player.update();
+                        combatManager.update();
+                        gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
+                        
+                        updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
+                        
+                        // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
+                        double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
+                        for (Enemy e : enemyManager.getEnemyList()) {
+                            boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
+                                               e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                                               e.getY() + e.getRenderHeight() >= cameraY - margin &&
+                                               e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
+                            e.setActive(onScreen);
+                        }
 
-                    enemyManager.updateAll();
-                    checkCollisions();
-                    com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                        enemyManager.updateAll();
+                        checkCollisions();
+                        com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                    }
                 }
 
                 gc.clearRect(0, 0, WIDTH, HEIGHT);
@@ -348,10 +373,50 @@ public class App extends Application {
                 // Draw map
                 gameManager.draw(gc);
 
-                obstacles.forEach(e -> e.render(gc));
+                // --- 2.5D DEPTH SORTING (Z-INDEX) ---
+                // Gom tất cả Entity lại để sắp xếp thứ tự vẽ (Y-Sorting)
+                List<BaseEntity> renderList = new ArrayList<>();
+                renderList.add(player);
+                
+                // Thêm Quái vật
+                for (Enemy e : enemyManager.getEnemyList()) {
+                    if (e.isActive()) renderList.add(e);
+                }
+                
+                // Thêm Cổng (Gate)
+                if (gameManager.getGates() != null) {
+                    renderList.addAll(gameManager.getGates());
+                }
+                
+                // Thêm Tường/Vật cản từ Map (áp dụng Culling để tối ưu hiệu năng)
+                if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
+                    double margin = GameConstants.TILE_SIZE * 2;
+                    for (BaseEntity wall : gameManager.getMap().mapEntities) {
+                        if (wall.getX() + wall.getRenderWidth() >= cameraX - margin &&
+                            wall.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                            wall.getY() + wall.getRenderHeight() >= cameraY - margin &&
+                            wall.getY() <= cameraY + (HEIGHT / ZOOM) + margin) {
+                            renderList.add(wall);
+                        }
+                    }
+                }
+                
+                renderList.addAll(obstacles);
+                
+                // Sắp xếp sao cho entity nào có tọa độ đáy (Y + Height) thấp hơn sẽ vẽ trước, cao hơn vẽ sau (đè lên)
+                renderList.sort((e1, e2) -> {
+                    double bottom1 = e1.getY() + e1.getRenderHeight();
+                    double bottom2 = e2.getY() + e2.getRenderHeight();
+                    return Double.compare(bottom1, bottom2);
+                });
 
-                player.render(gc);
-                enemyManager.renderAll(gc);
+                // Vẽ lần lượt theo thứ tự đã sắp xếp
+                for (BaseEntity entity : renderList) {
+                    entity.render(gc);
+                }
+                
+                combatManager.getParticleManager().render(gc);
+
                 com.hust.game.ui.DamageTextManager.render(gc); // Vẽ các số sát thương (vẽ sau quái để đè lên trên cùng)
                 combatManager.renderCrits(gc); // Vẽ text CRIT đè lên trên cùng
 
@@ -401,7 +466,7 @@ public class App extends Application {
                 }
 
                 // Clear level
-                if (isVictory && gameManager.getCurrentLevelIndex() > 0 && gameManager.getCurrentLevelIndex() < 2 && !isLevelClearUIShown) {
+                if (isVictory && gameManager.getCurrentLevelIndex() > 0 && gameManager.getCurrentLevelIndex() < 3 && !isLevelClearUIShown) {
                     gameLoop.stop();
                     levelClearScreen = new LevelClearScreen(
                             // Next level
@@ -437,7 +502,7 @@ public class App extends Application {
                 }
 
                 // End screen
-                if ((isVictory && gameManager.getCurrentLevelIndex() >= 2) || isGameOver) {
+                if ((isVictory && gameManager.getCurrentLevelIndex() >= 3) || isGameOver) {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
@@ -517,9 +582,9 @@ public class App extends Application {
         double viewW = WIDTH / ZOOM;
         double viewH = HEIGHT / ZOOM;
 
-        // Xác định vùng Deadzone (40% ở chính giữa màn hình viewport)
-        double dzWidth = viewW * 0.4;
-        double dzHeight = viewH * 0.4;
+        // Xác định vùng Deadzone thu hẹp sát player (chỉ khoảng = hitbox player + 1/2)
+        double dzWidth = player.getRenderWidth() * 1.5;
+        double dzHeight = player.getRenderHeight() * 1.5;
         double dzLeft = (viewW - dzWidth) / 2.0;
         double dzRight = dzLeft + dzWidth;
         double dzTop = (viewH - dzHeight) / 2.0;
@@ -597,6 +662,8 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
+
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
@@ -611,7 +678,8 @@ public class App extends Application {
                 treeImg, treeSkillImg,
                 slimeImg,
                 knightImg, knightSkillImg,
-                witchImg, witchSkillImg
+                witchImg, witchSkillImg,
+                bossImg
             );
 
             gameManager.loadLevel(level);
@@ -639,8 +707,25 @@ public class App extends Application {
 
         boolean isAnyKeyPressed = false;
 
-        // Khóa di chuyển khi đang chém để animation hiển thị rõ ràng và uy lực hơn
-        if (!player.isAttacking()) {
+        // Xử lý phím SHIFT để Dash
+        if (input.contains(KeyCode.SHIFT)) {
+            if (player.canDash()) {
+                double dashDx = 0, dashDy = 0;
+                if (input.contains(KeyCode.W) || input.contains(KeyCode.UP)) dashDy -= 1;
+                if (input.contains(KeyCode.S) || input.contains(KeyCode.DOWN)) dashDy += 1;
+                if (input.contains(KeyCode.A) || input.contains(KeyCode.LEFT)) dashDx -= 1;
+                if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) dashDx += 1;
+                
+                player.startDash(dashDx, dashDy);
+                com.hust.game.audio.SoundManager.playSlimeMoveSound(); // Tạm dùng âm thanh này làm tiếng gió lướt
+            }
+        }
+
+        if (player.isDashing()) {
+            player.setX(player.getX() + player.getDashVectorX());
+            player.setY(player.getY() + player.getDashVectorY());
+            isAnyKeyPressed = true; // Giữ trạng thái RUNNING để animation chạy bộ nhìn mượt
+        } else if (!player.isAttacking() && !player.isThrusting()) {
             boolean up    = input.contains(KeyCode.W) || input.contains(KeyCode.UP);
             boolean down  = input.contains(KeyCode.S) || input.contains(KeyCode.DOWN);
             boolean left  = input.contains(KeyCode.A) || input.contains(KeyCode.LEFT);
@@ -675,17 +760,7 @@ public class App extends Application {
         if (input.contains(KeyCode.J)) {
             if (!isJHeld) { // Yêu cầu phải nhả phím J ra rồi bấm lại mới chém tiếp được
                 if (player.canAttack()) {
-                    int combo = combatManager.playerAttack();
-                    if (combo > 0) {
-                        screenShakeTimer = 3; // Tăng lên 3 frame để độ rung rõ ràng hơn một chút
-                        // Phân tầng độ rung theo Combo
-                        if (combo <= 2)
-                            screenShakeAmplitude = 0.0; // Hit 1, 2: Không rung
-                        else if (combo == 3)
-                            screenShakeAmplitude = 0.3; // Hit 3: Rung nhẹ
-                        else
-                            screenShakeAmplitude = 0.5;
-                    }
+                    combatManager.playerAttack();
                 }
                 isJHeld = true; // Đánh dấu là đang đè phím
             }
@@ -706,7 +781,6 @@ public class App extends Application {
 
     private void checkCollisions() {
         // 1. Kiểm tra va chạm với bề mặt Map (Wall, Pond) - Xử lý trượt tường (Wall Sliding)
-        double padding = 12; // Cắt bớt phần viền trong suốt của ảnh để nhân vật đi mượt hơn
         double nextX = player.getX();
         double nextY = player.getY();
         double lastX = player.getLastX();
@@ -715,10 +789,11 @@ public class App extends Application {
         // Bước 1: Thử di chuyển trục X trước
         player.setX(nextX);
         player.setY(lastY);
-        int left = (int) (player.getX() + padding);
-        int right = (int) (player.getX() + player.getRenderWidth() - padding);
-        int top = (int) (player.getY() + padding);
-        int bottom = (int) (player.getY() + player.getRenderHeight() - padding);
+        javafx.geometry.Rectangle2D pCol = player.getCollisionBoundary();
+        int left = (int) pCol.getMinX();
+        int right = (int) pCol.getMaxX();
+        int top = (int) pCol.getMinY();
+        int bottom = (int) pCol.getMaxY();
 
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
             collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
@@ -727,10 +802,11 @@ public class App extends Application {
 
         // Bước 2: Thử di chuyển trục Y trên cơ sở X đã an toàn
         player.setY(nextY);
-        left = (int) (player.getX() + padding);
-        right = (int) (player.getX() + player.getRenderWidth() - padding);
-        top = (int) (player.getY() + padding);
-        bottom = (int) (player.getY() + player.getRenderHeight() - padding);
+        pCol = player.getCollisionBoundary();
+        left = (int) pCol.getMinX();
+        right = (int) pCol.getMaxX();
+        top = (int) pCol.getMinY();
+        bottom = (int) pCol.getMaxY();
 
         if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
             collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
@@ -747,13 +823,15 @@ public class App extends Application {
                 // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
                 for (int j = i + 1; j < enemies.size(); j++) {
                     Enemy otherEnemy = enemies.get(j);
-                    if (enemy.intersects(otherEnemy)) {
+                    if (enemy.getCollisionBoundary().intersects(otherEnemy.getCollisionBoundary())) {
                         // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt
                         // thành 1 cục)
-                        double cx1 = enemy.getX() + enemy.getRenderWidth() / 2.0;
-                        double cy1 = enemy.getY() + enemy.getRenderHeight() / 2.0;
-                        double cx2 = otherEnemy.getX() + otherEnemy.getRenderWidth() / 2.0;
-                        double cy2 = otherEnemy.getY() + otherEnemy.getRenderHeight() / 2.0;
+                        javafx.geometry.Rectangle2D eCol1 = enemy.getCollisionBoundary();
+                        javafx.geometry.Rectangle2D eCol2 = otherEnemy.getCollisionBoundary();
+                        double cx1 = eCol1.getMinX() + eCol1.getWidth() / 2.0;
+                        double cy1 = eCol1.getMinY() + eCol1.getHeight() / 2.0;
+                        double cx2 = eCol2.getMinX() + eCol2.getWidth() / 2.0;
+                        double cy2 = eCol2.getMinY() + eCol2.getHeight() / 2.0;
 
                         double dx = cx1 - cx2;
                         double dy = cy1 - cy2;
@@ -778,10 +856,11 @@ public class App extends Application {
             // giật ngược lại vị trí an toàn
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
-                int eLeft = (int) (enemy.getX() + padding);
-                int eRight = (int) (enemy.getX() + enemy.getRenderWidth() - padding);
-                int eTop = (int) (enemy.getY() + padding);
-                int eBottom = (int) (enemy.getY() + enemy.getRenderHeight() - padding);
+                javafx.geometry.Rectangle2D eCol = enemy.getCollisionBoundary();
+                int eLeft = (int) eCol.getMinX();
+                int eRight = (int) eCol.getMaxX();
+                int eTop = (int) eCol.getMinY();
+                int eBottom = (int) eCol.getMaxY();
 
                 if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
                         collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
@@ -791,7 +870,7 @@ public class App extends Application {
                 // KIỂM TRA VA CHẠM CỦA QUÁI VẬT VỚI CỬA (GATE)
                 if (gameManager.getGates() != null) {
                     for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                        if (gate.isSolid() && enemy.intersects(gate)) {
+                        if (gate.isSolid() && enemy.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
                             enemy.onCollision(gate); // Nếu cửa chưa mở -> Quái vật bị dội ngược lại
                         }
                     }
@@ -802,19 +881,27 @@ public class App extends Application {
         // Kiểm tra va chạm với Gate (Cửa màn Tutorial)
         if (gameManager.getGates() != null) {
             for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                if (gate.isSolid() && player.intersects(gate)) {
+                if (gate.isSolid() && player.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
                     player.onCollision(gate);
                 }
             }
         }
 
-        // 2. Kiểm tra va chạm với các vật cản khác (nếu list obstacles vẫn còn dùng sau
-        // này)
+        // 2. Kiểm tra va chạm với các vật cản khác (obstacles)
         for (BaseEntity wall : obstacles) {
-            if (player.intersects(wall)) {
+            if (player.getCollisionBoundary().intersects(wall.getCollisionBoundary())) {
                 player.onCollision(wall);
-
                 break;
+            }
+        }
+
+        // 3. Kiểm tra va chạm với các StaticEntity (Cây lớn, nhà cửa, tường) trên map
+        if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
+            for (BaseEntity entity : gameManager.getMap().mapEntities) {
+                if (player.getCollisionBoundary().intersects(entity.getCollisionBoundary())) {
+                    player.onCollision(entity);
+                    break;
+                }
             }
         }
 
@@ -822,10 +909,13 @@ public class App extends Application {
             List<Enemy> enemies = enemyManager.getEnemyList();
             for (Enemy enemy : enemies) {
                 // Phải soi xem nó có đụng Player không đã!
-                if (enemy.intersects(player)) {
+                if (enemy.getCollisionBoundary().intersects(player.getCollisionBoundary())) {
+
+                    // Chặn Player không đi xuyên qua quái
+                    player.onCollision(enemy);
 
                     if (enemy instanceof Knight && ((Knight) enemy).isDealingDamage()) {
-                        player.takeDamage(enemy.getDamage());
+                        player.takeDamage(enemy.getDamage(), enemy);
                     } else {
                         enemy.onCollision(player);
                     }
@@ -938,6 +1028,9 @@ public class App extends Application {
         } else if (level == 1) {
             musicPath = "/sounds/Music_lvl_1.mp3";
             volMultiplier = 0.7;
+        } else if (level == 3) {
+            musicPath = "/sounds/boss_fight_music.mp3";
+            volMultiplier = 0.8; // Âm lượng nhạc Boss (có thể chỉnh lại nếu thấy quá to/nhỏ)
         }
 
         if (!musicPath.isEmpty()) {

@@ -48,8 +48,24 @@ public class DamageTextManager {
     }
 
     public static void addText(Object target, double x, double y, String text, Color color) {
-        texts.removeIf(dt -> dt.target == target); // Xóa ngay số cũ của cùng một mục tiêu
+        // Chỉ xóa ngay số cũ nếu là chữ Combo (target là CombatManager)
+        if (target instanceof com.hust.game.combat.CombatManager) {
+            texts.removeIf(dt -> dt.target == target); 
+        } else {
+            // Thêm độ lệch ngẫu nhiên để các số sát thương bay ra không đè khít lên nhau
+            x += (Math.random() - 0.5) * 20;
+            y += (Math.random() - 0.5) * 20;
+        }
         texts.add(new DamageText(target, x, y, text, color));
+    }
+
+    public static void removeLastText(Object target) {
+        for (int i = texts.size() - 1; i >= 0; i--) {
+            if (texts.get(i).target == target) {
+                texts.remove(i);
+                break;
+            }
+        }
     }
 
     public static void update() {

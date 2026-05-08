@@ -24,10 +24,11 @@ public class GameManager {
     Image knightSkillImg;
     Image witchImg;
     Image witchSkillImg;
+    Image bossImg;
 
     public GameManager(EnemyManager enemyManager, Player player, Image treeImg,
             Image treeSkillImg, Image slimeImg, Image knightImg, Image knightSkillImg, Image witchImg,
-            Image witchSkillImg) {
+            Image witchSkillImg, Image bossImg) {
 
         this.currentLevelIndex = 1;
 
@@ -41,6 +42,7 @@ public class GameManager {
         this.knightSkillImg = knightSkillImg;
         this.witchImg = witchImg;
         this.witchSkillImg = witchSkillImg;
+        this.bossImg = bossImg;
     }
 
     public void loadLevel(int lvlID){
@@ -53,14 +55,19 @@ public class GameManager {
             treeImg, treeSkillImg,
             slimeImg,
             knightImg, knightSkillImg,
-            witchImg, witchSkillImg
+            witchImg, witchSkillImg,
+            bossImg
         );
 
         // Đặt lại chỉ số và toạ độ người chơi theo level
-        if (lvlID == 0 || lvlID == 1) {
+        if (lvlID == 0) {
             player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 5 * com.hust.game.constants.GameConstants.TILE_SIZE);
-        } else {
+        } else if (lvlID == 1) {
+            player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 16 * com.hust.game.constants.GameConstants.TILE_SIZE);
+        } else if (lvlID == 2) {
             player.reset(408, 200); // Tọa độ mặc định của Level 2
+        } else if (lvlID == 3) {
+            player.reset(150, 312); // Dịch player sang trái và giữa trục Y cho màn đánh Boss
         }
 
         currentLevel.init();

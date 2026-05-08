@@ -33,6 +33,8 @@ public class EnemyManager {
             newEnemy = new Knight(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
         } else if (enemyType.equals("Witch")) {
             newEnemy = new Witch(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite, this);
+        } else if (enemyType.equals("FinalBoss")) {
+            newEnemy = new FinalBoss(x, y, sprite, numFrames, w, h, targetPlayer);
         }
 
         if (newEnemy != null) {

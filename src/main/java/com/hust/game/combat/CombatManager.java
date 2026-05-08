@@ -65,6 +65,13 @@ public class CombatManager {
     }
     private List<CritText> critTexts = new ArrayList<>();
 
+    private ParticleManager particleManager = new ParticleManager();
+    private int hitStopFrames = 0;
+    private int shakeTimer = 0;
+    private double shakeAmplitude = 0;
+    private boolean hasDealtDamageThisAttack = true;
+    private boolean hasIncreasedComboThisAttack = false;
+
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
         this.enemyList = enemyList;
@@ -99,6 +106,20 @@ public class CombatManager {
                 comboCount = 0; // Hết 1 giây không chém trúng ai -> Reset Combo
             }
         }
+        
+        particleManager.update();
+
+        // Kiểm tra xem Player có đang chém và hoạt ảnh đã đến frame thứ 4 (index 3) chưa
+        if (player.isAttacking() && player.getFrameIndex() == 3 && !hasDealtDamageThisAttack) {
+            processAttackHits(player.getAttackDamage(), false, true);
+            hasDealtDamageThisAttack = true;
+        } else if (player.isThrusting()) {
+            int t = player.getThrustTimer();
+            // Tung 3 phát chọc ở các frame 15, 9, 3 (ngay khoảnh khắc lưỡi kiếm đâm ra xa nhất)
+            if (t == 15 || t == 9 || t == 3) {
+                processAttackHits(10, true, t == 3); // Mỗi nhát chọc cơ bản 10 sát thương, chỉ knockback ở đòn cuối
+            }
+        }
     }
 
     /**
@@ -111,17 +132,35 @@ public class CombatManager {
      *   4. Reset cooldown của player
      * @return Số đòn Combo hiện tại (0 nếu chém trượt)
      */
-    public int playerAttack() {
+    public void playerAttack() {
         // Kiểm tra cooldown tấn công — nếu chưa hết thì bỏ qua
-        if (!player.canAttack()) return 0;
+        if (!player.canAttack()) return;
 
-        // Tính tỷ lệ Crit dựa trên Combo (Max 75% ở Combo 5)
-        int[] critChances = {5, 20, 35, 50, 65, 75};
-        int currentChance = critChances[Math.min(5, comboCount)];
+        // Nếu đánh đến đòn thứ 3 -> Bật chế độ Chọc (Thrust)
+        boolean isThrust = (comboCount > 0 && comboCount % 3 == 2);
+
+        // Kích hoạt Animation chém và vẽ hiệu ứng
+        player.triggerAttackVisuals(isThrust);
+
+        // Reset cooldown tấn công của player ngay lúc vung kiếm
+        player.resetAttackCooldown(isThrust ? 18 : 16);
+        
+        hasDealtDamageThisAttack = false; // Đánh dấu là chưa gây sát thương cho nhát chém này
+        hasIncreasedComboThisAttack = false; // Reset cờ cộng dồn combo
+    }
+
+    private void processAttackHits(int baseDamage, boolean isThrust, boolean applyKnockback) {
+        // Tính tỷ lệ Crit dựa trên Combo
+        int currentChance = 1;
+        if (comboCount == 4) currentChance = 5;
+        else if (comboCount == 5) currentChance = 10;
+        else if (comboCount == 6) currentChance = 20;
+        else if (comboCount >= 7) currentChance = 30;
+        
         boolean isCrit = (Math.random() * 100) < currentChance;
 
         // Tính damage thực tế — nhân đôi nếu skill đang bật
-        int actualDamage = player.getAttackDamage();
+        int actualDamage = baseDamage;
         if (skillActive) {
             actualDamage *= SKILL_DAMAGE_MULTIPLIER;
         }
@@ -129,11 +168,8 @@ public class CombatManager {
             actualDamage *= 2; // Chí mạng x2 sát thương tổng
         }
 
-        // Kích hoạt Animation chém và vẽ hiệu ứng
-        player.triggerAttackVisuals();
-
         // Tính toán hitbox tấn công trực tiếp để tránh lỗi thiếu class PlayerCombat
-        double attackRange = 30.0; // Tầm chém (khoảng cách hitbox mở rộng ra phía trước)
+        double attackRange = isThrust ? 45.0 : 30.0; // Tầm chọc dài hơn chém thường 1 chút
         double px = player.getX();
         double py = player.getY();
         double pw = player.getRenderWidth();
@@ -159,7 +195,9 @@ public class CombatManager {
         boolean hitTree = false;
         boolean hitWitch = false;
         boolean isWitchDead = false;
+        boolean hitBoss = false;
         boolean isFinalHit = false;
+        boolean isBossDefeated = false;
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
@@ -173,19 +211,28 @@ public class CombatManager {
             if (attackBox.intersects(enemyBox)) {
                 enemy.takeDamage(actualDamage);
 
-                // Bật hiệu ứng knockback
-                enemy.applyKnockback(player.getDirection());
+                // Bật hiệu ứng knockback (với đòn chọc thì chỉ đẩy lùi ở phát cuối cùng)
+                if (applyKnockback) {
+                    enemy.applyKnockback(player.getDirection());
+                }
                 hitAny = true; // Xác nhận đã chém trúng
+                
+                // Bắn hạt máu văng ra
+                double bloodX = enemy.getX() + enemy.getRenderWidth() / 2;
+                double bloodY = enemy.getY() + enemy.getRenderHeight() / 2;
+                particleManager.spawnBlood(bloodX, bloodY, player.getDirection());
 
                 // Phân loại quái vật và xác định đòn kết liễu
                 if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
                 if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
                 if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
                 if (enemy instanceof com.hust.game.enemy.Witch) hitWitch = true;
+                if (enemy instanceof com.hust.game.enemy.FinalBoss) hitBoss = true;
                 
                 if (enemy.getHp() <= 0) {
                     isFinalHit = true;
                     if (enemy instanceof com.hust.game.enemy.Witch) isWitchDead = true;
+                if (enemy instanceof com.hust.game.enemy.FinalBoss) isBossDefeated = true;
                 }
 
                 // Tính toạ độ hiển thị text ngay trên đầu quái vật
@@ -198,15 +245,37 @@ public class CombatManager {
                     String text = "CRIT DAMAGE!\n-" + actualDamage;
                     critTexts.add(new CritText(textX - 20, textY - 20, text, critColor, sizeMult));
                     
-                    // Ghi đè số sát thương trắng mặc định sinh ra từ hàm takeDamage bằng chuỗi rỗng (tàng hình)
-                    com.hust.game.ui.DamageTextManager.addText(enemy, 0, 0, "", javafx.scene.paint.Color.TRANSPARENT);
+                    // Xóa số sát thương trắng mặc định sinh ra từ hàm takeDamage
+                    com.hust.game.ui.DamageTextManager.removeLastText(enemy);
                 } else if (skillActive) {
                     String text = "-" + actualDamage;
                     critTexts.add(new CritText(textX, textY, text, javafx.scene.paint.Color.CYAN, 1.0));
                     
-                    // Ghi đè số sát thương trắng mặc định sinh ra từ hàm takeDamage bằng chuỗi rỗng (tàng hình)
-                    com.hust.game.ui.DamageTextManager.addText(enemy, 0, 0, "", javafx.scene.paint.Color.TRANSPARENT);
+                    // Xóa số sát thương trắng mặc định sinh ra từ hàm takeDamage
+                    com.hust.game.ui.DamageTextManager.removeLastText(enemy);
                 }
+            }
+        }
+        
+        if (isBossDefeated) {
+            hitStopFrames = 30; // Khựng lại 0.5s (30 frame) khi kết liễu Final Boss
+        } else if (hitAny && !isThrust) { // Đòn chọc diễn ra quá nhanh nên tắt hit-stop để tránh màn hình bị giật cục
+            hitStopFrames = 6;  // Khựng lại 0.1s (6 frame) cho mọi đòn chém trúng thông thường
+        }
+        
+        if (hitAny) {
+            // Đẩy lùi Player lại một khoảng nhỏ khi chém trúng quái (Recoil)
+            if (applyKnockback) {
+                player.applyRecoil(15.0);
+            }
+
+            // Rung màn hình khi chém trúng
+            if (isCrit) {
+                shakeTimer = 5;
+                shakeAmplitude = isThrust ? 0.4 : 0.8; // Chọc liên tiếp nên giảm độ rung lại để không nhức mắt
+            } else {
+                shakeTimer = 4;
+                shakeAmplitude = isThrust ? 0.2 : 0.4; // Rung nhẹ mọi nhát chém thường
             }
         }
 
@@ -243,13 +312,17 @@ public class CombatManager {
                 if (hitWitch) {
                     com.hust.game.audio.SoundManager.playWitchDmgTakenSound();
                 }
+                if (hitBoss) com.hust.game.audio.SoundManager.playNsHitKnightSound();
             }
         }
 
         // Xử lý tăng Combo nếu chém trúng
         if (hitAny) {
-            if (comboTimer > 0) comboCount++; // Đang trong thời gian Combo -> Cộng dồn
-            else comboCount = 1; // Khởi đầu Combo mới
+            if (!hasIncreasedComboThisAttack) { // Cả 3 phát chọc chỉ tăng 1 combo tổng
+                if (comboTimer > 0) comboCount++; 
+                else comboCount = 1; 
+                hasIncreasedComboThisAttack = true;
+            }
             comboTimer = COMBO_WINDOW_FRAMES; // Reset lại đồng hồ 1 giây
             
             // Hiển thị chữ Combo bay lên (Tận dụng luôn DamageTextManager)
@@ -266,11 +339,6 @@ public class CombatManager {
                 com.hust.game.ui.DamageTextManager.addText(this, player.getX() - 10, player.getY() - 15, "Combo x" + comboCount, comboColor);
             }
         }
-
-        // Reset cooldown tấn công của player
-        player.resetAttackCooldown();
-
-        return hitAny ? comboCount : 0;
     }
 
     /**
@@ -351,5 +419,27 @@ public class CombatManager {
     public void resetSkill(){
         this.skillCooldown = 0;
         this.skillDuration = 0;
+    }
+    
+    public ParticleManager getParticleManager() {
+        return particleManager;
+    }
+    
+    public int consumeHitStopFrames() {
+        int frames = hitStopFrames;
+        hitStopFrames = 0;
+        return frames;
+    }
+    
+    public int consumeShakeTimer() {
+        int timer = shakeTimer;
+        shakeTimer = 0;
+        return timer;
+    }
+    
+    public double consumeShakeAmplitude() {
+        double amp = shakeAmplitude;
+        shakeAmplitude = 0;
+        return amp;
     }
 }

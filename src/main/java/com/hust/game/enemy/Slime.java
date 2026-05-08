@@ -62,7 +62,7 @@ public class Slime extends Enemy {
         }
         // Chỉ tấn công nếu đang không trong cooldown nhỏ sau đòn đánh
         if (!this.isHarmless && this.intersects(targetPlayer) && damageTick <= 0) {
-            targetPlayer.takeDamage(this.damage);
+            targetPlayer.takeDamage(this.damage, this);
             damageTick = 30; // Cooldown 0.5s để tránh gây damage mỗi frame
         }
     }
@@ -73,5 +73,14 @@ public class Slime extends Enemy {
         double paddingX = this.renderWidth * 0.20;
         double paddingY = this.renderHeight * 0.20;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+    }
+
+    @Override
+    public Rectangle2D getCollisionBoundary() {
+        double w = renderWidth * 0.6; 
+        double h = renderHeight * 0.4;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
     }
 }
