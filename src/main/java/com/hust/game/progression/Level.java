@@ -49,7 +49,8 @@ public class Level {
                  Image treeImg, Image treeSkillImg,
                  Image slimeImg,
                  Image knightImg, Image knightSkillImg,
-                 Image witchImg, Image witchSkillImg) {
+                 Image witchImg, Image witchSkillImg,
+                 Image healthPotionImg, Image manaPotionImg) {
 
         this.lvlID = lvlID;
         this.enemyManager = enemyManager;
@@ -62,6 +63,9 @@ public class Level {
         this.knightSkillImg = knightSkillImg;
         this.witchImg = witchImg;
         this.witchSkillImg = witchSkillImg;
+
+        this.healthPotionImg = healthPotionImg;
+        this.manaPotionImg = manaPotionImg;
 
         map = new MapManager(lvlID);
         

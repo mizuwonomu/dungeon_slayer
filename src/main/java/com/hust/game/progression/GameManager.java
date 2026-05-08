@@ -27,6 +27,9 @@ public class GameManager {
     Image witchImg;
     Image witchSkillImg;
 
+    Image healthPotionImg;
+    Image manaPotionImg;
+
     public GameManager(EnemyManager enemyManager, Player player, Image treeImg,
             Image treeSkillImg, Image slimeImg, Image knightImg, Image knightSkillImg, Image witchImg,
             Image witchSkillImg, Image healthPotionImg, 
@@ -56,7 +59,8 @@ public class GameManager {
             treeImg, treeSkillImg,
             slimeImg,
             knightImg, knightSkillImg,
-            witchImg, witchSkillImg
+            witchImg, witchSkillImg,
+            healthPotionImg, manaPotionImg
         );
 
         // Đặt lại chỉ số và toạ độ người chơi theo level
@@ -106,7 +110,7 @@ public class GameManager {
     public List<HealthPotion> getHealthPotions() {
         return currentLevel.getHealthPotions();
     }
-    
+
     public List<ManaPotion> getManaPotions() {
         return currentLevel.getManaPotion();
     }
