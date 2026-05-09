@@ -126,16 +126,16 @@ public class Witch extends Enemy {
             this.hitStunTimer--;
         }
 
+        if (this.hp <= 0) {
+            return;
+        }
+
         // Bổ sung Knockback cho Phù thủy để tự nhiên hơn khi bị đánh trúng
         if (this.kbTimer > 0) {
             double multiplier = this.kbTimer / 3.5;
             this.kbTimer--;
             this.x += kbVectorX * multiplier;
             this.y += kbVectorY * multiplier;
-        }
-
-        if (this.hp <= 0) {
-            return;
         }
 
         // 1. CƠ CHẾ DỊCH CHUYỂN (Chỉ kích hoạt 1 lần khi HP <= 50%)

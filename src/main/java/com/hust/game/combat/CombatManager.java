@@ -71,10 +71,15 @@ public class CombatManager {
     private double shakeAmplitude = 0;
     private boolean hasDealtDamageThisAttack = true;
     private boolean hasIncreasedComboThisAttack = false;
+    private com.hust.game.collision.CollisionChecker collisionChecker;
 
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
         this.enemyList = enemyList;
+    }
+
+    public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
+        this.collisionChecker = checker;
     }
 
     /**
@@ -168,26 +173,8 @@ public class CombatManager {
             actualDamage *= 2; // Chí mạng x2 sát thương tổng
         }
 
-        // Tính toán hitbox tấn công trực tiếp để tránh lỗi thiếu class PlayerCombat
-        double attackRange = isThrust ? 45.0 : 30.0; // Tầm chọc dài hơn chém thường 1 chút
-        double px = player.getX();
-        double py = player.getY();
-        double pw = player.getRenderWidth();
-        double ph = player.getRenderHeight();
-        
-        Rectangle2D attackBox;
-        switch (player.getDirection()) {
-            case UP:
-                attackBox = new Rectangle2D(px, py - attackRange, pw, attackRange); break;
-            case DOWN:
-                attackBox = new Rectangle2D(px, py + ph, pw, attackRange); break;
-            case LEFT:
-                attackBox = new Rectangle2D(px - attackRange, py, attackRange, ph); break;
-            case RIGHT:
-                attackBox = new Rectangle2D(px + pw, py, attackRange, ph); break;
-            default:
-                attackBox = new Rectangle2D(px, py, pw, ph); break;
-        }
+        // Tái sử dụng hàm lấy Hitbox vũ khí trực tiếp từ Player
+        Rectangle2D attackBox = player.getAttackBox();
 
         boolean hitAny = false;
         boolean hitSlime = false;
@@ -209,6 +196,26 @@ public class CombatManager {
 
             // Nếu hitbox chém intersects với boundary của enemy → gây damage
             if (attackBox.intersects(enemyBox)) {
+                
+                // CHỐNG CHÉM XUYÊN TƯỜNG (Kiểm tra Raycast từ tâm Player tới tâm Quái)
+                if (collisionChecker != null) {
+                    double pCenterX = player.getX() + player.getRenderWidth() / 2.0;
+                    double pCenterY = player.getY() + player.getRenderHeight() / 2.0;
+                    double ex = enemy.getX() + enemy.getRenderWidth() / 2.0;
+                    double ey = enemy.getY() + enemy.getRenderHeight() / 2.0;
+                    
+                    boolean hitWall = false;
+                    for (int i = 1; i <= 5; i++) { // Quét 5 điểm trên đường thẳng nối 2 tâm
+                        int checkX = (int) (pCenterX + (ex - pCenterX) * i / 5.0);
+                        int checkY = (int) (pCenterY + (ey - pCenterY) * i / 5.0);
+                        if (collisionChecker.checkTile(checkX, checkY)) {
+                            hitWall = true;
+                            break;
+                        }
+                    }
+                    if (hitWall) continue; // Bỏ qua quái này vì có tường chắn ở giữa
+                }
+
                 enemy.takeDamage(actualDamage);
 
                 // Bật hiệu ứng knockback (với đòn chọc thì chỉ đẩy lùi ở phát cuối cùng)

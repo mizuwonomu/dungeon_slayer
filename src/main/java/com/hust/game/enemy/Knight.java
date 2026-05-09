@@ -45,18 +45,18 @@ public class Knight extends Enemy {
         // --- BỔ SUNG LOGIC KNOCKBACK MÀ TRƯỚC ĐÓ BỊ THIẾU ---
         this.lastX = this.x;
         this.lastY = this.y;
-        if (this.kbTimer > 0) {
-            double multiplier = this.kbTimer / 3.5;
-            this.kbTimer--;
-            this.x += kbVectorX * multiplier;
-            this.y += kbVectorY * multiplier;
-        }
 
         // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
         if (this.hp <= 0) {
             return;
         }
         
+        if (this.kbTimer > 0) {
+            double multiplier = this.kbTimer / 3.5;
+            this.kbTimer--;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
+        }
         if (this.kbTimer > 0 || this.hitStunTimer > 0) {
             return; // Còn sống nhưng đang bị knockback hoặc choáng thì ngắt AI lướt/đi bộ
         }

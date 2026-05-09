@@ -173,13 +173,13 @@ public class Level {
     void spawnEnemy(){
         if (lvlID == 0) {
             // Phòng 2: Slime bất động
-            enemyManager.spawnEnemy("Slime", 15 * TILE_SIZE, 5 * TILE_SIZE, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+            enemyManager.spawnEnemy("Slime", 15 * TILE_SIZE, 5 * TILE_SIZE, slimeImg, 8, 51, 31.5, player);
             // Phòng 3: Knight bất động
             enemyManager.spawnEnemy("Knight", 29 * TILE_SIZE, 4 * TILE_SIZE, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, player, knightSkillImg);
             // Phòng 4: 3 Tree bình thường
-            enemyManager.spawnEnemy("Tree", 45 * TILE_SIZE, 3 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Tree", 47 * TILE_SIZE, 6 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
-            enemyManager.spawnEnemy("Tree", 49 * TILE_SIZE, 4 * TILE_SIZE, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+            enemyManager.spawnEnemy("Tree", 45 * TILE_SIZE, 3 * TILE_SIZE, treeImg, 8, 83.2, 76.8, player, treeSkillImg);
+            enemyManager.spawnEnemy("Tree", 47 * TILE_SIZE, 6 * TILE_SIZE, treeImg, 8, 83.2, 76.8, player, treeSkillImg);
+            enemyManager.spawnEnemy("Tree", 49 * TILE_SIZE, 4 * TILE_SIZE, treeImg, 8, 83.2, 76.8, player, treeSkillImg);
             
             for (Enemy e : enemyManager.getEnemyList()) {
                 // Khóa toàn bộ quái vật ban đầu (Bao gồm cả Tree ở phòng cuối)
@@ -250,9 +250,9 @@ public class Level {
                             
                             // Tỉ lệ 50% ra Cây, 50% ra Slime
                             if (Math.random() > 0.5) {
-                                enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, TILE_SIZE, TILE_SIZE, player, treeSkillImg);
+                                enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, 83.2, 76.8, player, treeSkillImg);
                             } else {
-                                enemyManager.spawnEnemy("Slime", spawnX, spawnY, slimeImg, 8, TILE_SIZE, TILE_SIZE, player);
+                                enemyManager.spawnEnemy("Slime", spawnX, spawnY, slimeImg, 8, 51, 31.5, player);
                             }
                         }
                     }

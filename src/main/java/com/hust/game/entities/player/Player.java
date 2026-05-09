@@ -10,6 +10,7 @@ import com.hust.game.entities.interfaces.Collidable;
 import com.hust.game.entities.interfaces.Damageable;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.geometry.Rectangle2D;
 import lombok.Getter;
 
 /**
@@ -33,6 +34,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     // Ảnh combat (đang chém)
     private final Image combatUp, combatDown, combatLeft, combatRight;
+
+    // Ảnh lướt (Dash)
+    private final Image dashUp, dashDown, dashLeft, dashRight;
 
     // Thêm field bật skill
     private final Image rageHitImg;
@@ -58,10 +62,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     // Trạng thái lướt (Dash)
     private boolean isDashing = false;
-    private int dashTimer = 0;
     private int dashCooldown = 0;
-    private static final int DASH_DURATION = 15; // Lướt nhanh trong 15 frames (~0.25s)
-    private static final int DASH_COOLDOWN_MAX = 45; // Hồi chiêu 0.75s
+    private int dashComboTimer = 0; // Bộ đếm thời gian cho phép lướt đúp
+    private static final int DASH_COOLDOWN_MAX = 90; // Hồi chiêu 1.5s
     private double dashVectorX = 0;
     private double dashVectorY = 0;
 
@@ -122,6 +125,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
             Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
+            Image dashDown, Image dashUp, Image dashLeft, Image dashRight,
             Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
@@ -147,6 +151,11 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.combatLeft = combatLeft;
         this.combatRight = combatRight;
 
+        this.dashDown = dashDown;
+        this.dashUp = dashUp;
+        this.dashLeft = dashLeft;
+        this.dashRight = dashRight;
+
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
         this.currentMana = maxMana;
@@ -165,6 +174,18 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // tránh hiện tượng nhảy frame giữa chừng khi đổi hướng.
     // -------------------------------------------------------
     private void updateSpriteSheet() {
+        if (isDashing) {
+            this.spriteSheet = switch (direction) {
+                case UP -> dashUp;
+                case DOWN -> dashDown;
+                case LEFT -> dashLeft;
+                case RIGHT -> dashRight;
+            };
+            this.frameWidth = spriteSheet.getWidth() / 3.0; // Dash có 3 frames
+            this.frameHeight = spriteSheet.getHeight();
+            return;
+        }
+
         if (isAttacking || isThrusting) {
             this.spriteSheet = switch (direction) {
                 case UP -> combatUp;
@@ -273,6 +294,22 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             }
             if (attackEffect != null)
                 attackEffect.update();
+        } else if (isDashing) {
+            // Làm mượt Dash: Giảm tốc độ dần đều (Ease-out) bằng ma sát
+            dashVectorX *= 0.85;
+            dashVectorY *= 0.85;
+
+            animationTimer++;
+            // Chạy 3 frame animation trong 12 frame game (0.2s) -> mỗi frame tồn tại 4 frame game
+            if (animationTimer >= 4) {
+                animationTimer = 0;
+                frameIndex++;
+                if (frameIndex >= 3) {
+                    isDashing = false;
+                    frameIndex = 0;
+                    updateSpriteSheet(); // Lướt xong thì quay về dáng đứng hoặc chạy
+                }
+            }
         } else {
             // Đếm frame game đã trôi qua cho trạng thái đi bộ/đứng
             animationTimer++;
@@ -288,12 +325,6 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             
         // Cập nhật trạng thái lướt
         if (dashCooldown > 0) dashCooldown--;
-        if (isDashing) {
-            dashTimer--;
-            if (dashTimer <= 0) {
-                isDashing = false;
-            }
-        }
 
         // Cập nhật giật lùi (Recoil)
         if (recoilTimer > 0) {
@@ -363,7 +394,28 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             gc.setEffect(RED_EFFECT);
         }
 
-        super.render(gc);
+        if (isDashing) {
+            // Tỷ lệ gốc của Player là 48x48 (tương ứng file 32x32 sau upscale 1.5). 
+            // Bằng cách này ảnh 40x40 sẽ được nội suy tự động lên 60x60 và ôm trọn tâm của Player
+            double drawW = this.frameWidth * (this.renderWidth / 32.0); 
+            double drawH = this.frameHeight * (this.renderHeight / 32.0);
+            
+            double centerX = this.x + this.renderWidth / 2.0;
+            double centerY = this.y + this.renderHeight / 2.0;
+            
+            double drawX = centerX - drawW / 2.0;
+            double drawY = centerY - drawH / 2.0;
+            
+            double sx = this.frameIndex * this.frameWidth;
+            
+            if (this.isFlipped) {
+                gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX + drawW, drawY, -drawW, drawH);
+            } else {
+                gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX, drawY, drawW, drawH);
+            }
+        } else {
+            super.render(gc);
+        }
         gc.restore();
 
         // Vẽ hiệu ứng Power Up đè lên Player
@@ -427,10 +479,36 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         return dashCooldown <= 0 && !isDashing && !isAttacking;
     }
 
+    public Rectangle2D getAttackBox() {
+        double attackRange = isThrusting ? 45.0 : 30.0;
+        double px = this.x;
+        double py = this.y;
+        double pw = this.renderWidth;
+        double ph = this.renderHeight;
+        
+        switch (direction) {
+            case UP:    return new Rectangle2D(px, py - attackRange, pw, attackRange);
+            case DOWN:  return new Rectangle2D(px, py + ph, pw, attackRange);
+            case LEFT:  return new Rectangle2D(px - attackRange, py, attackRange, ph);
+            case RIGHT: return new Rectangle2D(px + pw, py, attackRange, ph);
+            default:    return new Rectangle2D(px, py, pw, ph);
+        }
+    }
+
     public void startDash(double dx, double dy) {
         isDashing = true;
-        dashTimer = DASH_DURATION;
-        dashCooldown = DASH_COOLDOWN_MAX;
+        
+        if (dashComboTimer > 0) {
+            dashCooldown = DASH_COOLDOWN_MAX; // Lướt lần 2 -> Phạt hồi chiêu 1.5s
+            dashComboTimer = 0;
+        } else {
+            dashCooldown = 0; // Lướt lần 1 -> Không hồi chiêu ngay
+            dashComboTimer = 30; // Cho phép 0.5s (30 frames) để lướt đúp kể từ lúc lướt xong lần 1
+        }
+        
+        frameIndex = 0;
+        animationTimer = 0;
+        updateSpriteSheet();
         
         // Nếu không bấm phím hướng nào mà vẫn ấn SHIFT -> lướt theo hướng mặt hiện tại
         if (dx == 0 && dy == 0) {
@@ -447,7 +525,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             dy /= length;
         }
         
-        double dashSpeedMultiplier = 3.5; // Tốc độ lướt gấp 3.5 lần đi bộ
+        // Tăng mạnh tốc độ ban đầu và giảm dần (Ease-out) trong quá trình update
+        // Vận tốc ban đầu cao (9.5) nhân với hệ số suy giảm 0.85 qua 12 frame sẽ cho tổng quãng đường ~160px
+        double dashSpeedMultiplier = 9.5;
         dashVectorX = dx * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
         dashVectorY = dy * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
     }
@@ -494,13 +574,48 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public void takeDamage(int amount, BaseEntity source) {
+        if (flashTimer > 0 || isDashing) return;
+        
+        // --- CƠ CHẾ PARRY ---
+        // Chỉ tính Parry đúng vào các frame lưỡi kiếm chạm mục tiêu (Khung hình 3 với chém thường, hoặc các nhịp chọc)
+        boolean isParryWindow = false;
+        if (isAttacking && this.frameIndex == 3) isParryWindow = true;
+        if (isAttacking && this.frameIndex >= 3 && this.frameIndex <= 5) isParryWindow = true;
+        if (isThrusting && (this.thrustTimer == 15 || this.thrustTimer == 9 || this.thrustTimer == 3)) isParryWindow = true;
+        
+        // Nếu quái vật tấn công từ phía trước (nằm trong tầm chém) vào đúng Frame này
+        if (isParryWindow && source != null) {
+            Rectangle2D attackBox = getAttackBox();
+            Rectangle2D sourceBox = source.getBoundary();
+            
+            // Tầm đánh của Tree xa hơn thân hình, nên ta mở rộng hitbox xét Parry để chém trúng "chiêu" của nó
+            if (source instanceof com.hust.game.enemy.Tree) {
+                sourceBox = new Rectangle2D(sourceBox.getMinX() - 30, sourceBox.getMinY() - 30, sourceBox.getWidth() + 60, sourceBox.getHeight() + 60);
+            }
+            
+            if (attackBox.intersects(sourceBox)) {
+                // Đỡ đòn thành công! Không mất máu.
+                applyRecoil(25.0); // Giật lùi Player lại để tạo cảm giác chém vào vật cứng
+                
+                if (source instanceof com.hust.game.enemy.Enemy) {
+                    ((com.hust.game.enemy.Enemy) source).applyKnockback(this.direction);
+                }
+
+                com.hust.game.main.App.triggerScreenShake(6, 0.4);
+                com.hust.game.audio.SoundManager.playNsHitKnightSound(); // Dùng tiếng chém trúng giáp sắt làm tiếng Parry
+                com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 20, this.y - 15, "PARRY!", javafx.scene.paint.Color.CYAN);
+                
+                return; // Thoát hàm, miễn nhiễm sát thương
+            }
+        }
+
         takeDamage(amount, source.getX() + source.getRenderWidth() / 2.0, source.getY() + source.getRenderHeight() / 2.0);
     }
 
     /** Trừ máu, bật tử và tính toán góc giật lùi */
     public void takeDamage(int amount, double srcX, double srcY) {
-        if (flashTimer > 0)
-            return; // Nếu đang trong trạng thái nháy đỏ -> Bất tử (Miễn nhiễm sát thương)
+        if (flashTimer > 0 || isDashing)
+            return; // Nháy đỏ hoặc Đang lướt (I-frames) -> Miễn nhiễm sát thương
         currentHp = Math.max(0, currentHp - amount);
         flashTimer = 18; // Kích hoạt thời gian nháy đỏ và bất tử (18 frame ~ 0.3s)
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount,

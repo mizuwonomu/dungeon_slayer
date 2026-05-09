@@ -447,6 +447,8 @@ public class App extends Application {
                                 showLoadingScreen(stage, scene, () -> {
                                     gameManager.loadLevel(1);
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
+                                    combatManager.setCollisionChecker(collisionChecker);
+                                    enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
                                     input.clear(); // Chống kẹt nút
                                     fadeInTimer = 120;
@@ -476,6 +478,8 @@ public class App extends Application {
                                 showLoadingScreen(stage, scene, () -> {
                                     gameManager.loadNextLevel();
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
+                                    combatManager.setCollisionChecker(collisionChecker);
+                                    enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
                                     input.clear(); // Xóa các phím đang đè để tránh kẹt nút
                                     fadeInTimer = 120; // Kích hoạt lại hiệu ứng mờ dần sáng lên khi vào màn mới
@@ -648,6 +652,11 @@ public class App extends Application {
             Image cLeft = loadImg("/assets/player/combatleft.png");
             Image cRight = loadImg("/assets/player/combatright.png");
 
+            Image dDown = loadImg("/assets/player/dash_down.png");
+            Image dUp = loadImg("/assets/player/dash_up.png");
+            Image dLeft = loadImg("/assets/player/dash_left.png");
+            Image dRight = loadImg("/assets/player/dash_right.png");
+
             Image swordHit = loadImg("/assets/player/wswordhit.png");
             Image rageHit = loadImg("/assets/player/bswordhit.png");
 
@@ -667,7 +676,9 @@ public class App extends Application {
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
-                    cDown, cUp, cLeft, cRight, swordHit, rageHit, powerUpImg, thunderImg);
+                    cDown, cUp, cLeft, cRight, 
+                    dDown, dUp, dLeft, dRight, 
+                    swordHit, rageHit, powerUpImg, thunderImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
@@ -699,6 +710,8 @@ public class App extends Application {
             System.exit(1);
         }
         collisionChecker = new CollisionChecker(gameManager.getMap());
+        combatManager.setCollisionChecker(collisionChecker);
+        enemyManager.setCollisionChecker(collisionChecker);
         hud = new HUD(player, combatManager);
     }
 

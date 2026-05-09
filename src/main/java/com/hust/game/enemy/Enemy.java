@@ -36,6 +36,8 @@ public abstract class Enemy extends MovingEntity {
     protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
     protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
 
+    protected com.hust.game.collision.CollisionChecker collisionChecker;
+
     private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
 
     // Constructor tạm thời ở Giai đoạn 1
@@ -142,6 +144,10 @@ public abstract class Enemy extends MovingEntity {
         }
     }
 
+    public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
+        this.collisionChecker = checker;
+    }
+
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---
     public double getLastX() {
         return lastX;
@@ -176,12 +182,17 @@ public abstract class Enemy extends MovingEntity {
         if (this.hp <= 0) {
             this.hp = 0;
             this.flashTimer = 60; // Quái chết -> Tồn tại thêm 60 frames (1 giây) để chạy hiệu ứng mờ dần
+            this.kbTimer = 0; // Hủy giật lùi để quái đứng im khi chết
         } else {
             this.flashTimer = 6; // Quái còn sống -> Chỉ nháy trắng 6 frames (~0.1 giây)
         }
         
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount, javafx.scene.paint.Color.WHITE);
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
+    }
+
+    protected void drawShadow(GraphicsContext gc) {
+        // Mặc định không làm gì, dành cho các class con override (ví dụ Slime)
     }
 
     @Override
@@ -195,6 +206,8 @@ public abstract class Enemy extends MovingEntity {
             
             gc.setGlobalAlpha(alpha);
             
+            drawShadow(gc); // Vẽ bóng mờ dần cùng với quái
+            
             // Chớp trắng trong 6 frame đầu tiên khi vừa nhận đòn kết liễu (flashTimer từ 55 đến 60)
             if (this.flashTimer > 54) {
                 gc.setEffect(WHITE_EFFECT);
@@ -204,11 +217,13 @@ public abstract class Enemy extends MovingEntity {
         } else {
             // Quái còn sống và đang bị thương -> Chớp trắng
             if (this.flashTimer > 0) {
+                drawShadow(gc); // Vẽ bóng tĩnh trước, không bị chớp trắng
                 gc.save();
                 gc.setEffect(WHITE_EFFECT);
                 super.render(gc);
                 gc.restore();
             } else {
+                drawShadow(gc); // Vẽ bóng trước khi vẽ quái
                 super.render(gc); // Vẽ bình thường
             }
         }
@@ -216,6 +231,7 @@ public abstract class Enemy extends MovingEntity {
 
     // Hàm xử lý đẩy lùi quái vật (Knockback)
     public void applyKnockback(com.hust.game.entities.Direction dir) {
+        if (this.hp <= 0) return; // Không đẩy lùi nếu quái đã chết
         this.kbTimer = 6; // Bị đẩy lùi trượt đi trong 6 frames liên tiếp
         this.hitStunTimer = 30; // Bị khựng lại (stun) trong 0.5s (30 frame)
         this.frameIndex = 0; // Reset về frame animation đầu tiên
