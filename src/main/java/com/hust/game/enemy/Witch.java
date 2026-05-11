@@ -41,7 +41,7 @@ public class Witch extends Enemy {
         this.enemyManager = manager;
         this.castSprite = skillImg; // witch_atk.png
         this.summonSprite = idleImg; // witch_summon.png
-
+        
         try {
             this.circleSprite = new javafx.scene.image.Image(
                     getClass().getResourceAsStream("/assets/enemy/witch_circle.png"));

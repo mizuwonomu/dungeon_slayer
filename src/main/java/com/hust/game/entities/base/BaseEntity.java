@@ -37,8 +37,10 @@ public abstract class BaseEntity {
         this.renderHeight = renderHeight;
 
         // kích thước gốc của 1 khung hình
-        this.frameWidth = spriteSheet.getWidth() / numFrames;
-        this.frameHeight = spriteSheet.getHeight();
+        if (spriteSheet != null) {
+            this.frameWidth = spriteSheet.getWidth() / numFrames;
+            this.frameHeight = spriteSheet.getHeight();
+        }
     }
 
     public abstract void update();

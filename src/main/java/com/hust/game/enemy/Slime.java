@@ -7,10 +7,11 @@ import javafx.geometry.Rectangle2D;
 
 public class Slime extends Enemy {
     private int damageTick = 0;
-    private Image shadowSprite;
     private Image dieSprite;
     private boolean isDying = false;
     private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
+
+    private Rectangle2D[] frameHitboxes = new Rectangle2D[8]; // Lưu cache hitbox riêng cho từng frame
 
     public Slime(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer) {
@@ -22,26 +23,12 @@ public class Slime extends Enemy {
         this.knockback = 3;
         
         try {
-            this.shadowSprite = new Image(getClass().getResourceAsStream("/assets/enemy/slime_shadow.png"));
-        } catch (Exception e) {
-            System.err.println("Không tìm thấy slime_shadow.png");
-        }
-        
-        try {
             this.dieSprite = new Image(getClass().getResourceAsStream("/assets/enemy/slime_die.png"));
         } catch (Exception e) {
             System.err.println("Không tìm thấy slime_die.png");
         }
     }
 
-    @Override
-    protected void drawShadow(GraphicsContext gc) {
-        if (shadowSprite != null) {
-            double sx = this.frameIndex * this.frameWidth;
-            // Vẽ bóng trùng khớp toạ độ của Slime nhưng không đi qua logic lật chiều ảnh
-            gc.drawImage(shadowSprite, sx, 0, this.frameWidth, this.frameHeight, this.x, this.y, this.renderWidth, this.renderHeight);
-        }
-    }
 
     @Override
     public void update() {
@@ -139,7 +126,6 @@ public class Slime extends Enemy {
     @Override
     public void render(GraphicsContext gc) {
         if (this.hp <= 0) {
-            drawShadow(gc);
             gc.save();
             if (this.flashTimer > 54) gc.setEffect(WHITE_EFFECT); // Lóe trắng lúc vừa nhận đòn kết liễu
             
@@ -157,10 +143,60 @@ public class Slime extends Enemy {
 
     @Override
     public Rectangle2D getBoundary() {
-        // Thu nhỏ hitbox của Slime lại 35% mỗi bên (Tránh việc Slime quá dễ chạm trúng Player)
-        double paddingX = this.renderWidth * 0.35;
-        double paddingY = this.renderHeight * 0.35;
-        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+        // Bỏ qua khi đã chết
+        if (this.hp <= 0) {
+            return new Rectangle2D(x, y, renderWidth, renderHeight);
+        }
+        
+        int idx = this.frameIndex;
+        if (idx < 0 || idx >= frameHitboxes.length) return new Rectangle2D(x, y, renderWidth, renderHeight);
+        
+        // Cắt hitbox động: Quét pixel loại bỏ điểm ảnh rỗng (trong suốt) khi Slime nhảy lên
+        if (frameHitboxes[idx] == null) {
+            javafx.scene.image.PixelReader pr = this.spriteSheet.getPixelReader();
+            if (pr != null) {
+                int fw = (int) this.frameWidth;
+                int fh = (int) this.frameHeight;
+                int sx = idx * fw;
+
+                int minX = fw, maxX = 0, minY = fh, maxY = 0;
+                for (int py = 0; py < fh; py++) {
+                    for (int px = 0; px < fw; px++) {
+                        if (sx + px >= this.spriteSheet.getWidth() || py >= this.spriteSheet.getHeight()) continue;
+                        if (pr.getColor(sx + px, py).getOpacity() > 0.1) {
+                            if (px < minX) minX = px;
+                            if (px > maxX) maxX = px;
+                            if (py < minY) minY = py;
+                            if (py > maxY) maxY = py;
+                        }
+                    }
+                }
+                if (minX <= maxX && minY <= maxY) {
+                    double scaleX = this.renderWidth / fw;
+                    double scaleY = this.renderHeight / fh;
+                    
+                    // Cắt bớt 15% ở viền để Slime không quá dễ chạm trúng người chơi
+                    double boxW = (maxX - minX + 1) * scaleX;
+                    double boxH = (maxY - minY + 1) * scaleY;
+                    double padX = boxW * 0.15;
+                    double padY = boxH * 0.15;
+                    
+                    frameHitboxes[idx] = new Rectangle2D(minX * scaleX + padX, minY * scaleY + padY, boxW - 2 * padX, boxH - 2 * padY);
+                } else {
+                    frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
+                }
+            } else {
+                frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
+            }
+        }
+        
+        Rectangle2D box = frameHitboxes[idx];
+        if (this.isFlipped) {
+            double flippedX = this.renderWidth - (box.getMinX() + box.getWidth());
+            return new Rectangle2D(this.x + flippedX, this.y + box.getMinY(), box.getWidth(), box.getHeight());
+        } else {
+            return new Rectangle2D(this.x + box.getMinX(), this.y + box.getMinY(), box.getWidth(), box.getHeight());
+        }
     }
 
     @Override

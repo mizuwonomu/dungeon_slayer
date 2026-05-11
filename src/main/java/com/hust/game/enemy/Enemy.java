@@ -191,10 +191,6 @@ public abstract class Enemy extends MovingEntity {
         System.out.println("Quái vật bị chém trúng! Máu còn: " + this.hp + "/" + this.maxHp);
     }
 
-    protected void drawShadow(GraphicsContext gc) {
-        // Mặc định không làm gì, dành cho các class con override (ví dụ Slime)
-    }
-
     @Override
     public void render(GraphicsContext gc) {
         // Nếu quái vật đã chết, kích hoạt hiệu ứng mờ dần (Fade out)
@@ -206,8 +202,6 @@ public abstract class Enemy extends MovingEntity {
             
             gc.setGlobalAlpha(alpha);
             
-            drawShadow(gc); // Vẽ bóng mờ dần cùng với quái
-            
             // Chớp trắng trong 6 frame đầu tiên khi vừa nhận đòn kết liễu (flashTimer từ 55 đến 60)
             if (this.flashTimer > 54) {
                 gc.setEffect(WHITE_EFFECT);
@@ -217,13 +211,11 @@ public abstract class Enemy extends MovingEntity {
         } else {
             // Quái còn sống và đang bị thương -> Chớp trắng
             if (this.flashTimer > 0) {
-                drawShadow(gc); // Vẽ bóng tĩnh trước, không bị chớp trắng
                 gc.save();
                 gc.setEffect(WHITE_EFFECT);
                 super.render(gc);
                 gc.restore();
             } else {
-                drawShadow(gc); // Vẽ bóng trước khi vẽ quái
                 super.render(gc); // Vẽ bình thường
             }
         }
