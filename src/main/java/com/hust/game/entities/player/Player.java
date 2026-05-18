@@ -593,7 +593,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             
             // Tầm đánh của Tree xa hơn thân hình, nên ta mở rộng hitbox xét Parry để chém trúng "chiêu" của nó
             if (source instanceof com.hust.game.enemy.Tree) {
-                sourceBox = new Rectangle2D(sourceBox.getMinX() - 30, sourceBox.getMinY() - 30, sourceBox.getWidth() + 60, sourceBox.getHeight() + 60);
+                sourceBox = new Rectangle2D(sourceBox.getMinX() - 45, sourceBox.getMinY() - 45, sourceBox.getWidth() + 90, sourceBox.getHeight() + 90);
             }
             
             if (attackBox.intersects(sourceBox)) {
