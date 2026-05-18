@@ -1,6 +1,8 @@
 package com.hust.game.map;
 
 import com.hust.game.constants.GameConstants;
+import com.hust.game.entities.items.HealthPotion;
+import com.hust.game.entities.items.ManaPotion;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import java.io.BufferedReader;
@@ -11,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MapManager {
+    private static final int POTION_SPAWN_TOTAL = 3;
+    private static final int POTION_MANA_COUNT = 2;
     public Map<Integer, Tile> tiles;
     public int[][] mapTileNum;
     public int level;
@@ -98,7 +102,78 @@ public class MapManager {
                     }
                 }
             }
+
+            spawnPotions();
         } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    private void spawnPotions() {
+        Image healthPotion = loadPotionSprite("/assets/items/health_potion.png");
+        Image manaPotion = loadPotionSprite("/assets/items/mana_potion.png");
+        if (healthPotion == null || manaPotion == null) {
+            return;
+        }
+
+        List<int[]> spots = findPotionSpots(POTION_SPAWN_TOTAL);
+        for (int i = 0; i < spots.size(); i++) {
+            int[] spot = spots.get(i);
+            double x = spot[0] * GameConstants.TILE_SIZE
+                    + (GameConstants.TILE_SIZE - GameConstants.POTION_RENDER_SIZE) / 2.0;
+            double y = spot[1] * GameConstants.TILE_SIZE
+                    + (GameConstants.TILE_SIZE - GameConstants.POTION_RENDER_SIZE) / 2.0;
+
+            if (i < POTION_MANA_COUNT) {
+                mapEntities.add(new ManaPotion(x, y, manaPotion));
+            } else {
+                mapEntities.add(new HealthPotion(x, y, healthPotion));
+            }
+        }
+    }
+
+    private List<int[]> findPotionSpots(int count) {
+        List<int[]> spots = new ArrayList<>();
+        int stride = 7;
+
+        for (int row = 1; row < GameConstants.MAX_WORLD_ROW - 1 && spots.size() < count; row++) {
+            for (int col = 1; col < GameConstants.MAX_WORLD_COL - 1 && spots.size() < count; col++) {
+                if ((row + col) % stride != 0) {
+                    continue;
+                }
+                if (isWalkableTile(row, col)) {
+                    spots.add(new int[]{col, row});
+                }
+            }
+        }
+
+        for (int row = 1; row < GameConstants.MAX_WORLD_ROW - 1 && spots.size() < count; row++) {
+            for (int col = 1; col < GameConstants.MAX_WORLD_COL - 1 && spots.size() < count; col++) {
+                if (isWalkableTile(row, col)) {
+                    spots.add(new int[]{col, row});
+                }
+            }
+        }
+
+        return spots;
+    }
+
+    private boolean isWalkableTile(int row, int col) {
+        int tileId = mapTileNum[row][col];
+        Tile tile = tiles.get(tileId);
+        return tile != null && !tile.collision;
+    }
+
+    private Image loadPotionSprite(String path) {
+        try {
+            java.io.InputStream is = getClass().getResourceAsStream(path);
+            if (is == null) {
+                System.err.println("Missing item asset: " + path);
+                return null;
+            }
+            return new Image(is);
+        } catch (Exception e) {
+            System.err.println("Failed to load item asset: " + path);
+            return null;
+        }
     }
 
     public void draw(GraphicsContext gc) {

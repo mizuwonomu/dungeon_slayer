@@ -6,6 +6,7 @@ import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
+import com.hust.game.entities.interfaces.Interactable;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
 import com.hust.game.enemy.Knight;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.List;
+import java.util.Iterator;
 
 public class App extends Application {
     // kích thước cửa sổ
@@ -67,6 +69,8 @@ public class App extends Application {
     private Set<KeyCode> input = new HashSet<>();
 
     private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
+    private boolean isEHeld = false;
+    private boolean isRHeld = false;
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
@@ -84,6 +88,9 @@ public class App extends Application {
     private javafx.scene.media.MediaPlayer menuMusicPlayer;
     private javafx.scene.media.MediaPlayer inGameMusicPlayer;
     private static App instance;
+
+    private Image healthPotionImg;
+    private Image manaPotionImg;
 
     public static void triggerScreenShake(int timer, double amplitude) {
         if (instance != null) {
@@ -671,6 +678,9 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            healthPotionImg = loadImg("/assets/items/health_potion.png");
+            manaPotionImg = loadImg("/assets/items/mana_potion.png");
+
             Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
 
             // Khai báo Player trước khi đưa cho Quái
@@ -783,6 +793,24 @@ public class App extends Application {
 
         if (input.contains(KeyCode.L)) {
             combatManager.activateSkill();
+        }
+
+        if (input.contains(KeyCode.E)) {
+            if (!isEHeld) {
+                player.useHealthPotion();
+                isEHeld = true;
+            }
+        } else {
+            isEHeld = false;
+        }
+
+        if (input.contains(KeyCode.Q)) {
+            if (!isRHeld) {
+                player.useManaPotion();
+                isRHeld = true;
+            }
+        } else {
+            isRHeld = false;
         }
 
         if (isAnyKeyPressed) {
@@ -910,9 +938,18 @@ public class App extends Application {
 
         // 3. Kiểm tra va chạm với các StaticEntity (Cây lớn, nhà cửa, tường) trên map
         if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
-            for (BaseEntity entity : gameManager.getMap().mapEntities) {
+            Iterator<BaseEntity> iterator = gameManager.getMap().mapEntities.iterator();
+            while (iterator.hasNext()) {
+                BaseEntity entity = iterator.next();
                 if (player.getCollisionBoundary().intersects(entity.getCollisionBoundary())) {
-                    player.onCollision(entity);
+                    if (entity instanceof Interactable) {
+                        Interactable interactable = (Interactable) entity;
+                        if (interactable.onInteract(player)) {
+                            iterator.remove();
+                        }
+                    } else {
+                        player.onCollision(entity);
+                    }
                     break;
                 }
             }
