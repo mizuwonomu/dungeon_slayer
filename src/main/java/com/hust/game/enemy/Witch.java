@@ -59,15 +59,33 @@ public class Witch extends Enemy {
         resetToIdle();
     }
 
+    // Hàm trợ giúp để cập nhật Frame và Tỷ lệ khi chuyển đổi kỹ năng
+    private void updateSpriteAndDimensions(Image sprite, int totalFramesInSheet, int animationFrames) {
+        double oldCenterX = this.x + this.renderWidth / 2.0;
+        
+        this.spriteSheet = sprite;
+        this.numFrames = animationFrames;
+        if (sprite != null) {
+            this.frameWidth = sprite.getWidth() / totalFramesInSheet;
+            this.frameHeight = sprite.getHeight();
+            
+            // Fix cứng chiều cao Witch là 150 để upscale ảnh rõ nét, chiều ngang tự tính theo tỷ lệ
+            this.renderHeight = 150;
+            this.renderWidth = this.renderHeight * (this.frameWidth / this.frameHeight);
+        }
+        this.frameIndex = 0;
+        
+        // Căn giữa lại tọa độ X để Witch không bị giật sang bên trái/phải khi đổi ảnh
+        this.x = oldCenterX - this.renderWidth / 2.0;
+    }
+
     private void resetToIdle() {
         isCastingCircle = false;
         isSummoning = false;
         circleTimer = 0;
-        this.spriteSheet = castSprite;
-        this.numFrames = 7; // IDLE chỉ lấy 7 frame đầu của witch_atk
-        this.frameWidth = castSprite.getWidth() / 20.0; // Phải chia cứng 20 vì ảnh thực tế dài 20 frame
-        this.frameHeight = castSprite.getHeight();
-        this.frameIndex = 0;
+        
+        // IDLE chỉ lấy 7 frame đầu của witch_atk (tổng 20 frame)
+        updateSpriteAndDimensions(castSprite, 20, 7);
     }
 
     private void decideNextSkill() {
@@ -79,20 +97,16 @@ public class Witch extends Enemy {
         if (knightCount < 2 && circleCountSinceLastSummon >= 2) {
             isSummoning = true;
             circleCountSinceLastSummon = 0;
-            this.spriteSheet = summonSprite;
-            this.numFrames = 25;
-            this.frameWidth = summonSprite.getWidth() / 25.0;
-            this.frameHeight = summonSprite.getHeight();
-            this.frameIndex = 0;
+            
+            // SUMMON dùng witch_summon.png (tổng 25 frame)
+            updateSpriteAndDimensions(summonSprite, 25, 25);
         } else {
             isCastingCircle = true;
             circleCountSinceLastSummon++;
             circleTimer = 0;
-            this.spriteSheet = castSprite;
-            this.numFrames = 20;
-            this.frameWidth = castSprite.getWidth() / 20.0;
-            this.frameHeight = castSprite.getHeight();
-            this.frameIndex = 0;
+            
+            // CAST dùng witch_atk.png (tổng 20 frame)
+            updateSpriteAndDimensions(castSprite, 20, 20);
         }
     }
 
@@ -265,15 +279,7 @@ public class Witch extends Enemy {
 
     @Override
     public void render(GraphicsContext gc) {
-        gc.save();
-        double centerX = this.x + this.renderWidth / 2.0;
-        double centerY = this.y + this.renderHeight / 2.0;
-        gc.translate(centerX, centerY);
-        gc.scale(3.0, 3.0);
-        gc.translate(-centerX, -centerY);
-
         super.render(gc);
-        gc.restore();
 
         // Render Vòng lửa dựa theo bộ đếm circleTimer
         if (isCastingCircle && circleTimer > 60) {
@@ -300,12 +306,10 @@ public class Witch extends Enemy {
     }
 
     @Override
-    public void onCollision(com.hust.game.entities.base.BaseEntity other) {
-        super.onCollision(other);
-
-        // Nếu đụng trúng Player -> Trừ máu Player bằng damage của Witch
-        if (other instanceof Player) {
-            ((Player) other).takeDamage(this.damage, this);
-        }
+    public Rectangle2D getBoundary() {
+        // Cắt bớt hitbox vì sprite kích thước rộng (269x300, 223x300) có rất nhiều viền trống 2 bên
+        double paddingX = this.renderWidth * 0.3;
+        double paddingY = this.renderHeight * 0.2;
+        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 }

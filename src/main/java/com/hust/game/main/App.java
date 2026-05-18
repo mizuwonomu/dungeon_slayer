@@ -808,8 +808,19 @@ public class App extends Application {
         int top = (int) pCol.getMinY();
         int bottom = (int) pCol.getMaxY();
 
-        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+        boolean hitX = collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+                       collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom);
+
+        if (!hitX && gameManager.getGates() != null) {
+            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                if (gate.isSolid() && pCol.intersects(gate.getBoundary())) { // Dùng getBoundary() để lấy trọn khối 48x48
+                    hitX = true;
+                    break;
+                }
+            }
+        }
+
+        if (hitX) {
             player.setX(lastX); // Chạm tường trục X -> Hủy di chuyển X
         }
 
@@ -821,12 +832,23 @@ public class App extends Application {
         top = (int) pCol.getMinY();
         bottom = (int) pCol.getMaxY();
 
-        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+        boolean hitY = collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+                       collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom);
+
+        if (!hitY && gameManager.getGates() != null) {
+            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                if (gate.isSolid() && pCol.intersects(gate.getBoundary())) {
+                    hitY = true;
+                    break;
+                }
+            }
+        }
+
+        if (hitY) {
             player.setY(lastY); // Chạm tường trục Y -> Hủy di chuyển Y
         }
 
-        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)
+        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond, Gate)
         if (enemyManager != null) {
             List<Enemy> enemies = enemyManager.getEnemyList();
 
@@ -875,45 +897,20 @@ public class App extends Application {
                 int eTop = (int) eCol.getMinY();
                 int eBottom = (int) eCol.getMaxY();
 
-                if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
-                        collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
-                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
-                }
+                boolean eHit = collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
+                               collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom);
 
-                // KIỂM TRA VA CHẠM CỦA QUÁI VẬT VỚI CỬA (GATE)
-                if (gameManager.getGates() != null) {
+                if (!eHit && gameManager.getGates() != null) {
                     for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                        if (gate.isSolid() && enemy.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
-                            enemy.onCollision(gate); // Nếu cửa chưa mở -> Quái vật bị dội ngược lại
+                        if (gate.isSolid() && eCol.intersects(gate.getBoundary())) {
+                            eHit = true;
+                            break;
                         }
                     }
                 }
-            }
-        }
-        
-        // Kiểm tra va chạm với Gate (Cửa màn Tutorial)
-        if (gameManager.getGates() != null) {
-            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                if (gate.isSolid() && player.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
-                    player.onCollision(gate);
-                }
-            }
-        }
-
-        // 2. Kiểm tra va chạm với các vật cản khác (obstacles)
-        for (BaseEntity wall : obstacles) {
-            if (player.getCollisionBoundary().intersects(wall.getCollisionBoundary())) {
-                player.onCollision(wall);
-                break;
-            }
-        }
-
-        // 3. Kiểm tra va chạm với các StaticEntity (Cây lớn, nhà cửa, tường) trên map
-        if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
-            for (BaseEntity entity : gameManager.getMap().mapEntities) {
-                if (player.getCollisionBoundary().intersects(entity.getCollisionBoundary())) {
-                    player.onCollision(entity);
-                    break;
+                
+                if (eHit) {
+                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
                 }
             }
         }
