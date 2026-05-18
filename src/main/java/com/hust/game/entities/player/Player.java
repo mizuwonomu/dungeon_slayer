@@ -107,6 +107,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
+    private int healthPotionCount = 0;
+    private int manaPotionCount = 0;
+
     // -------------------------------------------------------
     // ATTACK COOLDOWN
     // Sau mỗi lần tấn công, phải chờ ATTACK_COOLDOWN_MAX frame
@@ -659,6 +662,64 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         return currentMana;
     }
 
+    public int getHealthPotionCount() {
+        return healthPotionCount;
+    }
+
+    public int getManaPotionCount() {
+        return manaPotionCount;
+    }
+
+    public int getTotalPotionCount() {
+        return healthPotionCount + manaPotionCount;
+    }
+
+    public boolean isPotionInventoryFull() {
+        return getTotalPotionCount() >= GameConstants.MAX_POTIONS_TOTAL;
+    }
+
+    public boolean addHealthPotion() {
+        if (isPotionInventoryFull() || healthPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        healthPotionCount++;
+        return true;
+    }
+
+    public boolean addManaPotion() {
+        if (isPotionInventoryFull() || manaPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        manaPotionCount++;
+        return true;
+    }
+
+    public boolean useHealthPotion() {
+        if (healthPotionCount <= 0 || currentHp >= maxHp) {
+            return false;
+        }
+        healthPotionCount--;
+        healHp(GameConstants.POTION_HEAL_AMOUNT);
+        return true;
+    }
+
+    public boolean useManaPotion() {
+        if (manaPotionCount <= 0 || currentMana >= maxMana) {
+            return false;
+        }
+        manaPotionCount--;
+        restoreMana(GameConstants.POTION_MANA_AMOUNT);
+        return true;
+    }
+
+    private void healHp(int amount) {
+        currentHp = Math.min(maxHp, currentHp + amount);
+    }
+
+    private void restoreMana(int amount) {
+        currentMana = Math.min(maxMana, currentMana + amount);
+    }
+
     /** Trả về true khi máu = 0 → game over */
     @Override
     public boolean isDead() {
@@ -696,6 +757,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
         this.currentHp = maxHp;
         this.currentMana = maxMana;
+        this.healthPotionCount = 0;
+        this.manaPotionCount = 0;
         resetAttackCooldown();
     }
 }

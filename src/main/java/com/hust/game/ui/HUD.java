@@ -10,6 +10,8 @@ public class HUD {
     private Image avatarImg;
     private Image healthImg;
     private Image manaImg;
+    private Image healthPotionSheet;
+    private Image manaPotionSheet;
     private Image berserkIcon;
     private javafx.scene.text.Font pixelFont;
 
@@ -19,6 +21,12 @@ public class HUD {
 
     private static final double RENDER_WIDTH = FRAME_WIDTH * SCALE;
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
+
+    private static final int POTION_FRAMES = 8;
+    private static final double POTION_ICON_SIZE = 32.0;
+    private static final double POTION_TEXT_GAP = 6.0;
+    private static final double POTION_GROUP_GAP = 20.0;
+    private static final double POTION_OFFSET_X = -48.0;
 
     private final Player player;
     private final CombatManager combatManager;
@@ -36,6 +44,8 @@ public class HUD {
         avatarImg = loadImg("/assets/avatar.png", RENDER_WIDTH, RENDER_HEIGHT);
         healthImg = loadImg("/assets/player_health.png", RENDER_WIDTH * 21, RENDER_HEIGHT);
         manaImg = loadImg("/assets/player_mana.png", RENDER_WIDTH * 6, RENDER_HEIGHT);
+        healthPotionSheet = loadRawImg("/assets/items/health_potion.png");
+        manaPotionSheet = loadRawImg("/assets/items/mana_potion.png");
 
         // Skill icon
         berserkIcon = new Image(
@@ -83,6 +93,8 @@ public class HUD {
         gc.setTextAlign(javafx.scene.text.TextAlignment.RIGHT); // Đảm bảo số luôn đổ về trái, thẳng hàng mép phải
         gc.strokeText(hpText, textX, textY);
         gc.fillText(hpText, textX, textY);
+
+        renderPotionCounts(gc, drawX, drawY);
 
         gc.restore();
 
@@ -141,11 +153,59 @@ public class HUD {
         return Math.max(0, Math.min(5, index));
     }
 
+    private void renderPotionCounts(GraphicsContext gc, double drawX, double drawY) {
+        if (healthPotionSheet == null || manaPotionSheet == null) {
+            return;
+        }
+
+        double manaBarRightX = drawX + RENDER_WIDTH + POTION_OFFSET_X;
+        double iconY = drawY + (RENDER_HEIGHT / 2.0) + 6.0;
+
+        double frameW = healthPotionSheet.getWidth() / POTION_FRAMES;
+        double frameH = healthPotionSheet.getHeight();
+
+        double healthIconX = manaBarRightX;
+        gc.drawImage(healthPotionSheet, 0, 0, frameW, frameH,
+                healthIconX, iconY, POTION_ICON_SIZE, POTION_ICON_SIZE);
+
+        gc.setFont(pixelFont);
+        gc.setFill(javafx.scene.paint.Color.WHITE);
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(1.0);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+
+        String healthCount = "x" + player.getHealthPotionCount();
+        double healthTextX = healthIconX + POTION_ICON_SIZE + POTION_TEXT_GAP;
+        double textY = iconY + POTION_ICON_SIZE / 2.0;
+        gc.strokeText(healthCount, healthTextX, textY);
+        gc.fillText(healthCount, healthTextX, textY);
+
+        double manaIconX = healthTextX + 24.0 + POTION_GROUP_GAP;
+        double manaFrameW = manaPotionSheet.getWidth() / POTION_FRAMES;
+        double manaFrameH = manaPotionSheet.getHeight();
+        gc.drawImage(manaPotionSheet, 0, 0, manaFrameW, manaFrameH,
+                manaIconX, iconY, POTION_ICON_SIZE, POTION_ICON_SIZE);
+
+        String manaCount = "x" + player.getManaPotionCount();
+        double manaTextX = manaIconX + POTION_ICON_SIZE + POTION_TEXT_GAP;
+        gc.strokeText(manaCount, manaTextX, textY);
+        gc.fillText(manaCount, manaTextX, textY);
+    }
+
     private Image loadImg(String path, double requestedWidth, double requestedHeight) {
         var stream = getClass().getResourceAsStream(path);
         if (stream == null) {
             throw new RuntimeException("Missing asset: " + path);
         }
         return new Image(stream, requestedWidth, requestedHeight, false, true); // true cho việc bật làm mịn ảnh (smooth scaling)
+    }
+
+    private Image loadRawImg(String path) {
+        var stream = getClass().getResourceAsStream(path);
+        if (stream == null) {
+            throw new RuntimeException("Missing asset: " + path);
+        }
+        return new Image(stream);
     }
 }

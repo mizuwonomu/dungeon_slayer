@@ -30,6 +30,14 @@ public class GameConstants {
     public static final int PLAYER_MAX_HP = 100;
     public static final int PLAYER_MAX_MANA = 50;
 
+    // Potions
+    public static final int MAX_POTIONS_PER_TYPE = 2;
+    public static final int MAX_POTIONS_TOTAL = 4;
+    public static final int POTION_NUM_FRAMES = 8;
+    public static final int POTION_RENDER_SIZE = 32;
+    public static final int POTION_HEAL_AMOUNT = 20;
+    public static final int POTION_MANA_AMOUNT = 10;
+
     // Enemy (Member B tham chiếu)
     public static final double ENEMY_SPEED = 1.5;
     public static final int    ENEMY_MAX_HP = 50;

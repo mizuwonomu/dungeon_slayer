@@ -3,9 +3,11 @@ package com.hust.game.main;
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
+import com.hust.game.entities.interfaces.Interactable;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
 import com.hust.game.enemy.Knight;
@@ -38,6 +40,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.List;
+import java.util.Iterator;
 
 public class App extends Application {
     // kích thước cửa sổ
@@ -67,6 +70,12 @@ public class App extends Application {
     private Set<KeyCode> input = new HashSet<>();
 
     private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
+    private boolean isEHeld = false;
+    private boolean isRHeld = false;
+    private boolean isHHeld = false;
+    private boolean isOHeld = false;
+    private boolean is1Held = false;
+    private boolean is2Held = false;
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
@@ -84,6 +93,9 @@ public class App extends Application {
     private javafx.scene.media.MediaPlayer menuMusicPlayer;
     private javafx.scene.media.MediaPlayer inGameMusicPlayer;
     private static App instance;
+
+    private Image healthPotionImg;
+    private Image manaPotionImg;
 
     public static void triggerScreenShake(int timer, double amplitude) {
         if (instance != null) {
@@ -307,42 +319,56 @@ public class App extends Application {
                     if (hitStopTimer > 0) {
                         hitStopTimer--;
                     } else {
-                        handleInput();
-                        
-                        int stopFrames = combatManager.consumeHitStopFrames();
-                        if (stopFrames > 0) {
-                            hitStopTimer = stopFrames;
+                        Npc npc = getActiveNpc();
+                        if (npc != null) {
+                            npc.update(player);
+                            handleNpcInput(npc);
                         }
-                        
-                        int sTimer = combatManager.consumeShakeTimer();
-                        if (sTimer > 0) {
-                            screenShakeTimer = sTimer;
-                            screenShakeAmplitude = combatManager.consumeShakeAmplitude();
-                        }
-                        
-                        if (tutorialManager != null) {
-                            tutorialManager.update(player, input);
+                        boolean isNpcInteractionOpen = npc != null && npc.isInteractionOpen();
+
+                        if (isNpcInteractionOpen) {
+                            player.savePosition();
+                            player.setState(EntityState.IDLE);
+                        } else {
+                            handleInput();
                         }
 
                         player.update();
-                        combatManager.update();
-                        gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
-                        
                         updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
-                        
-                        // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
-                        double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
-                        for (Enemy e : enemyManager.getEnemyList()) {
-                            boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
-                                               e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
-                                               e.getY() + e.getRenderHeight() >= cameraY - margin &&
-                                               e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
-                            e.setActive(onScreen);
-                        }
 
-                        enemyManager.updateAll();
-                        checkCollisions();
-                        com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                        if (!isNpcInteractionOpen) {
+                            int stopFrames = combatManager.consumeHitStopFrames();
+                            if (stopFrames > 0) {
+                                hitStopTimer = stopFrames;
+                            }
+
+                            int sTimer = combatManager.consumeShakeTimer();
+                            if (sTimer > 0) {
+                                screenShakeTimer = sTimer;
+                                screenShakeAmplitude = combatManager.consumeShakeAmplitude();
+                            }
+
+                            if (tutorialManager != null) {
+                                tutorialManager.update(player, input);
+                            }
+
+                            combatManager.update();
+                            gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
+
+                            // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
+                            double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
+                            for (Enemy e : enemyManager.getEnemyList()) {
+                                boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
+                                                   e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                                                   e.getY() + e.getRenderHeight() >= cameraY - margin &&
+                                                   e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
+                                e.setActive(onScreen);
+                            }
+
+                            enemyManager.updateAll();
+                            checkCollisions();
+                            com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                        }
                     }
                 }
 
@@ -387,6 +413,11 @@ public class App extends Application {
                 if (gameManager.getGates() != null) {
                     renderList.addAll(gameManager.getGates());
                 }
+
+                Npc npc = getActiveNpc();
+                if (npc != null) {
+                    renderList.add(npc);
+                }
                 
                 // Thêm Tường/Vật cản từ Map (áp dụng Culling để tối ưu hiệu năng)
                 if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
@@ -423,6 +454,10 @@ public class App extends Application {
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
+
+                if (npc != null) {
+                    npc.renderOverlay(gc);
+                }
                 
                 if (tutorialManager != null) {
                     tutorialManager.render(gc);
@@ -671,6 +706,9 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            healthPotionImg = loadImg("/assets/items/health_potion.png");
+            manaPotionImg = loadImg("/assets/items/mana_potion.png");
+
             Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
 
             // Khai báo Player trước khi đưa cho Quái
@@ -785,11 +823,80 @@ public class App extends Application {
             combatManager.activateSkill();
         }
 
+        if (input.contains(KeyCode.E)) {
+            if (!isEHeld) {
+                player.useHealthPotion();
+                isEHeld = true;
+            }
+        } else {
+            isEHeld = false;
+        }
+
+        if (input.contains(KeyCode.Q)) {
+            if (!isRHeld) {
+                player.useManaPotion();
+                isRHeld = true;
+            }
+        } else {
+            isRHeld = false;
+        }
+
         if (isAnyKeyPressed) {
             player.setState(EntityState.RUNNING);
         } else {
             player.setState(EntityState.IDLE);
         }
+    }
+
+    private void handleNpcInput(Npc npc) {
+        if (input.contains(KeyCode.H)) {
+            if (!isHHeld) {
+                npc.startInteraction();
+                isHHeld = true;
+            }
+        } else {
+            isHHeld = false;
+        }
+
+        boolean onePressed = input.contains(KeyCode.DIGIT1) || input.contains(KeyCode.NUMPAD1);
+        if (onePressed) {
+            if (!is1Held) {
+                if (npc.isInteractionOpen()) {
+                    npc.handleOptionOne(player);
+                }
+                is1Held = true;
+            }
+        } else {
+            is1Held = false;
+        }
+
+        boolean twoPressed = input.contains(KeyCode.DIGIT2) || input.contains(KeyCode.NUMPAD2);
+        if (twoPressed) {
+            if (!is2Held) {
+                if (npc.isInteractionOpen()) {
+                    npc.handleOptionTwo(player);
+                }
+                is2Held = true;
+            }
+        } else {
+            is2Held = false;
+        }
+
+        if (input.contains(KeyCode.O)) {
+            if (!isOHeld) {
+                npc.closeInteraction();
+                isOHeld = true;
+            }
+        } else {
+            isOHeld = false;
+        }
+    }
+
+    private Npc getActiveNpc() {
+        if (gameManager == null || gameManager.getCurrentLevelIndex() != 1) {
+            return null;
+        }
+        return gameManager.getNpc();
     }
 
     private void checkCollisions() {

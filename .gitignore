@@ -6,9 +6,11 @@ target/
 *.iml
 
 # Build output
-target/
 out/
 
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Ignore skills
+skills/

@@ -2,6 +2,7 @@ package com.hust.game.progression;
 
 import com.hust.game.enemy.EnemyManager;
 import com.hust.game.entities.player.Player;
+import com.hust.game.entities.npc.Npc;
 import com.hust.game.map.MapManager;
 
 import javafx.scene.canvas.GraphicsContext;
@@ -105,5 +106,9 @@ public class GameManager {
 
     public List<Gate> getGates() {
         return currentLevel != null ? currentLevel.getGates() : null;
+    }
+
+    public Npc getNpc() {
+        return currentLevel != null ? currentLevel.getNpc() : null;
     }
 }
