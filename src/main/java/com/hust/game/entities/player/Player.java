@@ -695,7 +695,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public boolean useHealthPotion() {
-        if (healthPotionCount <= 0 || currentHp >= maxHp || isPotionInventoryFull()) {
+        if (healthPotionCount <= 0 || currentHp >= maxHp) {
             return false;
         }
         healthPotionCount--;
@@ -704,7 +704,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public boolean useManaPotion() {
-        if (manaPotionCount <= 0 || currentMana >= maxMana || isPotionInventoryFull()) {
+        if (manaPotionCount <= 0 || currentMana >= maxMana) {
             return false;
         }
         manaPotionCount--;

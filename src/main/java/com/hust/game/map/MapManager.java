@@ -20,6 +20,8 @@ public class MapManager {
     public int level;
     public List<int[]> gatePositions;
     public List<com.hust.game.entities.base.BaseEntity> mapEntities; // Danh sách các vật thể cứng trên Map
+    private int loadedRowCount;
+    private int loadedColCount;
 
     public MapManager(int level) {
         this.level = level;
@@ -67,6 +69,8 @@ public class MapManager {
                 return;
             }
             BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            loadedRowCount = 0;
+            loadedColCount = 0;
             for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
                 String line = br.readLine();
                 if (line == null) break;
@@ -76,6 +80,8 @@ public class MapManager {
                 if (line.isEmpty()) { row--; continue; } // Bỏ qua dòng trống, không tính vào row
                 
                 String[] numbers = line.split("\\s+");
+                loadedRowCount = Math.max(loadedRowCount, row + 1);
+                loadedColCount = Math.max(loadedColCount, Math.min(GameConstants.MAX_WORLD_COL, numbers.length));
                 for (int col = 0; col < GameConstants.MAX_WORLD_COL && col < numbers.length; col++) {
                     int val = Integer.parseInt(numbers[col].trim());
                     if (val == -100) {
@@ -105,6 +111,14 @@ public class MapManager {
 
             spawnPotions();
         } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public int getLoadedRowCount() {
+        return loadedRowCount;
+    }
+
+    public int getLoadedColCount() {
+        return loadedColCount;
     }
 
     private void spawnPotions() {
