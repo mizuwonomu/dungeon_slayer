@@ -157,12 +157,17 @@ public class Witch extends Enemy {
             hasTeleported = true;
             
             // Kích thước phòng Level 2 là 816x480. Dịch chuyển trong vùng an toàn (x: 100->650, y: 200)
+            // Dịch chuyển Witch đến vị trí an toàn hơn, tránh bị kẹt vào tường ở rìa màn hình.
+            // Các giá trị đã được điều chỉnh để đảm bảo có khoảng trống xung quanh.
             if (targetPlayer.getX() < 400) {
                 this.x = 650;
+                this.x = 600;
             } else {
                 this.x = 100;
+                this.x = 150;
             }
             this.y = 200;
+            this.y = 250;
             
             // Cập nhật lastX, lastY để cơ chế chống kẹt tường không đẩy ngược Witch về chỗ cũ
             this.lastX = this.x;
@@ -308,8 +313,9 @@ public class Witch extends Enemy {
     @Override
     public Rectangle2D getBoundary() {
         // Cắt bớt hitbox vì sprite kích thước rộng (269x300, 223x300) có rất nhiều viền trống 2 bên
-        double paddingX = this.renderWidth * 0.3;
-        double paddingY = this.renderHeight * 0.2;
+        // Giảm bớt padding để hitbox lớn hơn, dễ trúng hơn.
+        double paddingX = this.renderWidth * 0.2;
+        double paddingY = this.renderHeight * 0.1;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 }

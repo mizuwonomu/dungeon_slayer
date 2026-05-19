@@ -79,6 +79,7 @@ public class App extends Application {
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
+    private boolean isMousePressed = false;
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
@@ -295,6 +296,15 @@ public class App extends Application {
                 input.remove(e.getCode());
             }
         });
+        
+        scene.setOnMousePressed(e -> {
+            if (fadeInTimer > 0) return;
+            if (!isPaused) isMousePressed = true;
+        });
+        scene.setOnMouseReleased(e -> {
+            if (fadeInTimer > 0) return;
+            if (!isPaused) isMousePressed = false;
+        });
 
         initializeEntities(startLevel);
         playInGameMusic(startLevel);
@@ -349,7 +359,7 @@ public class App extends Application {
                             }
 
                             if (tutorialManager != null) {
-                                tutorialManager.update(player, input);
+                                tutorialManager.update(player, input, isMousePressed);
                             }
 
                             combatManager.update();
@@ -889,6 +899,10 @@ public class App extends Application {
             }
         } else {
             isOHeld = false;
+        }
+        
+        if (input.contains(KeyCode.SPACE) || isMousePressed) {
+            npc.skipDialogue();
         }
     }
 

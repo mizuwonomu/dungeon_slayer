@@ -174,10 +174,14 @@ public class Tree extends Enemy {
         
         // CHỐNG CHÉM XUYÊN TƯỜNG (Raycast từ tâm Quái tới tâm Player)
         if (collisionChecker != null) {
-            double pCenterX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0;
-            double pCenterY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0;
-            double eCenterX = this.x + this.renderWidth / 2.0;
-            double eCenterY = this.y + this.renderHeight / 2.0;
+            // SỬA LỖI: Raycast từ TÂM HITBOX VA CHẠM (dưới chân) thay vì tâm ảnh render.
+            // Logic này tương tự như trong CombatManager để đảm bảo quái không tấn công xuyên tường.
+            Rectangle2D pColBox = targetPlayer.getCollisionBoundary();
+            Rectangle2D eColBox = this.getCollisionBoundary();
+            double pCenterX = pColBox.getMinX() + pColBox.getWidth() / 2.0;
+            double pCenterY = pColBox.getMinY() + pColBox.getHeight() / 2.0;
+            double eCenterX = eColBox.getMinX() + eColBox.getWidth() / 2.0;
+            double eCenterY = eColBox.getMinY() + eColBox.getHeight() / 2.0;
             
             for (int i = 1; i <= 5; i++) {
                 int checkX = (int) (eCenterX + (pCenterX - eCenterX) * i / 5.0);
@@ -230,8 +234,9 @@ public class Tree extends Enemy {
     @Override
     public Rectangle2D getBoundary() {
         // Cắt hitbox lại 30% bề ngang, 20% bề dọc vì frame 96x96 vẫn có viền trống
-        double paddingX = this.renderWidth * 0.3;
-        double paddingY = this.renderHeight * 0.2;
+        // Giảm bớt padding để hitbox lớn hơn, dễ trúng hơn.
+        double paddingX = this.renderWidth * 0.15;
+        double paddingY = this.renderHeight * 0.1;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 }

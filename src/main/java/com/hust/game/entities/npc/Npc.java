@@ -6,13 +6,10 @@ import com.hust.game.entities.player.Player;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
-import javafx.scene.image.PixelReader;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
-import java.util.IdentityHashMap;
-import java.util.Map;
 
 public class Npc extends StaticEntity {
     private enum State {
@@ -24,10 +21,11 @@ public class Npc extends StaticEntity {
         APPROVAL
     }
 
-    private static final int FRAMES = 8;
+    private enum PanelState { HIDDEN, APPEARING, VISIBLE, DISAPPEARING }
+
     private static final int ANIMATION_DELAY = 10;
     private static final int DIALOGUE_DELAY = 2;
-    private static final int APPROVAL_FRAMES = FRAMES * ANIMATION_DELAY;
+    private static final int APPROVAL_FRAMES = 8 * ANIMATION_DELAY; // Approval có 8 frames
     private static final double INTERACTION_RANGE = GameConstants.TILE_SIZE;
 
     private final Image idle1;
@@ -38,8 +36,9 @@ public class Npc extends StaticEntity {
     private final Image manaPotion;
     private final Image healthPotion;
     private final Font font;
-    private final Map<Image, SheetBounds> boundsCache = new IdentityHashMap<>();
+    private Image cmtBox;
 
+    // --- Main State Machine ---
     private State state = State.FAR_IDLE;
     private int animTimer = 0;
     private int idleSwapTimer = 0;
@@ -50,6 +49,11 @@ public class Npc extends StaticEntity {
     private int approvalTimer = 0;
     private String feedbackText = "";
     private int feedbackTimer = 0;
+    private State postCloseState = State.FAR_IDLE;
+    // --- Panel Animation State ---
+    private PanelState panelState = PanelState.HIDDEN;
+    private int panelAnimTimer = 0;
+    private static final int PANEL_ANIM_DURATION = 30;
 
     private static final String PROMPT_TEXT = "Bấm H để tương tác";
     private static final String TIP_TEXT = "Cách đánh quái đơn giản lắm! Bạn chỉ cần canh thời gian đánh trúng!\n"
@@ -57,7 +61,7 @@ public class Npc extends StaticEntity {
 
     public Npc(double x, double y, Image idle1, Image idle2, Image idle3,
             Image dialogue, Image approval, Image manaPotion, Image healthPotion) {
-        super(x, y, idle1, FRAMES, GameConstants.TILE_SIZE, GameConstants.TILE_SIZE);
+        super(x, y, idle1, 6, GameConstants.TILE_SIZE, GameConstants.TILE_SIZE); // idle1 có 6 frames
         this.idle1 = idle1;
         this.idle2 = idle2;
         this.idle3 = idle3;
@@ -69,6 +73,12 @@ public class Npc extends StaticEntity {
         java.io.InputStream fontStream = getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf");
         Font loadedFont = fontStream != null ? Font.loadFont(fontStream, 24) : null;
         this.font = loadedFont != null ? loadedFont : Font.font("Arial", FontWeight.BOLD, 24);
+        
+        try {
+            this.cmtBox = new Image(getClass().getResourceAsStream("/assets/cmt_box.png"));
+        } catch (Exception e) {
+            System.err.println("Không tìm thấy ảnh cmt_box.png trong /assets/");
+        }
         setSheet(idle1);
     }
 
@@ -78,7 +88,7 @@ public class Npc extends StaticEntity {
             suppressPromptUntilLeave = false;
         }
 
-        if (state == State.FAR_IDLE || state == State.NEAR_PROMPT) {
+        if (panelState == PanelState.HIDDEN && (state == State.FAR_IDLE || state == State.NEAR_PROMPT)) {
             if (nearPlayer && !suppressPromptUntilLeave) {
                 state = State.NEAR_PROMPT;
                 setSheet(idle2);
@@ -111,14 +121,37 @@ public class Npc extends StaticEntity {
                 feedbackText = "";
             }
         }
+
+        // --- Panel Animation Logic ---
+        if (panelState == PanelState.APPEARING) {
+            panelAnimTimer++;
+            if (panelAnimTimer >= PANEL_ANIM_DURATION) {
+                panelAnimTimer = PANEL_ANIM_DURATION;
+                panelState = PanelState.VISIBLE;
+            }
+        } else if (panelState == PanelState.DISAPPEARING) {
+            panelAnimTimer++;
+            if (panelAnimTimer >= PANEL_ANIM_DURATION) {
+                panelAnimTimer = 0;
+                panelState = PanelState.HIDDEN;
+                // Now that panel is hidden, transition to the post-close state
+                state = postCloseState;
+                if (state == State.APPROVAL) {
+                    approvalTimer = APPROVAL_FRAMES;
+                    setSheet(approval);
+                } else {
+                    setSheet(idle1);
+                }
+            }
+        }
     }
 
     public boolean isInteractionOpen() {
-        return state == State.MENU || state == State.DIALOGUE || state == State.SHOP;
+        return panelState != PanelState.HIDDEN;
     }
 
     public boolean canStartInteraction() {
-        return state == State.NEAR_PROMPT;
+        return state == State.NEAR_PROMPT && panelState == PanelState.HIDDEN;
     }
 
     public void startInteraction() {
@@ -126,6 +159,8 @@ public class Npc extends StaticEntity {
             return;
         }
         state = State.MENU;
+        panelState = PanelState.APPEARING;
+        panelAnimTimer = 0;
         setSheet(idle2);
     }
 
@@ -149,32 +184,55 @@ public class Npc extends StaticEntity {
         }
     }
 
+    public void skipDialogue() {
+        if (state == State.DIALOGUE) {
+            dialogueVisibleChars = TIP_TEXT.length();
+        }
+    }
+
     public void closeInteraction() {
         if (!isInteractionOpen()) {
             return;
         }
         boolean approved = state == State.SHOP;
         suppressPromptUntilLeave = true;
-        if (approved) {
-            state = State.APPROVAL;
-            approvalTimer = APPROVAL_FRAMES;
-            setSheet(approval);
-        } else {
-            state = State.FAR_IDLE;
-            setSheet(idle1);
-        }
+        
+        // Decide where to go after closing, but don't go there yet.
+        postCloseState = approved ? State.APPROVAL : State.FAR_IDLE;
+
+        // Trigger the closing animation
+        panelState = PanelState.DISAPPEARING;
+        panelAnimTimer = 0;
     }
 
     public void renderOverlay(GraphicsContext gc) {
-        if (state == State.NEAR_PROMPT) {
+        if (state == State.NEAR_PROMPT && panelState == PanelState.HIDDEN) {
             renderPrompt(gc);
-        } else if (state == State.MENU) {
-            renderPanel(gc, "NPC", "[1] Tips and tricks\n[2] Buy items\n[O] Thoát");
-        } else if (state == State.DIALOGUE) {
-            int chars = Math.min(dialogueVisibleChars, TIP_TEXT.length());
-            renderPanel(gc, "Tips and tricks", TIP_TEXT.substring(0, chars) + "\n\n[O] Thoát");
-        } else if (state == State.SHOP) {
-            renderShop(gc);
+        } else if (panelState != PanelState.HIDDEN) {
+            // Calculate animated Y position for the panel
+            double targetY = GameConstants.WINDOW_HEIGHT - 275;
+            double height = 230;
+            double offsetY = 0;
+            double t = (double) panelAnimTimer / PANEL_ANIM_DURATION;
+
+            if (panelState == PanelState.APPEARING) {
+                double progress = 1.0 - Math.pow(1.0 - t, 2); // Ease Out Quad
+                offsetY = height * (1.0 - progress);
+            } else if (panelState == PanelState.DISAPPEARING) {
+                double progress = Math.pow(t, 2); // Ease In Quad
+                offsetY = height * progress;
+            }
+            double animatedY = targetY + offsetY;
+
+            // Render the correct panel based on the internal NPC state
+            if (state == State.MENU) {
+                renderPanel(gc, "NPC", "[1] Tips and tricks\n[2] Buy items\n[O] Thoát", animatedY);
+            } else if (state == State.DIALOGUE) {
+                int chars = Math.min(dialogueVisibleChars, TIP_TEXT.length());
+                renderPanel(gc, "Tips and tricks", TIP_TEXT.substring(0, chars) + "\n\n[O] Thoát", animatedY);
+            } else if (state == State.SHOP) {
+                renderShop(gc, animatedY);
+            }
         }
     }
 
@@ -184,18 +242,16 @@ public class Npc extends StaticEntity {
             return;
         }
 
-        SheetBounds bounds = getSheetBounds(spriteSheet);
-        FrameCrop crop = bounds.frames[Math.max(0, Math.min(frameIndex, bounds.frames.length - 1))];
+        // Vẽ NPC theo Grid-based, tránh hiện tượng trượt hình khi crop pixel động
+        double sx = frameIndex * frameWidth;
+        double scale = renderHeight / frameHeight;
+        double drawW = frameWidth * scale;
+        double drawH = renderHeight;
 
-        double scale = renderHeight / bounds.unionHeight;
-        double drawX = x + renderWidth / 2.0 - (bounds.unionWidth * scale) / 2.0
-                + (crop.x - bounds.unionX) * scale;
-        double drawY = y + renderHeight - (bounds.unionHeight * scale)
-                + (crop.y - bounds.unionY) * scale;
+        double drawX = x + (renderWidth - drawW) / 2.0;
+        double drawY = y + renderHeight - drawH;
 
-        gc.drawImage(spriteSheet,
-                crop.sourceX, crop.y, crop.width, crop.height,
-                drawX, drawY, crop.width * scale, crop.height * scale);
+        gc.drawImage(spriteSheet, sx, 0, frameWidth, frameHeight, drawX, drawY, drawW, drawH);
     }
 
     private void renderPrompt(GraphicsContext gc) {
@@ -216,18 +272,23 @@ public class Npc extends StaticEntity {
         gc.restore();
     }
 
-    private void renderPanel(GraphicsContext gc, String title, String body) {
+    private void renderPanel(GraphicsContext gc, String title, String body, double yPos) {
         gc.save();
         double x = 220;
-        double y = GameConstants.WINDOW_HEIGHT - 275;
+        double y = yPos;
         double width = GameConstants.WINDOW_WIDTH - 440;
         double height = 230;
 
-        gc.setFill(Color.rgb(0, 0, 0, 0.82));
-        gc.fillRoundRect(x, y, width, height, 14, 14);
-        gc.setStroke(Color.WHITE);
-        gc.setLineWidth(3);
-        gc.strokeRoundRect(x, y, width, height, 14, 14);
+        // Vẽ hình ảnh comment box nếu có, ngược lại fallback về vẽ bằng code như cũ
+        if (cmtBox != null) {
+            gc.drawImage(cmtBox, x, y, width, height);
+        } else {
+            gc.setFill(Color.rgb(0, 0, 0, 0.82));
+            gc.fillRoundRect(x, y, width, height, 14, 14);
+            gc.setStroke(Color.WHITE);
+            gc.setLineWidth(3);
+            gc.strokeRoundRect(x, y, width, height, 14, 14);
+        }
 
         gc.setFont(Font.font(font.getFamily(), FontWeight.BOLD, 28));
         gc.setTextAlign(TextAlignment.CENTER);
@@ -243,19 +304,19 @@ public class Npc extends StaticEntity {
         gc.restore();
     }
 
-    private void renderShop(GraphicsContext gc) {
+    private void renderShop(GraphicsContext gc, double yPos) {
         gc.save();
-        renderPanel(gc, "Buy items", "[1] Mana Potion\n[2] Health Potion\n[O] Hoàn tất");
+        renderPanel(gc, "Buy items", "[1] Mana Potion\n[2] Health Potion\n[O] Hoàn tất", yPos);
 
-        double iconY = GameConstants.WINDOW_HEIGHT - 165;
+        double iconY = yPos + 110; // yPos is the top of the panel, text starts at y+88, so this is ~line 1
         drawPotion(gc, manaPotion, 560, iconY);
         drawPotion(gc, healthPotion, 560, iconY + 34);
 
         if (!feedbackText.isEmpty()) {
             gc.setFont(font);
             gc.setTextAlign(TextAlignment.CENTER);
-            drawOutlinedText(gc, feedbackText, GameConstants.WINDOW_WIDTH / 2.0,
-                    GameConstants.WINDOW_HEIGHT - 60, Color.LIGHTGREEN);
+            double height = 230;
+            drawOutlinedText(gc, feedbackText, GameConstants.WINDOW_WIDTH / 2.0, yPos + height + 30, Color.LIGHTGREEN);
         }
         gc.restore();
     }
@@ -290,8 +351,13 @@ public class Npc extends StaticEntity {
         animTimer++;
         if (animTimer >= ANIMATION_DELAY) {
             animTimer = 0;
-            frameIndex = (frameIndex + 1) % FRAMES;
+            frameIndex = (frameIndex + 1) % numFrames;
         }
+    }
+
+    @Override
+    public void update() {
+        // Trống, vì NPC sử dụng logic qua hàm update(Player player)
     }
 
     private void setSheet(Image sheet) {
@@ -299,115 +365,23 @@ public class Npc extends StaticEntity {
             return;
         }
         spriteSheet = sheet;
-        frameWidth = spriteSheet.getWidth() / FRAMES;
+        
+        if (sheet == idle1) {
+            numFrames = 6;
+        } else if (sheet == idle2) {
+            numFrames = 11;
+        } else if (sheet == idle3) {
+            numFrames = 7;
+        } else if (sheet == dialogue) {
+            numFrames = 16;
+        } else if (sheet == approval) {
+            numFrames = 8;
+        }
+        
+        frameWidth = spriteSheet.getWidth() / numFrames;
         frameHeight = spriteSheet.getHeight();
         frameIndex = 0;
         animTimer = 0;
-    }
-
-    private SheetBounds getSheetBounds(Image sheet) {
-        SheetBounds cached = boundsCache.get(sheet);
-        if (cached != null) {
-            return cached;
-        }
-
-        FrameCrop[] crops = new FrameCrop[FRAMES];
-        double sheetFrameWidth = sheet.getWidth() / FRAMES;
-        int frameW = Math.max(1, (int) Math.round(sheetFrameWidth));
-        int frameH = Math.max(1, (int) Math.round(sheet.getHeight()));
-        int unionMinX = frameW;
-        int unionMinY = frameH;
-        int unionMaxX = 0;
-        int unionMaxY = 0;
-
-        for (int frame = 0; frame < FRAMES; frame++) {
-            FrameCrop crop = findVisibleCrop(sheet, frame, frameW, frameH);
-            crops[frame] = crop;
-            unionMinX = Math.min(unionMinX, crop.x);
-            unionMinY = Math.min(unionMinY, crop.y);
-            unionMaxX = Math.max(unionMaxX, crop.x + crop.width);
-            unionMaxY = Math.max(unionMaxY, crop.y + crop.height);
-        }
-
-        if (unionMaxX <= unionMinX || unionMaxY <= unionMinY) {
-            unionMinX = 0;
-            unionMinY = 0;
-            unionMaxX = frameW;
-            unionMaxY = frameH;
-        }
-
-        SheetBounds computed = new SheetBounds(
-                crops,
-                unionMinX,
-                unionMinY,
-                Math.max(1, unionMaxX - unionMinX),
-                Math.max(1, unionMaxY - unionMinY));
-        boundsCache.put(sheet, computed);
-        return computed;
-    }
-
-    private FrameCrop findVisibleCrop(Image sheet, int frame, int frameW, int frameH) {
-        PixelReader reader = sheet.getPixelReader();
-        int sourceX = (int) Math.round(frame * (sheet.getWidth() / FRAMES));
-        if (reader == null) {
-            return new FrameCrop(sourceX, 0, 0, frameW, frameH);
-        }
-
-        int minX = frameW;
-        int minY = frameH;
-        int maxX = -1;
-        int maxY = -1;
-        int maxReadableX = Math.min(frameW, (int) Math.round(sheet.getWidth()) - sourceX);
-
-        for (int py = 0; py < frameH; py++) {
-            for (int px = 0; px < maxReadableX; px++) {
-                int alpha = (reader.getArgb(sourceX + px, py) >>> 24) & 0xff;
-                if (alpha > 8) {
-                    minX = Math.min(minX, px);
-                    minY = Math.min(minY, py);
-                    maxX = Math.max(maxX, px);
-                    maxY = Math.max(maxY, py);
-                }
-            }
-        }
-
-        if (maxX < minX || maxY < minY) {
-            return new FrameCrop(sourceX, 0, 0, frameW, frameH);
-        }
-
-        return new FrameCrop(sourceX + minX, minX, minY, maxX - minX + 1, maxY - minY + 1);
-    }
-
-    private static class FrameCrop {
-        final int sourceX;
-        final int x;
-        final int y;
-        final int width;
-        final int height;
-
-        FrameCrop(int sourceX, int x, int y, int width, int height) {
-            this.sourceX = sourceX;
-            this.x = x;
-            this.y = y;
-            this.width = width;
-            this.height = height;
-        }
-    }
-
-    private static class SheetBounds {
-        final FrameCrop[] frames;
-        final int unionX;
-        final int unionY;
-        final int unionWidth;
-        final int unionHeight;
-
-        SheetBounds(FrameCrop[] frames, int unionX, int unionY, int unionWidth, int unionHeight) {
-            this.frames = frames;
-            this.unionX = unionX;
-            this.unionY = unionY;
-            this.unionWidth = unionWidth;
-            this.unionHeight = unionHeight;
-        }
     }
 
     private boolean isPlayerNear(Player player) {

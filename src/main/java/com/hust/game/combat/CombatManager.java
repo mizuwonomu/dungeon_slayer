@@ -199,10 +199,15 @@ public class CombatManager {
                 
                 // CHỐNG CHÉM XUYÊN TƯỜNG (Kiểm tra Raycast từ tâm Player tới tâm Quái)
                 if (collisionChecker != null) {
-                    double pCenterX = player.getX() + player.getRenderWidth() / 2.0;
-                    double pCenterY = player.getY() + player.getRenderHeight() / 2.0;
-                    double ex = enemy.getX() + enemy.getRenderWidth() / 2.0;
-                    double ey = enemy.getY() + enemy.getRenderHeight() / 2.0;
+                    // SỬA LỖI: Raycast từ TÂM HITBOX VA CHẠM (dưới chân) thay vì tâm ảnh render.
+                    // Điều này giúp logic chống chém xuyên tường hoạt động đúng trong môi trường 2.5D,
+                    // khi player có thể đứng "phía trên" (Y nhỏ hơn) so với tường.
+                    Rectangle2D pColBox = player.getCollisionBoundary();
+                    Rectangle2D eColBox = enemy.getCollisionBoundary();
+                    double pCenterX = pColBox.getMinX() + pColBox.getWidth() / 2.0;
+                    double pCenterY = pColBox.getMinY() + pColBox.getHeight() / 2.0;
+                    double ex = eColBox.getMinX() + eColBox.getWidth() / 2.0;
+                    double ey = eColBox.getMinY() + eColBox.getHeight() / 2.0;
                     
                     boolean hitWall = false;
                     for (int i = 1; i <= 5; i++) { // Quét 5 điểm trên đường thẳng nối 2 tâm
