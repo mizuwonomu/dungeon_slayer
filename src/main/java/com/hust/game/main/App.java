@@ -1040,6 +1040,24 @@ public class App extends Application {
                 }
             }
         }
+
+        // KIỂM TRA NHẶT VẬT PHẨM (Interactable)
+        if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
+            Iterator<BaseEntity> it = gameManager.getMap().mapEntities.iterator();
+            while (it.hasNext()) {
+                BaseEntity entity = it.next();
+                if (entity instanceof Interactable) {
+                    // Player dẫm lên vật phẩm (so sánh 2 hitbox)
+                    if (player.getCollisionBoundary().intersects(entity.getBoundary())) {
+                        boolean pickedUp = ((Interactable) entity).onInteract(player);
+                        if (pickedUp) {
+                            it.remove(); // Xóa vật phẩm khỏi bản đồ nếu nhặt thành công
+                            com.hust.game.audio.SoundManager.playButtonHoverSound(); // Tạm dùng âm thanh này làm hiệu ứng nhặt đồ
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private StackPane createSpriteBtn(Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {
