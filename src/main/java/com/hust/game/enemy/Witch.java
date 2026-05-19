@@ -160,13 +160,10 @@ public class Witch extends Enemy {
             // Dịch chuyển Witch đến vị trí an toàn hơn, tránh bị kẹt vào tường ở rìa màn hình.
             // Các giá trị đã được điều chỉnh để đảm bảo có khoảng trống xung quanh.
             if (targetPlayer.getX() < 400) {
-                this.x = 650;
                 this.x = 600;
             } else {
-                this.x = 100;
-                this.x = 150;
+                this.x = 200;
             }
-            this.y = 200;
             this.y = 250;
             
             // Cập nhật lastX, lastY để cơ chế chống kẹt tường không đẩy ngược Witch về chỗ cũ
@@ -247,17 +244,17 @@ public class Witch extends Enemy {
             // 2. Giai đoạn xử lý Vòng lửa
             if (circleTimer <= 180) {
                 // Vòng lửa bám đuôi Player
-                circleX = targetPlayer.getX() - 24;
-                circleY = targetPlayer.getY() - 15;
+                circleX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0 - 32;
+                circleY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0 - 32;
             } else if (circleTimer <= 210) {
                 // Vòng dừng lại khóa mục tiêu (chuẩn bị nổ)
             } else if (circleTimer == 211) {
                 com.hust.game.audio.SoundManager.playWitchCircleExplodeSound();
                 // Phát nổ gây sát thương
-                double cDiffX = (targetPlayer.getX() + targetPlayer.getRenderWidth() / 2) - (circleX + 48);
-                double cDiffY = (targetPlayer.getY() + targetPlayer.getRenderHeight() / 2) - (circleY + 48);
-                if (Math.sqrt(cDiffX * cDiffX + cDiffY * cDiffY) <= 60) {
-                    targetPlayer.takeDamage(this.damage, circleX + 48, circleY + 48); // Đẩy lùi tính từ tâm vòng lửa
+                double cDiffX = (targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0) - (circleX + 32);
+                double cDiffY = (targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0) - (circleY + 32);
+                if (Math.sqrt(cDiffX * cDiffX + cDiffY * cDiffY) <= 40) {
+                    targetPlayer.takeDamage(this.damage, circleX + 32, circleY + 32); // Đẩy lùi tính từ tâm vòng lửa
                 }
             } else if (circleTimer > 230) {
                 resetToIdle();
@@ -306,7 +303,7 @@ public class Witch extends Enemy {
 
             double cWidth = currentCircle.getWidth() / cFrames;
             gc.drawImage(currentCircle, cIndex * cWidth, 0, cWidth, currentCircle.getHeight(),
-                    circleX, circleY, 96, 96);
+                    circleX, circleY + 5, 64, 64);
         }
     }
 
@@ -317,5 +314,14 @@ public class Witch extends Enemy {
         double paddingX = this.renderWidth * 0.2;
         double paddingY = this.renderHeight * 0.1;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+    }
+
+    @Override
+    public Rectangle2D getCollisionBoundary() {
+        double w = renderWidth * 0.4;
+        double h = renderHeight * 0.2;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
     }
 }

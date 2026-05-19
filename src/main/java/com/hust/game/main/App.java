@@ -52,8 +52,8 @@ public class App extends Application {
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
 
-    // Độ zoom camera (1.5 = phóng to 50%)
-    private static final double ZOOM = 1.5;
+    // Độ zoom camera (1.0 = gốc)
+    private static final double ZOOM = 1.0;
 
     private GraphicsContext gc;
     private Player player;

@@ -262,7 +262,9 @@ public class Level {
                             
                             // Tỉ lệ 50% ra Cây, 50% ra Slime
                             if (Math.random() > 0.5) {
-                                enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, 96, 96, player, treeSkillImg);
+                                // Ảnh Tree cao 96px (2 ô), mà điểm xét tường là dưới chân. 
+                                // Phải lùi Y lên 1 ô (-48) để chân Tree đáp đúng vào ô trống đã quét được
+                                enemyManager.spawnEnemy("Tree", spawnX, spawnY - 48, treeImg, 8, 96, 96, player, treeSkillImg);
                             } else {
                                 enemyManager.spawnEnemy("Slime", spawnX, spawnY, slimeImg, 8, 51, 31.5, player);
                             }
@@ -277,7 +279,7 @@ public class Level {
                                     player, knightSkillImg);
             enemyManager.spawnEnemy("Knight", WIDTH / 2 + 50 , HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
                                     player, knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 250 , HEIGHT / 2 , witchImg, 25, TILE_SIZE, TILE_SIZE,
+            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 100, HEIGHT / 2 - 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
                                     player, witchSkillImg);
         }
         else if (lvlID == 3) {
@@ -309,8 +311,7 @@ public class Level {
         Image manaPotion = loadOptionalImage("/assets/items/mana_potion.png");
         Image healthPotion = loadOptionalImage("/assets/items/health_potion.png");
 
-        if (idle1 == null || idle2 == null || idle3 == null || dialogue == null || approval == null
-                || manaPotion == null || healthPotion == null) {
+        if (idle1 == null || idle2 == null || dialogue == null || manaPotion == null || healthPotion == null) {
             System.err.println("Không thể sinh NPC level 1 vì thiếu sprite sheet NPC hoặc item.");
             npc = null;
             return;

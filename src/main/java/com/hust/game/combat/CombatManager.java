@@ -197,30 +197,6 @@ public class CombatManager {
             // Nếu hitbox chém intersects với boundary của enemy → gây damage
             if (attackBox.intersects(enemyBox)) {
                 
-                // CHỐNG CHÉM XUYÊN TƯỜNG (Kiểm tra Raycast từ tâm Player tới tâm Quái)
-                if (collisionChecker != null) {
-                    // SỬA LỖI: Raycast từ TÂM HITBOX VA CHẠM (dưới chân) thay vì tâm ảnh render.
-                    // Điều này giúp logic chống chém xuyên tường hoạt động đúng trong môi trường 2.5D,
-                    // khi player có thể đứng "phía trên" (Y nhỏ hơn) so với tường.
-                    Rectangle2D pColBox = player.getCollisionBoundary();
-                    Rectangle2D eColBox = enemy.getCollisionBoundary();
-                    double pCenterX = pColBox.getMinX() + pColBox.getWidth() / 2.0;
-                    double pCenterY = pColBox.getMinY() + pColBox.getHeight() / 2.0;
-                    double ex = eColBox.getMinX() + eColBox.getWidth() / 2.0;
-                    double ey = eColBox.getMinY() + eColBox.getHeight() / 2.0;
-                    
-                    boolean hitWall = false;
-                    for (int i = 1; i <= 5; i++) { // Quét 5 điểm trên đường thẳng nối 2 tâm
-                        int checkX = (int) (pCenterX + (ex - pCenterX) * i / 5.0);
-                        int checkY = (int) (pCenterY + (ey - pCenterY) * i / 5.0);
-                        if (collisionChecker.checkTile(checkX, checkY)) {
-                            hitWall = true;
-                            break;
-                        }
-                    }
-                    if (hitWall) continue; // Bỏ qua quái này vì có tường chắn ở giữa
-                }
-
                 enemy.takeDamage(actualDamage);
 
                 // Bật hiệu ứng knockback (với đòn chọc thì chỉ đẩy lùi ở phát cuối cùng)

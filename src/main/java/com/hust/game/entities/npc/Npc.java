@@ -50,6 +50,7 @@ public class Npc extends StaticEntity {
     private String feedbackText = "";
     private int feedbackTimer = 0;
     private State postCloseState = State.FAR_IDLE;
+    private boolean playedGreeting = false;
     // --- Panel Animation State ---
     private PanelState panelState = PanelState.HIDDEN;
     private int panelAnimTimer = 0;
@@ -61,7 +62,7 @@ public class Npc extends StaticEntity {
 
     public Npc(double x, double y, Image idle1, Image idle2, Image idle3,
             Image dialogue, Image approval, Image manaPotion, Image healthPotion) {
-        super(x, y, idle1, 6, GameConstants.TILE_SIZE, GameConstants.TILE_SIZE); // idle1 có 6 frames
+        super(x, y, idle1, 6, GameConstants.TILE_SIZE * 2, GameConstants.TILE_SIZE * 2); // idle1 có 6 frames, x2 kích thước
         this.idle1 = idle1;
         this.idle2 = idle2;
         this.idle3 = idle3;
@@ -90,11 +91,16 @@ public class Npc extends StaticEntity {
 
         if (panelState == PanelState.HIDDEN && (state == State.FAR_IDLE || state == State.NEAR_PROMPT)) {
             if (nearPlayer && !suppressPromptUntilLeave) {
-                state = State.NEAR_PROMPT;
-                setSheet(idle2);
+                if (state == State.FAR_IDLE) {
+                    state = State.NEAR_PROMPT;
+                    setSheet(idle2);
+                    playedGreeting = false;
+                }
             } else {
-                state = State.FAR_IDLE;
-                updateFarIdleSheet();
+                if (!(spriteSheet == idle2 && !playedGreeting)) {
+                    state = State.FAR_IDLE;
+                    updateFarIdleSheet();
+                }
             }
         } else if (state == State.APPROVAL) {
             approvalTimer--;
@@ -136,12 +142,7 @@ public class Npc extends StaticEntity {
                 panelState = PanelState.HIDDEN;
                 // Now that panel is hidden, transition to the post-close state
                 state = postCloseState;
-                if (state == State.APPROVAL) {
-                    approvalTimer = APPROVAL_FRAMES;
-                    setSheet(approval);
-                } else {
-                    setSheet(idle1);
-                }
+                setSheet(idle1);
             }
         }
     }
@@ -161,7 +162,7 @@ public class Npc extends StaticEntity {
         state = State.MENU;
         panelState = PanelState.APPEARING;
         panelAnimTimer = 0;
-        setSheet(idle2);
+        setSheet(idle1);
     }
 
     public void handleOptionOne(Player player) {
@@ -169,7 +170,7 @@ public class Npc extends StaticEntity {
             state = State.DIALOGUE;
             dialogueVisibleChars = 0;
             dialogueTimer = 0;
-            setSheet(dialogue);
+            setSheet(idle1);
         } else if (state == State.SHOP) {
             showFeedback(player.addManaPotion() ? "Đã nhận Mana Potion" : "Túi đồ đã đầy");
         }
@@ -194,11 +195,10 @@ public class Npc extends StaticEntity {
         if (!isInteractionOpen()) {
             return;
         }
-        boolean approved = state == State.SHOP;
         suppressPromptUntilLeave = true;
         
         // Decide where to go after closing, but don't go there yet.
-        postCloseState = approved ? State.APPROVAL : State.FAR_IDLE;
+        postCloseState = State.FAR_IDLE;
 
         // Trigger the closing animation
         panelState = PanelState.DISAPPEARING;
@@ -339,19 +339,31 @@ public class Npc extends StaticEntity {
     }
 
     private void updateFarIdleSheet() {
-        idleSwapTimer++;
-        if (idleSwapTimer >= 180) {
-            idleSwapTimer = 0;
-            useIdle3 = !useIdle3;
-        }
-        setSheet(useIdle3 ? idle3 : idle1);
+        // Tạm bỏ qua idle3
+        setSheet(idle1);
     }
 
     private void animate() {
         animTimer++;
         if (animTimer >= ANIMATION_DELAY) {
             animTimer = 0;
-            frameIndex = (frameIndex + 1) % numFrames;
+            
+            if (spriteSheet == idle2 && !playedGreeting) {
+                if (frameIndex == numFrames - 1) {
+                    playedGreeting = true;
+                    setSheet(idle1);
+                } else {
+                    frameIndex++;
+                }
+            } else if (spriteSheet == dialogue) {
+                if (frameIndex >= 6) {
+                    frameIndex = 3;
+                } else {
+                    frameIndex++;
+                }
+            } else {
+                frameIndex = (frameIndex + 1) % numFrames;
+            }
         }
     }
 
@@ -369,11 +381,11 @@ public class Npc extends StaticEntity {
         if (sheet == idle1) {
             numFrames = 6;
         } else if (sheet == idle2) {
-            numFrames = 11;
+            numFrames = 8;
         } else if (sheet == idle3) {
             numFrames = 7;
         } else if (sheet == dialogue) {
-            numFrames = 16;
+            numFrames = 8;
         } else if (sheet == approval) {
             numFrames = 8;
         }

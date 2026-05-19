@@ -136,7 +136,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         super(x, y,
                 idleDown,
                 GameConstants.PLAYER_NUM_FRAMES,
-                GameConstants.TILE_SIZE, GameConstants.TILE_SIZE,
+                64, 64,
                 GameConstants.PLAYER_SPEED);
 
         // Lưu tất cả 8 sprite sheet vào field
@@ -398,10 +398,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
 
         if (isDashing) {
-            // Tỷ lệ gốc của Player là 48x48 (tương ứng file 32x32 sau upscale 1.5). 
-            // Bằng cách này ảnh 40x40 sẽ được nội suy tự động lên 60x60 và ôm trọn tâm của Player
-            double drawW = this.frameWidth * (this.renderWidth / 32.0); 
-            double drawH = this.frameHeight * (this.renderHeight / 32.0);
+            // Tính toán khung hình lướt sao cho ôm trọn tâm Player dựa trên kích thước gốc 64x64
+            double drawW = this.frameWidth * (this.renderWidth / 64.0); 
+            double drawH = this.frameHeight * (this.renderHeight / 64.0);
             
             double centerX = this.x + this.renderWidth / 2.0;
             double centerY = this.y + this.renderHeight / 2.0;
