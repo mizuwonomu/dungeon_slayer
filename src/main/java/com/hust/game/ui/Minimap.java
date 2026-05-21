@@ -37,8 +37,13 @@ public class Minimap {
         // ===== MAP VIEW =====
         ImageView mapView = new ImageView(minimapImage);
 
-        mapView.setFitWidth(width * 0.9);
-        mapView.setFitHeight(height * 0.9);
+        // Scale map to fully fit screen width
+        mapView.setFitWidth(width);
+
+// Height auto-scales from aspect ratio
+        mapView.setPreserveRatio(true);
+
+        mapView.setSmooth(false);
 
         mapView.setPreserveRatio(true);
         mapView.setSmooth(false);
