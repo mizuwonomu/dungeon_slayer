@@ -22,6 +22,7 @@ import com.hust.game.ui.LevelClearScreen;
 import com.hust.game.ui.TutorialCompleteScreen;
 import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
+import com.hust.game.ui.Minimap;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -73,6 +74,8 @@ public class App extends Application {
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
+    private boolean isMinimapOpen = false;
+    private Minimap minimapUI;
 
     // Camera position
     private double cameraX = 0;
@@ -270,10 +273,21 @@ public class App extends Application {
         scene.setOnKeyPressed(e -> {
             if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
             if (e.getCode() == KeyCode.ESCAPE) {
+                if (isMinimapOpen) {
+                    toggleMinimap(root);
+                    return;
+                }
                 togglePause(stage);
                 return;
             }
-            if (!isPaused) {
+            if (e.getCode() == KeyCode.M) {
+                // Don't open minimap while paused
+                if (!isPaused) {
+                    toggleMinimap(root);
+                }
+                return;
+            }
+            if (!isPaused && !isMinimapOpen) {
                 input.add(e.getCode());
             }
         });
@@ -300,7 +314,7 @@ public class App extends Application {
                     fadeInTimer--;
                     updateCamera(); // Chỉ tính toán camera theo người chơi, bỏ qua logic game
                     pauseBtn.setMouseTransparent(true); // Khóa tương tác nút Pause
-                } else if (!isVictory && !isGameOver && !isPaused) {
+                } else if (!isVictory && !isGameOver && !isPaused && !isMinimapOpen) {
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     
                     // Cơ chế Hit Stop: Đóng băng toàn bộ hoạt động (trừ việc vẽ ra hình)
@@ -632,6 +646,33 @@ public class App extends Application {
             SoundManager.stopGameplaySounds();
         } else {
             com.hust.game.audio.SoundManager.playUnpauseSound(); // Phát âm thanh khi quay lại game
+        }
+    }
+
+    private void toggleMinimap(StackPane root) {
+        isMinimapOpen = !isMinimapOpen;
+        if (isMinimapOpen) {
+            minimapUI = new Minimap(
+                    WIDTH,
+                    HEIGHT,
+                    () -> toggleMinimap(root),
+                    this::loadImg,
+                    player,
+                    gameManager.getMap()
+            );
+
+            root.getChildren().add(minimapUI.getRoot());
+
+            if (gameLoop != null) {
+                gameLoop.stop();
+            }
+        } else {
+            if (minimapUI != null) {
+                root.getChildren().remove(minimapUI.getRoot());
+            }
+            if (gameLoop != null) {
+                gameLoop.start();
+            }
         }
     }
 
