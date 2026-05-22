@@ -114,11 +114,14 @@ public class CombatManager {
         
         particleManager.update();
 
-        // Kiểm tra xem Player có đang chém và hoạt ảnh đã đến frame thứ 4 (index 3) chưa
-        if (player.isAttacking() && player.getFrameIndex() == 3 && !hasDealtDamageThisAttack) {
+        // Kiểm tra xem Player có đang trong frame chém hiệu quả không
+        // Mở rộng cửa sổ gây sát thương ra 2 frame animation (3 và 4) để tăng độ ổn định, tránh lỗi timing hiếm gặp
+        if (player.isAttacking() && (player.getFrameIndex() == 3 || player.getFrameIndex() == 4) && !hasDealtDamageThisAttack) {
             processAttackHits(player.getAttackDamage(), false, true);
             hasDealtDamageThisAttack = true;
-        } else if (player.isThrusting()) {
+        }
+        
+        if (player.isThrusting()) {
             int t = player.getThrustTimer();
             // Tung 3 phát chọc ở các frame 15, 9, 3 (ngay khoảnh khắc lưỡi kiếm đâm ra xa nhất)
             if (t == 15 || t == 9 || t == 3) {

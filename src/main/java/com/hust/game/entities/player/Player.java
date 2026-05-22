@@ -385,21 +385,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
     }
 
-    // Tạo sẵn hiệu ứng tĩnh (static) để GPU không bị quá tải khi load lại mỗi frame
-    private static final javafx.scene.effect.ColorAdjust RED_EFFECT = new javafx.scene.effect.ColorAdjust(-0.15, 0.8,
-            0.1, 0);
-
     @Override
     public void render(GraphicsContext gc) {
-        gc.save();
-        // Hiệu ứng đỏ khi bị thương đồng bộ với quái vật
-        if (flashTimer > 0) {
-            gc.setEffect(RED_EFFECT);
-        }
+        // Hiệu ứng đỏ khi bị thương đã được loại bỏ theo yêu cầu.
 
         if (isDashing) {
             // Tính toán khung hình lướt sao cho ôm trọn tâm Player dựa trên kích thước gốc 64x64
-            double drawW = this.frameWidth * (this.renderWidth / 64.0); 
+            double drawW = this.frameWidth * (this.renderWidth / 64.0);
             double drawH = this.frameHeight * (this.renderHeight / 64.0);
             
             double centerX = this.x + this.renderWidth / 2.0;
@@ -418,7 +410,6 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         } else {
             super.render(gc);
         }
-        gc.restore();
 
         // Vẽ hiệu ứng Power Up đè lên Player
         if (isRageActive && powerUpImg != null) {
@@ -463,12 +454,14 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     public void triggerAttackVisuals(boolean isThrust) {
         if (isThrust) {
+            this.isAttacking = false;
             isThrusting = true;
             thrustTimer = 18; // Kéo dài 0.3s cho đòn chọc
             frameIndex = 0;
             updateSpriteSheet();
             if (attackEffect != null) attackEffect.trigger(true);
         } else {
+            this.isThrusting = false;
             isAttacking = true;
             frameIndex = 0;
             animationTimer = 0;

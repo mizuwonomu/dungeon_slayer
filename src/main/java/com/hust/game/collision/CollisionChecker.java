@@ -21,12 +21,23 @@ public class CollisionChecker {
             return true; // Coi như va chạm nếu ra ngoài map
         }
 
-        int tileId = mapM.mapTileNum[row][col];
-
-        com.hust.game.map.Tile tile = mapM.tiles.get(tileId);
-        if (tile == null) {
+        int tileId1 = mapM.mapTileNum[row][col];
+        com.hust.game.map.Tile tile1 = mapM.tiles.get(tileId1);
+        
+        // Nếu layer 1 là null hoặc solid thì trả về va chạm
+        if (tile1 == null || tile1.collision) {
             return true;
         }
-        return tile.collision; // Trả về true nếu là Pond hoặc Wall
+
+        // Kiểm tra tiếp layer 2
+        if (mapM.mapTileNumLayer2 != null) {
+            int tileId2 = mapM.mapTileNumLayer2[row][col];
+            if (tileId2 == -15) return true; // Vật cản ảo tạo ra từ object to như House (2x2)
+            if (tileId2 > 0) {
+                com.hust.game.map.Tile tile2 = mapM.tiles.get(tileId2);
+                if (tile2 != null && tile2.collision) return true;
+            }
+        }
+        return false;
     }
 }
