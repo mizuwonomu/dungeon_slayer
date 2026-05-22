@@ -48,30 +48,37 @@ public class Tree extends Enemy {
         if (!isActive) return; // Bất động khi ra ngoài camera
         
         if (this.hp <= 0) {
-            if (this.flashTimer > 0) this.flashTimer--;
-
             this.hitStunTimer = 0; 
             this.isCastingSkill = false;
             
-            if (this.flashTimer <= 54) {
-                if (!isDying) {
-                    isDying = true;
-                    if (dieSprite != null) {
-                        this.spriteSheet = dieSprite;
-                        this.numFrames = 8; 
-                        this.frameWidth = dieSprite.getWidth() / 8.0;
-                        this.frameHeight = dieSprite.getHeight();
-                    }
-                    this.frameIndex = 0;
-                    this.animationTimer = 0;
+            if (!isDying) {
+                isDying = true;
+                if (dieSprite != null) {
+                    this.spriteSheet = dieSprite;
+                    this.numFrames = 8; 
+                    this.frameWidth = dieSprite.getWidth() / 8.0;
+                    this.frameHeight = dieSprite.getHeight();
                 }
-                
+                this.frameIndex = 0;
+                this.animationTimer = 0;
+            }
+
+            // Chớp trắng 6 frame đầu tiên
+            if (this.flashTimer > 54) {
+                this.flashTimer--;
+            }
+
+            // Chạy animation chết đến frame cuối
+            if (this.frameIndex < 7) {
                 this.animationTimer++;
                 if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
                     this.animationTimer = 0;
-                    if (this.frameIndex < 7) {
-                        this.frameIndex++;
-                    }
+                    this.frameIndex++;
+                }
+            } else {
+                // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                if (this.flashTimer > 0 && this.flashTimer <= 54) {
+                    this.flashTimer--;
                 }
             }
             return;
@@ -196,6 +203,12 @@ public class Tree extends Enemy {
     public void render(GraphicsContext gc) {
         if (this.hp <= 0) {
             gc.save();
+            // Tính toán alpha để mờ dần (từ 54 về 0)
+            double alpha = this.flashTimer / 54.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            gc.setGlobalAlpha(alpha);
+
             double renderX = this.x;
             double renderY = this.y;
             if (this.isFlipped) renderX += this.renderWidth;

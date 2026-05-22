@@ -16,8 +16,8 @@ public class AttackEffect extends BaseEntity {
     private final Image rageSprite;   // sprite kiếm khi bật skill
 
     public AttackEffect(Image normalSprite, Image rageSprite, Player player) {
-        // Phóng to kích thước render lên x1.5 (90x90)
-        super(0, 0, normalSprite, 8, 90, 90);
+        // Scale kích thước kiếm x0.75 để khớp với Player (48/64 = 0.75). Từ 90x90 xuống 67.5x67.5
+        super(0, 0, normalSprite, 8, 67.5, 67.5);
         this.player = player;
         this.normalSprite = normalSprite;
         this.rageSprite = rageSprite;
@@ -55,25 +55,25 @@ public class AttackEffect extends BaseEntity {
         switch (dir) {
             case UP:
                 baseX = px + (pw / 2) - (renderWidth / 2);
-                baseY = py - renderHeight + 35;
+                baseY = py - renderHeight + 26.25;
                 rotation = -90; // Xoay lên trên
                 this.isFlipped = false;
                 break;
             case DOWN:
                 baseX = px + (pw / 2) - (renderWidth / 2);
-                baseY = py + ph - 35; // Sát vào player
+                baseY = py + ph - 26.25; // Sát vào player
                 rotation = 90; // Xoay xuống dưới
                 this.isFlipped = false;
                 break;
             case LEFT:
-                baseX = px - renderWidth + 35; // Sát vào player
+                baseX = px - renderWidth + 26.25; // Sát vào player
                 baseY = py + (ph / 2) - (renderHeight / 2);
                 rotation = 0; // Giữ nguyên góc quay
                 this.isFlipped = true; // Chỉ lật ảnh ngang (mirror)
                 break;
             case RIGHT:
             default:
-                baseX = px + pw - 35; // Sát vào player
+                baseX = px + pw - 26.25; // Sát vào player
                 baseY = py + (ph / 2) - (renderHeight / 2);
                 rotation = 0; // Giữ nguyên
                 this.isFlipped = false;
@@ -86,9 +86,9 @@ public class AttackEffect extends BaseEntity {
             int cycle = phase % 6; // Lặp lại 3 nhịp (mỗi nhịp 6 khung hình)
             // Tính toán khoảng cách chọc (Thò ra và thụt vào)
             double offset = 0;
-            if (cycle == 0 || cycle == 5) offset = 10;
-            else if (cycle == 1 || cycle == 4) offset = 25;
-            else offset = 40; // Điểm chọc xa nhất
+            if (cycle == 0 || cycle == 5) offset = 7.5;
+            else if (cycle == 1 || cycle == 4) offset = 18.75;
+            else offset = 30.0; // Điểm chọc xa nhất (40 * 0.75)
 
             switch (dir) {
                 case UP: baseY -= offset; break;

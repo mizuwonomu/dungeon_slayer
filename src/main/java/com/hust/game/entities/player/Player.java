@@ -136,7 +136,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         super(x, y,
                 idleDown,
                 GameConstants.PLAYER_NUM_FRAMES,
-                64, 64,
+                48, 48,
                 GameConstants.PLAYER_SPEED);
 
         // Lưu tất cả 8 sprite sheet vào field
@@ -390,7 +390,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         // Hiệu ứng đỏ khi bị thương đã được loại bỏ theo yêu cầu.
 
         if (isDashing) {
-            // Tính toán khung hình lướt sao cho ôm trọn tâm Player dựa trên kích thước gốc 64x64
+            // Tính toán khung hình lướt sao cho ôm trọn tâm Player.
+            // Ảnh dash được thiết kế gốc cho 64x64, nay Player thu nhỏ còn 48x48 nên ta lấy tỷ lệ / 64.0
             double drawW = this.frameWidth * (this.renderWidth / 64.0);
             double drawH = this.frameHeight * (this.renderHeight / 64.0);
             
@@ -475,7 +476,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public Rectangle2D getAttackBox() {
-        double attackRange = isThrusting ? 45.0 : 30.0;
+        double attackRange = isThrusting ? 33.75 : 22.5; // Scale lại tầm đánh theo tỷ lệ 48/64 (x0.75)
         double px = this.x;
         double py = this.y;
         double pw = this.renderWidth;

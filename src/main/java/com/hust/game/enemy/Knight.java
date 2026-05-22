@@ -13,6 +13,8 @@ public class Knight extends Enemy {
     private Image normalSprite;
     private Image skillSprite;
     private boolean isDashing = false;
+    private Image dieSprite;
+    private boolean isDying = false;
     private double dashVectorX, dashVectorY;
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
@@ -26,6 +28,12 @@ public class Knight extends Enemy {
 
         this.normalSprite = sprSheet;
         this.skillSprite = skillSprite;
+        
+        try {
+            this.dieSprite = new Image(getClass().getResourceAsStream("/assets/enemy/knight_die.png"));
+        } catch (Exception e) {
+            System.err.println("Không tìm thấy ảnh die của Knight!");
+        }
     }
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
@@ -35,19 +43,53 @@ public class Knight extends Enemy {
 
     @Override
     public void update() {
-        if (this.flashTimer > 0) {
-            this.flashTimer--;
-        }
-        if (this.hitStunTimer > 0) {
-            this.hitStunTimer--;
+        if (this.hp > 0) {
+            if (this.flashTimer > 0) {
+                this.flashTimer--;
+            }
+            if (this.hitStunTimer > 0) {
+                this.hitStunTimer--;
+            }
         }
 
         // --- BỔ SUNG LOGIC KNOCKBACK MÀ TRƯỚC ĐÓ BỊ THIẾU ---
         this.lastX = this.x;
         this.lastY = this.y;
 
-        // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
         if (this.hp <= 0) {
+            this.hitStunTimer = 0;
+            this.isDashing = false;
+            
+            if (!isDying) {
+                isDying = true;
+                if (dieSprite != null) {
+                    this.spriteSheet = dieSprite;
+                    this.numFrames = 6;
+                    this.frameWidth = dieSprite.getWidth() / 6.0;
+                    this.frameHeight = dieSprite.getHeight();
+                }
+                this.frameIndex = 0;
+                this.animationTimer = 0;
+            }
+            
+            // Chớp trắng 6 frame đầu tiên
+            if (this.flashTimer > 54) {
+                this.flashTimer--;
+            }
+
+            // Chạy animation chết đến frame cuối
+            if (this.frameIndex < 5) {
+                this.animationTimer++;
+                if (this.animationTimer >= 9) { // 54 / 6 = 9 frames game mỗi ảnh
+                    this.animationTimer = 0;
+                    this.frameIndex++;
+                }
+            } else {
+                // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                if (this.flashTimer > 0 && this.flashTimer <= 54) {
+                    this.flashTimer--;
+                }
+            }
             return;
         }
         
@@ -144,6 +186,35 @@ public class Knight extends Enemy {
     public boolean isDealingDamage() {
         // Chỉ gây sát thương đúng vào khoảnh khắc lướt (frame 8 và 9)
         return this.isDashing && this.frameIndex >= 8 && this.frameIndex <= 9;
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        if (this.hp <= 0) {
+            gc.save();
+            // Tính toán alpha để mờ dần (từ 54 về 0)
+            double alpha = this.flashTimer / 54.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            gc.setGlobalAlpha(alpha);
+
+            double renderX = this.x;
+            double renderY = this.y;
+            if (this.isFlipped) renderX += this.renderWidth;
+            double renderW = this.isFlipped ? -this.renderWidth : this.renderWidth;
+
+            gc.drawImage(this.spriteSheet,
+                this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+                renderX, renderY, renderW, this.renderHeight);
+            gc.restore();
+
+            // Chớp trắng lúc vừa nhận đòn kết liễu
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
+            }
+        } else {
+            super.render(gc);
+        }
     }
 
     @Override
