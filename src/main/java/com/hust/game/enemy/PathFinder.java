@@ -3,6 +3,7 @@ package com.hust.game.enemy;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.collision.CollisionChecker;
 import java.util.ArrayList;
+import java.util.PriorityQueue;
 
 public class PathFinder {
     public class Node {
@@ -18,7 +19,13 @@ public class PathFinder {
     }
     
     Node[][] node;
-    ArrayList<Node> openList = new ArrayList<>();
+    PriorityQueue<Node> openList = new PriorityQueue<>((n1, n2) -> {
+        int result = Integer.compare(n1.fCost, n2.fCost);
+        if (result == 0) {
+            return Integer.compare(n1.gCost, n2.gCost);
+        }
+        return result;
+    });
     public ArrayList<Node> pathList = new ArrayList<>();
     Node startNode, goalNode, currentNode;
     boolean goalReached = false;
@@ -53,25 +60,21 @@ public class PathFinder {
         startNode = node[startRow][startCol];
         currentNode = startNode;
         goalNode = node[goalRow][goalCol];
-        openList.add(currentNode);
         
-        // Đặt lại trạng thái và tính toán Heuristic (Chi phí quãng đường) cho tất cả các Node
+        // Đặt lại trạng thái cho tất cả các Node (Chỉ thiết lập cờ, KHÔNG tính toán toán học ở đây)
         for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
             for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
                 node[row][col].open = false;
                 node[row][col].checked = false;
-                
-                int xDistance = Math.abs(col - startCol);
-                int yDistance = Math.abs(row - startRow);
-                node[row][col].gCost = xDistance + yDistance;
-                
-                xDistance = Math.abs(col - goalCol);
-                yDistance = Math.abs(row - goalRow);
-                node[row][col].hCost = xDistance + yDistance;
-                
-                node[row][col].fCost = node[row][col].gCost + node[row][col].hCost;
             }
         }
+        
+        startNode.gCost = 0;
+        startNode.hCost = Math.abs(startCol - goalCol) + Math.abs(startRow - goalRow);
+        startNode.fCost = startNode.gCost + startNode.hCost;
+        
+        openList.add(currentNode);
+        currentNode.open = true;
     }
     
     public boolean search() {
@@ -80,7 +83,6 @@ public class PathFinder {
             int row = currentNode.row;
             
             currentNode.checked = true;
-            openList.remove(currentNode);
             
             // Quét 4 hướng: Lên, Trái, Xuống, Phải
             if (row - 1 >= 0) openNode(node[row - 1][col]);
@@ -88,21 +90,8 @@ public class PathFinder {
             if (row + 1 < GameConstants.MAX_WORLD_ROW) openNode(node[row + 1][col]);
             if (col + 1 < GameConstants.MAX_WORLD_COL) openNode(node[row][col + 1]);
             
-            int bestNodeIndex = -1;
-            int bestNodefCost = 9999;
-            
-            for (int i = 0; i < openList.size(); i++) {
-                if (openList.get(i).fCost < bestNodefCost) {
-                    bestNodeIndex = i;
-                    bestNodefCost = openList.get(i).fCost;
-                } else if (openList.get(i).fCost == bestNodefCost) {
-                    if (openList.get(i).gCost < openList.get(bestNodeIndex).gCost) {
-                        bestNodeIndex = i;
-                    }
-                }
-            }
-            if (bestNodeIndex == -1) break; // Kẹt cứng không tìm được đường
-            currentNode = openList.get(bestNodeIndex);
+            currentNode = openList.poll();
+            if (currentNode == null) break; // Kẹt cứng không tìm được đường
             
             if (currentNode == goalNode) {
                 goalReached = true;
@@ -122,6 +111,11 @@ public class PathFinder {
             if (!collisionChecker.checkTile(pixelX, pixelY)) {
                 node.open = true;
                 node.parent = currentNode;
+                
+                node.gCost = currentNode.gCost + 1;
+                node.hCost = Math.abs(node.col - goalNode.col) + Math.abs(node.row - goalNode.row);
+                node.fCost = node.gCost + node.hCost;
+                
                 openList.add(node);
             } else {
                 node.checked = true; // Là tường thì chốt lại luôn, không xét lại nữa

@@ -188,8 +188,8 @@ public class CombatManager {
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
-            // Bỏ qua nếu quái vật đã chết (đang trong trạng thái mờ dần)
-            if (enemy.getHp() <= 0) continue;
+            // Bỏ qua nếu quái vật đã chết hoặc nằm ngoài vùng camera (Culling)
+            if (enemy.getHp() <= 0 || !enemy.isActive()) continue;
 
             // Lấy boundary của enemy (Rectangle2D)
             Rectangle2D enemyBox = enemy.getBoundary();

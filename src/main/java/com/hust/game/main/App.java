@@ -976,9 +976,13 @@ public class App extends Application {
             // Bước 1: Tính toán lực đẩy (Soft Collision) giữa các quái vật trước
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
                 for (int j = i + 1; j < enemies.size(); j++) {
                     Enemy otherEnemy = enemies.get(j);
+                    if (!otherEnemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                    
                     if (enemy.getCollisionBoundary().intersects(otherEnemy.getCollisionBoundary())) {
                         // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt
                         // thành 1 cục)
@@ -1012,6 +1016,8 @@ public class App extends Application {
             // giật ngược lại vị trí an toàn
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 javafx.geometry.Rectangle2D eCol = enemy.getCollisionBoundary();
                 int eLeft = (int) eCol.getMinX();
                 int eRight = (int) eCol.getMaxX();
@@ -1039,6 +1045,8 @@ public class App extends Application {
         if (enemyManager != null) {
             List<Enemy> enemies = enemyManager.getEnemyList();
             for (Enemy enemy : enemies) {
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 // Phải soi xem nó có đụng Player không đã!
                 if (enemy.getCollisionBoundary().intersects(player.getCollisionBoundary())) {
 
@@ -1057,9 +1065,17 @@ public class App extends Application {
 
         // KIỂM TRA NHẶT VẬT PHẨM (Interactable)
         if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
+            double pX = player.getX();
+            double pY = player.getY();
             Iterator<BaseEntity> it = gameManager.getMap().mapEntities.iterator();
             while (it.hasNext()) {
                 BaseEntity entity = it.next();
+                
+                // Tối ưu culling: Chỉ kiểm tra va chạm với những vật thể nằm rất gần Player (Khoảng ~3 ô)
+                if (Math.abs(entity.getX() - pX) > 150 || Math.abs(entity.getY() - pY) > 150) {
+                    continue;
+                }
+
                 if (entity instanceof Interactable) {
                     // Player dẫm lên vật phẩm (so sánh 2 hitbox)
                     if (player.getCollisionBoundary().intersects(entity.getBoundary())) {
