@@ -2,6 +2,7 @@ package com.hust.game.main;
 
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
+import com.hust.game.dev.DevSettings;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
@@ -1235,6 +1236,17 @@ public class App extends Application {
     }
 
     private void showLoadingScreen(Stage stage, Scene nextScene, Runnable onLoaded) {
+        if (DevSettings.shouldSkipLoadingScreens()) {
+            if (App.this.gc != null) {
+                App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
+                App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
+                App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
+            }
+            stage.setScene(nextScene);
+            onLoaded.run();
+            return;
+        }
+
         StackPane root = new StackPane();
         root.setStyle("-fx-background-color: black;");
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
