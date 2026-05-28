@@ -8,6 +8,8 @@ import com.hust.game.entities.base.MovingEntity;
 import com.hust.game.entities.interfaces.Attackable;
 import com.hust.game.entities.interfaces.Collidable;
 import com.hust.game.entities.interfaces.Damageable;
+import com.hust.game.entities.player.merge.MergeFormType;
+import com.hust.game.entities.player.merge.PlayerMergeController;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.geometry.Rectangle2D;
@@ -118,6 +120,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private int attackCooldown = 0; 
     private static final int ATTACK_COOLDOWN_MAX = (8 * 2); // Giảm thời gian chờ xuống còn một nửa (16 frames)
     private final int attackDamage = 20; // sát thương mỗi đòn
+    private final PlayerMergeController mergeController = new PlayerMergeController();
 
     // -------------------------------------------------------
     // CONSTRUCTOR
@@ -167,6 +170,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.powerUpImg = powerUpImg;
         this.thunderImg = thunderImg;
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
+    }
+
+    public void configureTreeMerge(Image treeImg, Image treeSkillImg) {
+        mergeController.configureTreeSprites(treeImg, treeSkillImg);
     }
 
     // -------------------------------------------------------
@@ -367,6 +374,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
                 }
             }
         }
+
+        mergeController.update();
     }
 
     // Thêm method — CombatManager gọi khi bật/tắt skill
@@ -389,7 +398,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     public void render(GraphicsContext gc) {
         // Hiệu ứng đỏ khi bị thương đã được loại bỏ theo yêu cầu.
 
-        if (isDashing) {
+        if (mergeController.isActive()) {
+            mergeController.render(gc, x, y, renderWidth, renderHeight, direction);
+        } else if (isDashing) {
             // Tính toán khung hình lướt sao cho ôm trọn tâm Player.
             // Ảnh dash được thiết kế gốc cho 64x64, nay Player thu nhỏ còn 48x48 nên ta lấy tỷ lệ / 64.0
             double drawW = this.frameWidth * (this.renderWidth / 64.0);
@@ -413,7 +424,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
 
         // Vẽ hiệu ứng Power Up đè lên Player
-        if (isRageActive && powerUpImg != null) {
+        if (isRageActive && !mergeController.isActive() && powerUpImg != null) {
             gc.save();
             // Ở 60 frame (1 giây) cuối cùng -> giảm dần Alpha để tạo hiệu ứng mờ dần
             double alpha = 1.0;
@@ -432,7 +443,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
         
         // Vẽ hiệu ứng Thunder sấm sét đè lên tất cả
-        if (isThunderActive && thunderImg != null) {
+        if (isThunderActive && !mergeController.isActive() && thunderImg != null) {
             double tw = thunderImg.getWidth() / 3;
             double th = thunderImg.getHeight();
             double tx = thunderFrameIndex * tw;
@@ -454,6 +465,14 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public void triggerAttackVisuals(boolean isThrust) {
+        if (mergeController.isTreeActive()) {
+            isAttacking = false;
+            isThrusting = false;
+            if (attackEffect != null) attackEffect.setActive(false);
+            mergeController.startTreeAttack();
+            return;
+        }
+
         if (isThrust) {
             this.isAttacking = false;
             isThrusting = true;
@@ -476,6 +495,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     }
 
     public Rectangle2D getAttackBox() {
+        if (mergeController.isTreeActive()) {
+            return mergeController.getTreeAttackBox(x, y, renderWidth, renderHeight);
+        }
+
         double attackRange = isThrusting ? 33.75 : 22.5; // Scale lại tầm đánh theo tỷ lệ 48/64 (x0.75)
         double px = this.x;
         double py = this.y;
@@ -731,7 +754,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     /** Chỉ cho tấn công khi cooldown đã về 0 */
     @Override
     public boolean canAttack() {
-        return attackCooldown == 0 && !isDashing && !isThrusting; // Không được chém khi đang lướt/chọc
+        return attackCooldown == 0 && !isDashing && !isThrusting && !isTreeMergeAttacking(); // Không được chém khi đang lướt/chọc
     }
 
     public void resetAttackCooldown(int cooldown) {
@@ -752,6 +775,51 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.currentMana = maxMana;
         this.healthPotionCount = 0;
         this.manaPotionCount = 0;
+        mergeController.clearAll();
         resetAttackCooldown();
+    }
+
+    public void grantMergeForm(MergeFormType formType) {
+        mergeController.grantForm(formType);
+    }
+
+    public boolean activateStoredMergeForm() {
+        return mergeController.activateStoredForm();
+    }
+
+    public boolean hasStoredMergeForm() {
+        return mergeController.hasStoredForm();
+    }
+
+    public boolean isMergeActive() {
+        return mergeController.isActive();
+    }
+
+    public boolean isTreeMergeActive() {
+        return mergeController.isTreeActive();
+    }
+
+    public boolean isTreeMergeAttacking() {
+        return mergeController.isTreeAttacking();
+    }
+
+    public int getTreeMergeFrameIndex() {
+        return mergeController.getTreeFrameIndex();
+    }
+
+    public int getTreeMergeDamageFrame() {
+        return mergeController.getTreeDamageFrame();
+    }
+
+    public int getTreeMergeDamage() {
+        return mergeController.getTreeDamage();
+    }
+
+    public int getTreeMergeAttackCooldown() {
+        return mergeController.getTreeAttackCooldown();
+    }
+
+    public int getMergeDurationRemaining() {
+        return mergeController.getActiveTimer();
     }
 }

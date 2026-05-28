@@ -3,6 +3,7 @@ package com.hust.game.combat;
 import com.hust.game.enemy.Enemy;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.player.PlayerCombat;
+import com.hust.game.entities.player.merge.MergeFormType;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
@@ -116,6 +117,13 @@ public class CombatManager {
 
         // Kiểm tra xem Player có đang trong frame chém hiệu quả không
         // Mở rộng cửa sổ gây sát thương ra 2 frame animation (3 và 4) để tăng độ ổn định, tránh lỗi timing hiếm gặp
+        if (player.isTreeMergeAttacking()
+                && player.getTreeMergeFrameIndex() == player.getTreeMergeDamageFrame()
+                && !hasDealtDamageThisAttack) {
+            processAttackHits(player.getTreeMergeDamage(), false, true);
+            hasDealtDamageThisAttack = true;
+        }
+
         if (player.isAttacking() && (player.getFrameIndex() == 3 || player.getFrameIndex() == 4) && !hasDealtDamageThisAttack) {
             processAttackHits(player.getAttackDamage(), false, true);
             hasDealtDamageThisAttack = true;
@@ -144,6 +152,14 @@ public class CombatManager {
         // Kiểm tra cooldown tấn công — nếu chưa hết thì bỏ qua
         if (!player.canAttack()) return;
 
+        if (player.isTreeMergeActive()) {
+            player.triggerAttackVisuals(false);
+            player.resetAttackCooldown(player.getTreeMergeAttackCooldown());
+            hasDealtDamageThisAttack = false;
+            hasIncreasedComboThisAttack = false;
+            return;
+        }
+
         // Nếu đánh đến đòn thứ 3 -> Bật chế độ Chọc (Thrust)
         boolean isThrust = (comboCount > 0 && comboCount % 3 == 2);
 
@@ -169,7 +185,7 @@ public class CombatManager {
 
         // Tính damage thực tế — nhân đôi nếu skill đang bật
         int actualDamage = baseDamage;
-        if (skillActive) {
+        if (skillActive && !player.isTreeMergeActive()) {
             actualDamage *= SKILL_DAMAGE_MULTIPLIER;
         }
         if (isCrit) {
@@ -222,6 +238,9 @@ public class CombatManager {
                 
                 if (enemy.getHp() <= 0) {
                     isFinalHit = true;
+                    if (enemy instanceof com.hust.game.enemy.Tree) {
+                        player.grantMergeForm(MergeFormType.TREE);
+                    }
                     if (enemy instanceof com.hust.game.enemy.Witch) isWitchDead = true;
                 if (enemy instanceof com.hust.game.enemy.FinalBoss) isBossDefeated = true;
                 }

@@ -77,6 +77,7 @@ public class App extends Application {
     private boolean isOHeld = false;
     private boolean is1Held = false;
     private boolean is2Held = false;
+    private boolean isKHeld = false;
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
@@ -728,6 +729,7 @@ public class App extends Application {
                     cDown, cUp, cLeft, cRight, 
                     dDown, dUp, dLeft, dRight, 
                     swordHit, rageHit, powerUpImg, thunderImg);
+            player.configureTreeMerge(treeImg, treeSkillImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
@@ -830,7 +832,16 @@ public class App extends Application {
             isJHeld = false; // Nhả phím J ra thì reset cờ cho phép chém tiếp
         }
 
-        if (input.contains(KeyCode.L)) {
+        if (input.contains(KeyCode.K)) {
+            if (!isKHeld) {
+                player.activateStoredMergeForm();
+                isKHeld = true;
+            }
+        } else {
+            isKHeld = false;
+        }
+
+        if (input.contains(KeyCode.L) && !player.isMergeActive()) {
             combatManager.activateSkill();
         }
 

@@ -137,6 +137,29 @@ public class HUD {
                 gc.fillText(seconds + "s", cdTextX, cdTextY);
             }
         }
+
+        renderMergeStatus(gc, drawX, drawY);
+    }
+
+    private void renderMergeStatus(GraphicsContext gc, double drawX, double drawY) {
+        if (!player.isMergeActive() && !player.hasStoredMergeForm()) {
+            return;
+        }
+
+        double textX = drawX + 5;
+        double textY = drawY + RENDER_HEIGHT + 54;
+        String text = player.isMergeActive()
+                ? "TREE " + Math.max(1, (int) Math.ceil(player.getMergeDurationRemaining() / 60.0)) + "s"
+                : "TREE READY [K]";
+
+        gc.setGlobalAlpha(1.0);
+        gc.setFont(pixelFont);
+        gc.setFill(javafx.scene.paint.Color.LIGHTGREEN);
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(1.0);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.strokeText(text, textX, textY);
+        gc.fillText(text, textX, textY);
     }
 
     private int getFrameIndex(int current, int max) {
