@@ -1,5 +1,6 @@
 package com.hust.game.progression;
 
+import com.hust.game.constants.GameConstants;
 import com.hust.game.enemy.EnemyManager;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.npc.Npc;
@@ -66,12 +67,21 @@ public class GameManager {
         } else if (lvlID == 1) {
             player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 16 * com.hust.game.constants.GameConstants.TILE_SIZE);
         } else if (lvlID == 2) {
-            player.reset(408, 200); // Tọa độ mặc định của Level 2
+            player.reset(7 * com.hust.game.constants.GameConstants.TILE_SIZE, 22 * com.hust.game.constants.GameConstants.TILE_SIZE); // Tọa độ mặc định của Level 2
         } else if (lvlID == 3) {
             player.reset(150, 312); // Dịch player sang trái và giữa trục Y cho màn đánh Boss
         }
 
         currentLevel.init();
+    }
+
+    public String getBackgroundPath() {
+        switch(currentLevelIndex) {
+            case 2:
+                return "/assets/lvl2_bg.png";
+            default:
+                return "/assets/back_screen.png";
+        }
     }
 
     public boolean isVictory(){
