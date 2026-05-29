@@ -52,7 +52,7 @@ public class HUD {
         // Skill icon
         berserkIcon = new Image(
                 getClass().getResourceAsStream("/assets/berserk.png"),
-                32, 32, true, false
+                32, 32, false, false
         );
 
     pixelFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 14);
