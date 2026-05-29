@@ -719,7 +719,7 @@ public class App extends Application {
             healthPotionImg = loadImg("/assets/items/health_potion.png");
             manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
-            Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
+            Image bossImg = loadImg("/assets/enemy/boss_idle.png");
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,

@@ -7,8 +7,12 @@ import com.hust.game.entities.player.Player;
 import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
 import javafx.scene.paint.Color;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -17,10 +21,7 @@ public class FinalBoss extends Enemy {
     // Bộ trạng thái của boss: mỗi thời điểm chỉ chạy một trạng thái để tránh spam/chồng chiêu.
     private enum BossState {
         CHASE,
-        NORMAL_WINDUP,
-        NORMAL_ACTIVE,
         SKILL1_TELEPORT,
-        SKILL1_DELAY,
         SKILL1_SLASH1,
         SKILL1_GAP,
         SKILL1_SLASH2,
@@ -40,36 +41,46 @@ public class FinalBoss extends Enemy {
     private static final int IDLE_FRAMES = 5;
     private static final int ATTACK_1_FRAMES = 21;
     private static final int ATTACK_2_FRAMES = 40;
-    private static final int TELE_FRAMES = 8;
+    private static final int TELE_FRAMES = 11;
     private static final int WALK_FRAMES = 10;
-    private static final int ULTIMATE_FRAMES = 25;
+    private static final int ULTIMATE_FRAMES = 50;
+    private static final int DRAGON_FRAMES = 3;
+    private static final int SKILL2_ITEM_FRAMES = 2;
+    private static final double ULTIMATE_SAFE_FRAME_SIZE = 160.0;
+    private static final double ULTIMATE_FRAME_CACHE_SIZE = 384.0;
 
     // Bộ đếm thời gian tính theo 60 FPS: 120 frame = 2 giây, 30 frame = 0.5 giây.
     private static final int ACTION_DELAY_FRAMES = 120;
-    private static final int NORMAL_WINDUP_FRAMES = 36;
-    private static final int NORMAL_ACTIVE_FRAMES = 18;
-    private static final int NORMAL_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
     private static final int SKILL1_TELEPORT_FRAMES = 40;
-    private static final int SKILL1_DELAY_FRAMES = 30;
     private static final int SKILL1_SLASH_FRAMES = 30;
     private static final int SKILL1_GAP_FRAMES = 20;
     private static final int SKILL1_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
-    private static final int SKILL2_CAST_FRAMES = 42;
+    private static final int SKILL2_CAST_FRAMES = ATTACK_2_FRAMES * 3;
     private static final int SKILL2_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
-    private static final int RAGE_TELEGRAPH_FRAMES = 60;
+    private static final int RAGE_TELEGRAPH_FRAMES = ULTIMATE_FRAMES * 3;
 
     private static final int TELEPORT_APPLY_FRAME = 5;
+    private static final int SKILL2_VOLLEY_1_FRAME = 8;
+    private static final int SKILL2_VOLLEY_2_FRAME = 20;
+    private static final int SKILL2_VOLLEY_3_FRAME = 32;
+    private static final int RAGE_DRAGON_RELEASE_FRAME = 24;
 
-    private static final int NORMAL_COOLDOWN_FRAMES = 110;
     private static final int SKILL1_COOLDOWN_FRAMES = 330;
     private static final int SKILL2_COOLDOWN_FRAMES = 300;
 
-    private static final double NORMAL_ATTACK_RADIUS_MULTIPLIER = 1.35;
     private static final double SKILL1_RADIUS_MULTIPLIER = 1.5;
-    private static final double RAGE_RADIUS_MULTIPLIER = 3.0;
-    private static final double FLYING_SWORD_RENDER_SIZE = 84.0;
-    private static final double FLYING_SWORD_HIT_RADIUS = 30.0;
+    private static final double RAGE_RADIUS_MULTIPLIER = 4.0;
+    private static final double SKILL2_ITEM_RENDER_SIZE = 96.0;
+    private static final double SKILL2_ITEM_HIT_RADIUS = 30.0;
+    private static final double SKILL2_PROJECTILE_SPEED = 9.0;
+    private static final double SKILL2_PROJECTILE_MAX_DISTANCE = GameConstants.TILE_SIZE * 18.0;
+    private static final double SKILL2_SPREAD_ANGLE_DEGREES = 60.0;
     private static final double SKILL2_BOSS_RENDER_SCALE = 2.0;
+    private static final double ULTIMATE_BOSS_RENDER_SCALE = 4.0;
+    private static final double DRAGON_SPEED = 8.0;
+    private static final int DRAGON_MAX_FLIGHT_FRAMES = 120;
+    private static final double DRAGON_RENDER_WIDTH = 288.0;
+    private static final double DRAGON_RENDER_HEIGHT = 198.0;
     private static final double WANDER_SPEED = 1.0;
 
     // Level 3 đang dùng lại level2.txt. Tâm arena đi được nằm quanh hàng 5,
@@ -84,18 +95,21 @@ public class FinalBoss extends Enemy {
     private final Image teleSprite;
     private final Image walkSprite;
     private final Image ultiSprite;
-    private final Image swordSprite;
+    private final Image[] ultiFrameSprites;
+    private final Image dragonSprite;
+    private final Image skill2Item1Sprite;
+    private final Image skill2Item2Sprite;
 
     private BossState bossState = BossState.CHASE;
     private int stateTimer = 0;
-    private int normalCooldownTimer = 45;
     private int skill1CooldownTimer = 120;
     private int skill2CooldownTimer = 80;
     private int attackCountSinceRage = 0;
     private boolean rageQueued = false;
-    private boolean hasHitPlayerThisAttack = false;
-    private boolean hasSpawnedSkill2Sword = false;
     private boolean hasTeleportedThisSkill = false;
+    private boolean hasFiredSkill2Volley = false;
+    private int currentSkill2VolleyCount = 1;
+    private int nextSkill2VolleyCount = 1;
 
     private double teleportTargetX = 0;
     private double teleportTargetY = 0;
@@ -109,7 +123,7 @@ public class FinalBoss extends Enemy {
 
     private CircleHitbox activeHitbox;
     private DragonStrike dragonStrike;
-    private final List<FlyingSwordProjectile> flyingSwords = new ArrayList<>();
+    private final List<Skill2SlashProjectile> skill2Projectiles = new ArrayList<>();
 
     public FinalBoss(double x, double y, Image spriteSheet, int numFrames,
             double renderWidth, double renderHeight, Player targetPlayer) {
@@ -118,7 +132,7 @@ public class FinalBoss extends Enemy {
         // Chỉ số chính của boss.
         this.maxHp = BOSS_MAX_HP;
         this.hp = maxHp;
-        this.damage = Math.max(1, targetPlayer.getMaxHp() / 5);
+        this.damage = 0;
         this.knockback = 1;
         this.speed = 1.15;
         this.isImmobile = false;
@@ -132,8 +146,14 @@ public class FinalBoss extends Enemy {
         this.attackSprite2 = loadOptionalImage("/assets/enemy/boss_atk_2.png");
         this.teleSprite = loadOptionalImage("/assets/enemy/boss_tele.png");
         this.walkSprite = loadOptionalImage("/assets/enemy/boss_walk.png");
-        this.ultiSprite = loadOptionalImage("/assets/enemy/final_boss_ulti.png");
-        this.swordSprite = loadOptionalImage("/assets/player/wswordhit.png");
+        // Ảnh ulti gốc rộng 38400px. Nếu vẽ trực tiếp, JavaFX Canvas có thể ném NullPointerException do vượt giới hạn texture GPU.
+        this.ultiSprite = loadOptionalImage("/assets/enemy/boss_ultimate.png",
+                ULTIMATE_SAFE_FRAME_SIZE * ULTIMATE_FRAMES, ULTIMATE_SAFE_FRAME_SIZE);
+        this.ultiFrameSprites = loadOptionalFrames("/assets/enemy/boss_ultimate.png",
+                ULTIMATE_FRAMES, (int) ULTIMATE_FRAME_CACHE_SIZE, (int) ULTIMATE_FRAME_CACHE_SIZE);
+        this.dragonSprite = loadOptionalImage("/assets/enemy/dragon.png");
+        this.skill2Item1Sprite = loadOptionalImage("/assets/enemy/atk_2_item_1.png");
+        this.skill2Item2Sprite = loadOptionalImage("/assets/enemy/atk_2_item_2.png");
     }
 
     @Override
@@ -160,11 +180,7 @@ public class FinalBoss extends Enemy {
 
         switch (bossState) {
             case CHASE -> updateChase();
-            case NORMAL_WINDUP -> updateNormalWindup();
-            case NORMAL_ACTIVE -> updateNormalActive();
             case SKILL1_TELEPORT -> updateSkill1Teleport();
-            case SKILL1_DELAY -> updateTimedState(BossState.SKILL1_SLASH1, SKILL1_SLASH_FRAMES, () ->
-                    activeHitbox = createSlashHitbox(SKILL1_DAMAGE, playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER, SKILL1_SLASH_FRAMES));
             case SKILL1_SLASH1 -> updateActiveCircleHitbox(BossState.SKILL1_GAP, SKILL1_GAP_FRAMES);
             case SKILL1_GAP -> updateTimedState(BossState.SKILL1_SLASH2, SKILL1_SLASH_FRAMES, () ->
                     activeHitbox = createSlashHitbox(SKILL1_DAMAGE, playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER, SKILL1_SLASH_FRAMES));
@@ -182,7 +198,6 @@ public class FinalBoss extends Enemy {
     private void updateCommonTimers() {
         // Giảm cooldown mỗi frame.
         if (flashTimer > 0) flashTimer--;
-        if (normalCooldownTimer > 0) normalCooldownTimer--;
         if (skill1CooldownTimer > 0) skill1CooldownTimer--;
         if (skill2CooldownTimer > 0) skill2CooldownTimer--;
 
@@ -212,36 +227,11 @@ public class FinalBoss extends Enemy {
             moveTowardPlayer(distance);
         }
 
-        if (normalCooldownTimer <= 0 && distance <= normalAttackStartRange()) {
-            startNormalAttack();
-        } else if (skill1CooldownTimer <= 0 && distance <= GameConstants.TILE_SIZE * 6.0) {
+        // Boss không có đánh thường: chỉ chọn Skill 1, Skill 2 hoặc chiêu nộ.
+        if (skill1CooldownTimer <= 0 && distance <= GameConstants.TILE_SIZE * 6.0) {
             startSkill1();
         } else if (skill2CooldownTimer <= 0) {
             startSkill2();
-        }
-    }
-
-    private void updateNormalWindup() {
-        // Đánh thường có windup để player kịp nhìn animation trước khi dính damage.
-        setSprite(attackSprite1 != null ? attackSprite1 : idleSprite,
-                attackSprite1 != null ? ATTACK_1_FRAMES : idleFrames, 3);
-        if (--stateTimer <= 0) {
-            changeState(BossState.NORMAL_ACTIVE, NORMAL_ACTIVE_FRAMES);
-            hasHitPlayerThisAttack = false;
-        }
-    }
-
-    private void updateNormalActive() {
-        // Một nhát đánh thường chỉ gây damage một lần nhờ hasHitPlayerThisAttack.
-        CircleHitbox hitbox = createSlashHitbox(this.damage, normalAttackRadius(), NORMAL_ACTIVE_FRAMES);
-        if (!hasHitPlayerThisAttack && hitbox.intersectsPlayer()) {
-            targetPlayer.takeDamage(hitbox.damage, hitbox.centerX, hitbox.centerY);
-            hasHitPlayerThisAttack = true;
-        }
-
-        if (--stateTimer <= 0) {
-            normalCooldownTimer = NORMAL_COOLDOWN_FRAMES;
-            changeState(BossState.RECOVERY, NORMAL_RECOVERY_FRAMES);
         }
     }
 
@@ -250,7 +240,7 @@ public class FinalBoss extends Enemy {
         setSprite(teleSprite != null ? teleSprite : idleSprite,
                 teleSprite != null ? TELE_FRAMES : idleFrames, 5);
 
-        // Tele không gây damage. Damage bắt đầu sau delay 0.5 giây ở state SKILL1_DELAY.
+        // Tele không gây damage. Sau khi animation tele xong thì vào chém ngay, không chờ delay.
         if (!hasTeleportedThisSkill && frameIndex >= TELEPORT_APPLY_FRAME) {
             x = teleportTargetX;
             y = teleportTargetY;
@@ -259,18 +249,19 @@ public class FinalBoss extends Enemy {
         }
 
         if (--stateTimer <= 0) {
-            changeState(BossState.SKILL1_DELAY, SKILL1_DELAY_FRAMES);
+            changeState(BossState.SKILL1_SLASH1, SKILL1_SLASH_FRAMES);
+            activeHitbox = createSlashHitbox(SKILL1_DAMAGE, playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER, SKILL1_SLASH_FRAMES);
         }
     }
 
     private void updateSkill2Cast() {
-        // Skill 2: boss vận chiêu kiếm bay theo hướng player tại thời điểm bắt đầu.
+        // Skill 2: mỗi lần cast chỉ bắn một pattern. Các lần cast sau tăng 1 -> 2 -> 3 vệt.
         setSprite(attackSprite2 != null ? attackSprite2 : idleSprite,
                 attackSprite2 != null ? ATTACK_2_FRAMES : idleFrames, 3);
 
-        if (!hasSpawnedSkill2Sword && stateTimer <= SKILL2_CAST_FRAMES / 2) {
-            hasSpawnedSkill2Sword = true;
-            flyingSwords.add(new FlyingSwordProjectile());
+        if (!hasFiredSkill2Volley && frameIndex >= skill2FireFrame(currentSkill2VolleyCount)) {
+            spawnSkill2Volley(currentSkill2VolleyCount);
+            hasFiredSkill2Volley = true;
         }
 
         if (--stateTimer <= 0) {
@@ -280,12 +271,25 @@ public class FinalBoss extends Enemy {
     }
 
     private void updateRageTelegraph() {
-        // Chiêu nộ có 1 giây cảnh báo tại vị trí player bị khóa lúc cast.
+        // Chiêu nộ dùng boss_ultimate.png. Cổng mở ở frame 24-45, rồng chui ra từ cổng ở frame 24.
         setSprite(ultiSprite != null ? ultiSprite : idleSprite,
-                ultiSprite != null ? ULTIMATE_FRAMES : idleFrames, 4);
+                ultiSprite != null ? ULTIMATE_FRAMES : idleFrames, 3);
+
+        if (dragonStrike == null && frameIndex >= RAGE_DRAGON_RELEASE_FRAME) {
+            dragonStrike = new DragonStrike(centerX(), centerY() - renderHeight * 0.45,
+                    rageTargetX, rageTargetY, playerZoneRadius() * RAGE_RADIUS_MULTIPLIER);
+        }
+        if (dragonStrike != null && !dragonStrike.isDone()) {
+            dragonStrike.update();
+        }
+
         if (--stateTimer <= 0) {
-            dragonStrike = new DragonStrike(rageTargetX, rageTargetY, playerZoneRadius() * RAGE_RADIUS_MULTIPLIER);
-            changeState(BossState.RAGE_DRAGON, 0);
+            if (dragonStrike != null && !dragonStrike.isDone()) {
+                changeState(BossState.RAGE_DRAGON, 0);
+            } else {
+                dragonStrike = null;
+                changeState(BossState.RECOVERY, ACTION_DELAY_FRAMES);
+            }
         }
     }
 
@@ -353,12 +357,12 @@ public class FinalBoss extends Enemy {
     }
 
     private void updateProjectiles() {
-        // Cập nhật tất cả kiếm bay và xóa vật thể bay đã kết thúc.
-        Iterator<FlyingSwordProjectile> iterator = flyingSwords.iterator();
+        // Cập nhật tất cả vệt chém bay và xóa vật thể bay đã kết thúc.
+        Iterator<Skill2SlashProjectile> iterator = skill2Projectiles.iterator();
         while (iterator.hasNext()) {
-            FlyingSwordProjectile sword = iterator.next();
-            sword.update();
-            if (sword.isFinished()) {
+            Skill2SlashProjectile slash = iterator.next();
+            slash.update();
+            if (slash.isFinished()) {
                 iterator.remove();
             }
         }
@@ -369,19 +373,11 @@ public class FinalBoss extends Enemy {
         bossState = BossState.DEAD;
         activeHitbox = null;
         dragonStrike = null;
-        flyingSwords.clear();
+        skill2Projectiles.clear();
         if (flashTimer > 0) {
             flashTimer--;
         }
         animateCurrentSprite();
-    }
-
-    private void startNormalAttack() {
-        // Bắt đầu đánh thường và tính 1 action vào bộ đếm nộ.
-        registerBossAttackAction();
-        lockAimToPlayer();
-        hasHitPlayerThisAttack = false;
-        changeState(BossState.NORMAL_WINDUP, NORMAL_WINDUP_FRAMES);
     }
 
     private void startSkill1() {
@@ -398,12 +394,51 @@ public class FinalBoss extends Enemy {
     }
 
     private void startSkill2() {
-        // Bắt đầu Skill 2: khóa hướng player rồi phóng kiếm đi và quay về.
+        // Bắt đầu Skill 2: mỗi lần cast chỉ chọn một pattern 1/2/3 vệt, rồi lần sau tăng cấp.
         registerBossAttackAction();
         lockAimToPlayer();
-        hasSpawnedSkill2Sword = false;
+        currentSkill2VolleyCount = nextSkill2VolleyCount;
+        nextSkill2VolleyCount = nextSkill2VolleyCount % 3 + 1;
+        hasFiredSkill2Volley = false;
         skill2CooldownTimer = SKILL2_COOLDOWN_FRAMES;
         changeState(BossState.SKILL2_CAST, SKILL2_CAST_FRAMES);
+    }
+
+    private void spawnSkill2Volley(int volleyCount) {
+        // Sinh pattern vệt chém theo cấp hiện tại của Skill 2.
+        double[] aim = directionToPlayerNow();
+        Image projectileSprite = volleyCount == 1 ? skill2Item1Sprite : skill2Item2Sprite;
+        if (projectileSprite == null) {
+            projectileSprite = skill2Item1Sprite;
+        }
+
+        if (volleyCount == 1) {
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+        } else if (volleyCount == 2) {
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+            spawnSkill2Projectile(-aim[0], -aim[1], projectileSprite);
+        } else {
+            double[] left = rotateVector(aim[0], aim[1], Math.toRadians(SKILL2_SPREAD_ANGLE_DEGREES));
+            double[] right = rotateVector(aim[0], aim[1], Math.toRadians(-SKILL2_SPREAD_ANGLE_DEGREES));
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+            spawnSkill2Projectile(left[0], left[1], projectileSprite);
+            spawnSkill2Projectile(right[0], right[1], projectileSprite);
+        }
+    }
+
+    private void spawnSkill2Projectile(double dirX, double dirY, Image projectileSprite) {
+        double spawnX = centerX() + dirX * renderWidth * 0.35;
+        double spawnY = centerY() + dirY * renderHeight * 0.35;
+        skill2Projectiles.add(new Skill2SlashProjectile(spawnX, spawnY, dirX, dirY, projectileSprite));
+    }
+
+    private int skill2FireFrame(int volleyCount) {
+        // Dùng đúng nhịp animation trong boss_atk_2 cho pattern 1/2/3.
+        return switch (volleyCount) {
+            case 2 -> SKILL2_VOLLEY_2_FRAME;
+            case 3 -> SKILL2_VOLLEY_3_FRAME;
+            default -> SKILL2_VOLLEY_1_FRAME;
+        };
     }
 
     private void startRage() {
@@ -411,6 +446,7 @@ public class FinalBoss extends Enemy {
         lockAimToPlayer();
         rageTargetX = playerCenterX();
         rageTargetY = playerCenterY();
+        dragonStrike = null;
         rageQueued = false;
         changeState(BossState.RAGE_TELEGRAPH, RAGE_TELEGRAPH_FRAMES);
     }
@@ -462,8 +498,7 @@ public class FinalBoss extends Enemy {
     private boolean shouldTrackPlayer() {
         // Một số trạng thái phải khóa hướng từ lúc vận chiêu, nên không cập nhật aim liên tục.
         return bossState == BossState.CHASE
-                || bossState == BossState.RECOVERY
-                || bossState == BossState.NORMAL_WINDUP;
+                || bossState == BossState.RECOVERY;
     }
 
     private void lockAimToPlayer() {
@@ -479,14 +514,57 @@ public class FinalBoss extends Enemy {
         isFlipped = lastAimX < 0;
     }
 
-    private void prepareTeleportNearPlayer() {
-        // Không kiểm tra vùng va chạm/tường: lấy trực tiếp vị trí sát player theo hướng đã khóa.
-        double stopDistance = playerZoneRadius() + renderWidth * 0.38;
-        double preferredCenterX = playerCenterX() - lastAimX * stopDistance;
-        double preferredCenterY = playerCenterY() - lastAimY * stopDistance;
+    private double[] directionToPlayerNow() {
+        // Lấy hướng mới nhất từ boss tới player để mỗi nhịp Skill 2 có thể nhắm lại.
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        double distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= 0.0001) {
+            return new double[]{lastAimX, lastAimY};
+        }
+        return new double[]{dx / distance, dy / distance};
+    }
 
-        teleportTargetX = preferredCenterX - renderWidth / 2.0;
-        teleportTargetY = preferredCenterY - renderHeight / 2.0;
+    private double[] rotateVector(double x, double y, double angle) {
+        // Xoay vector để tạo pattern tam giác đều cho nhịp 3 vệt chém.
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        return new double[]{x * cos - y * sin, x * sin + y * cos};
+    }
+
+    private void prepareTeleportNearPlayer() {
+        // Tìm vị trí sát player nhưng vẫn đặt được chân boss, tránh tele kẹt vào tường.
+        double stopDistance = playerZoneRadius() + renderWidth * 0.38;
+        double baseAngle = Math.atan2(-lastAimY, -lastAimX);
+        double[] angleOffsets = {
+                0.0,
+                Math.toRadians(30.0), Math.toRadians(-30.0),
+                Math.toRadians(60.0), Math.toRadians(-60.0),
+                Math.toRadians(90.0), Math.toRadians(-90.0),
+                Math.toRadians(120.0), Math.toRadians(-120.0),
+                Math.PI
+        };
+
+        for (int ring = 0; ring < 4; ring++) {
+            double candidateDistance = stopDistance + ring * GameConstants.TILE_SIZE * 0.35;
+            for (double offset : angleOffsets) {
+                double angle = baseAngle + offset;
+                double candidateCenterX = playerCenterX() + Math.cos(angle) * candidateDistance;
+                double candidateCenterY = playerCenterY() + Math.sin(angle) * candidateDistance;
+                double candidateX = candidateCenterX - renderWidth / 2.0;
+                double candidateY = candidateCenterY - renderHeight / 2.0;
+
+                if (canOccupy(candidateX, candidateY)) {
+                    teleportTargetX = candidateX;
+                    teleportTargetY = candidateY;
+                    return;
+                }
+            }
+        }
+
+        // Nếu quanh player đều kín, boss giữ nguyên vị trí để không bị nhét vào tile solid.
+        teleportTargetX = x;
+        teleportTargetY = y;
     }
 
     private void chooseRecoveryWanderDirection() {
@@ -495,7 +573,7 @@ public class FinalBoss extends Enemy {
         double dyFromPlayer = centerY() - playerCenterY();
         double distanceFromPlayer = Math.sqrt(dxFromPlayer * dxFromPlayer + dyFromPlayer * dyFromPlayer);
 
-        if (distanceFromPlayer > 0.0001 && distanceFromPlayer < normalAttackStartRange()) {
+        if (distanceFromPlayer > 0.0001 && distanceFromPlayer < closePlayerWanderRange()) {
             recoveryWanderX = dxFromPlayer / distanceFromPlayer;
             recoveryWanderY = dyFromPlayer / distanceFromPlayer;
             recoveryWanderTimer = 30 + (int) (Math.random() * 45);
@@ -590,13 +668,8 @@ public class FinalBoss extends Enemy {
         return targetPlayer.getRenderWidth() / 2.0;
     }
 
-    private double normalAttackRadius() {
-        // Đánh thường cần rộng hơn người chơi một chút để không bị hụt khi boss đứng sát.
-        return Math.max(playerZoneRadius() * NORMAL_ATTACK_RADIUS_MULTIPLIER, renderWidth * 0.25);
-    }
-
-    private double normalAttackStartRange() {
-        // Khoảng cách đủ gần để bắt đầu đánh thường.
+    private double closePlayerWanderRange() {
+        // Khi recovery mà đứng quá sát player thì boss lùi nhẹ để người chơi đọc animation skill kế tiếp.
         return renderWidth * 0.55 + playerZoneRadius() * 2.0;
     }
 
@@ -628,16 +701,22 @@ public class FinalBoss extends Enemy {
             sprite = idleSprite;
             frames = idleFrames;
         }
+        if (sprite == null) {
+            return;
+        }
 
-        if (this.spriteSheet != sprite || this.numFrames != frames) {
+        int safeFrames = Math.max(1, frames);
+        int safeDelay = Math.max(1, delay);
+
+        if (this.spriteSheet != sprite || this.numFrames != safeFrames) {
             this.spriteSheet = sprite;
-            this.numFrames = frames;
-            this.frameWidth = sprite.getWidth() / frames;
+            this.numFrames = safeFrames;
+            this.frameWidth = sprite.getWidth() / safeFrames;
             this.frameHeight = sprite.getHeight();
             this.frameIndex = 0;
             this.animationTimer = 0;
         }
-        this.animationDelay = delay;
+        this.animationDelay = safeDelay;
     }
 
     private void animateCurrentSprite() {
@@ -655,12 +734,19 @@ public class FinalBoss extends Enemy {
     }
 
     private Image loadOptionalImage(String path) {
+        return loadOptionalImage(path, 0, 0);
+    }
+
+    private Image loadOptionalImage(String path, double requestedWidth, double requestedHeight) {
         // Load asset phụ của boss. Thiếu asset không làm crash game, chỉ dùng animation dự phòng.
         try {
             java.io.InputStream stream = getClass().getResourceAsStream(path);
             if (stream == null) {
                 System.err.println("Missing boss asset: " + path);
                 return null;
+            }
+            if (requestedWidth > 0 && requestedHeight > 0) {
+                return new Image(stream, requestedWidth, requestedHeight, true, false);
             }
             return new Image(stream);
         } catch (Exception e) {
@@ -669,11 +755,55 @@ public class FinalBoss extends Enemy {
         }
     }
 
+    private Image[] loadOptionalFrames(String path, int frames, int targetWidth, int targetHeight) {
+        // Tách spritesheet quá rộng thành từng frame nhỏ để Canvas không phải vẽ texture ngang 38400px.
+        try (java.io.InputStream stream = getClass().getResourceAsStream(path)) {
+            if (stream == null) {
+                System.err.println("Missing boss frame asset: " + path);
+                return null;
+            }
+
+            BufferedImage sheet = ImageIO.read(stream);
+            if (sheet == null || frames <= 0) {
+                System.err.println("Invalid boss frame asset: " + path);
+                return null;
+            }
+
+            int sourceFrameWidth = sheet.getWidth() / frames;
+            int sourceFrameHeight = sheet.getHeight();
+            if (sourceFrameWidth <= 0 || sourceFrameHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+                return null;
+            }
+
+            Image[] result = new Image[frames];
+            for (int frame = 0; frame < frames; frame++) {
+                WritableImage frameImage = new WritableImage(targetWidth, targetHeight);
+                PixelWriter writer = frameImage.getPixelWriter();
+                int sourceOffsetX = frame * sourceFrameWidth;
+
+                for (int y = 0; y < targetHeight; y++) {
+                    int sourceY = Math.min(sourceFrameHeight - 1, y * sourceFrameHeight / targetHeight);
+                    for (int x = 0; x < targetWidth; x++) {
+                        int sourceX = sourceOffsetX + Math.min(sourceFrameWidth - 1, x * sourceFrameWidth / targetWidth);
+                        writer.setArgb(x, y, sheet.getRGB(sourceX, sourceY));
+                    }
+                }
+
+                result[frame] = frameImage;
+            }
+            return result;
+        } catch (Exception e) {
+            System.err.println("Failed to split boss frames: " + path);
+            return null;
+        }
+    }
+
     @Override
     public void render(GraphicsContext gc) {
         // Vẽ cảnh báo bên dưới entity trước, sau đó mới vẽ boss/vật thể bay bên trên.
-        if (dragonStrike != null) {
-            dragonStrike.renderUnder(gc);
+        DragonStrike currentDragonStrike = dragonStrike;
+        if (currentDragonStrike != null && !currentDragonStrike.isDone()) {
+            currentDragonStrike.renderUnder(gc);
         } else if (bossState == BossState.RAGE_TELEGRAPH) {
             renderRageTelegraph(gc);
         }
@@ -685,25 +815,36 @@ public class FinalBoss extends Enemy {
             super.render(gc);
             gc.restore();
         } else if (bossState == BossState.SKILL2_CAST && spriteSheet == attackSprite2) {
-            renderSkill2BossSprite(gc);
+            renderScaledBossSprite(gc, SKILL2_BOSS_RENDER_SCALE);
+        } else if (bossState == BossState.RAGE_TELEGRAPH && spriteSheet == ultiSprite) {
+            renderScaledBossSprite(gc, ULTIMATE_BOSS_RENDER_SCALE);
         } else {
             super.render(gc);
         }
 
-        for (FlyingSwordProjectile sword : flyingSwords) {
-            sword.render(gc);
+        for (Skill2SlashProjectile slash : skill2Projectiles) {
+            slash.render(gc);
         }
 
-        if (dragonStrike != null) {
-            dragonStrike.renderOver(gc);
+        if (currentDragonStrike != null && !currentDragonStrike.isDone()) {
+            currentDragonStrike.renderOver(gc);
         }
     }
 
-    private void renderSkill2BossSprite(GraphicsContext gc) {
-        // boss_atk_2.png có frame 384x384, lớn gấp đôi các animation 192px.
-        // Nếu ép về 144x144 như bình thường thì thân boss bị nhỏ, nên phóng to riêng trạng thái này.
-        double drawW = renderWidth * SKILL2_BOSS_RENDER_SCALE;
-        double drawH = renderHeight * SKILL2_BOSS_RENDER_SCALE;
+    private void renderScaledBossSprite(GraphicsContext gc, double scale) {
+        // Một số animation có frame lớn hơn 192px nên cần phóng to riêng khi render.
+        if (gc == null || spriteSheet == null || numFrames <= 0 || frameWidth <= 0 || frameHeight <= 0) {
+            return;
+        }
+
+        int safeFrameIndex = Math.max(0, Math.min(frameIndex, numFrames - 1));
+        if (bossState == BossState.RAGE_TELEGRAPH && hasUltimateFrame(safeFrameIndex)) {
+            renderSingleBossFrame(gc, ultiFrameSprites[safeFrameIndex], scale);
+            return;
+        }
+
+        double drawW = renderWidth * scale;
+        double drawH = renderHeight * scale;
         double drawCenterX = x + renderWidth / 2.0;
         double drawCenterY = y + renderHeight / 2.0;
         double drawX = drawCenterX - drawW / 2.0;
@@ -711,18 +852,48 @@ public class FinalBoss extends Enemy {
 
         if (isFlipped) {
             gc.drawImage(spriteSheet,
-                    frameIndex * frameWidth, 0, frameWidth, frameHeight,
+                    safeFrameIndex * frameWidth, 0, frameWidth, frameHeight,
                     drawCenterX + drawW / 2.0, drawY, -drawW, drawH);
         } else {
             gc.drawImage(spriteSheet,
-                    frameIndex * frameWidth, 0, frameWidth, frameHeight,
+                    safeFrameIndex * frameWidth, 0, frameWidth, frameHeight,
                     drawX, drawY, drawW, drawH);
+        }
+    }
+
+    private boolean hasUltimateFrame(int index) {
+        return ultiFrameSprites != null
+                && index >= 0
+                && index < ultiFrameSprites.length
+                && ultiFrameSprites[index] != null;
+    }
+
+    private void renderSingleBossFrame(GraphicsContext gc, Image frame, double scale) {
+        // Render 1 frame đã tách sẵn, tránh drawImage trên spritesheet quá rộng.
+        if (gc == null || frame == null) {
+            return;
+        }
+
+        double drawW = renderWidth * scale;
+        double drawH = renderHeight * scale;
+        double drawCenterX = x + renderWidth / 2.0;
+        double drawCenterY = y + renderHeight / 2.0;
+        double drawX = drawCenterX - drawW / 2.0;
+        double drawY = drawCenterY - drawH / 2.0;
+
+        if (isFlipped) {
+            gc.drawImage(frame, drawCenterX + drawW / 2.0, drawY, -drawW, drawH);
+        } else {
+            gc.drawImage(frame, drawX, drawY, drawW, drawH);
         }
     }
 
     private void renderRageTelegraph(GraphicsContext gc) {
         // Vùng cảnh báo chiêu nộ: player có 1 giây để né khỏi vòng tròn.
         double radius = playerZoneRadius() * RAGE_RADIUS_MULTIPLIER;
+        if (gc == null || radius <= 0) {
+            return;
+        }
         double pulse = 0.35 + 0.25 * Math.sin(stateTimer * 0.35);
 
         gc.save();
@@ -773,7 +944,6 @@ public class FinalBoss extends Enemy {
         // Các trạng thái này chủ động đứng sát player; va chạm chung không được hủy vị trí đó.
         return bossState == BossState.RECOVERY
                 || bossState == BossState.SKILL1_TELEPORT
-                || bossState == BossState.SKILL1_DELAY
                 || bossState == BossState.SKILL1_SLASH1
                 || bossState == BossState.SKILL1_GAP
                 || bossState == BossState.SKILL1_SLASH2;
@@ -833,74 +1003,59 @@ public class FinalBoss extends Enemy {
 
     }
 
-    private class FlyingSwordProjectile {
-        // Kiếm bay có 2 giai đoạn: bay ra theo hướng đã khóa, rồi quay về vị trí boss hiện tại.
-        private enum Phase { OUT, RETURN }
-
-        private Phase phase = Phase.OUT;
-        private double x = centerX();
-        private double y = centerY();
-        private double dirX;
-        private double dirY;
+    private class Skill2SlashProjectile {
+        // Vệt chém bay thẳng ra khỏi màn, không quay về tay boss nữa.
+        private double x;
+        private double y;
+        private final double dirX;
+        private final double dirY;
+        private final Image sprite;
         private double traveled = 0;
-        private boolean hitOut = false;
-        private boolean hitReturn = false;
+        private int animationTimer = 0;
+        private int frameIndex = 0;
+        private boolean hasHitPlayer = false;
         private boolean finished = false;
 
-        FlyingSwordProjectile() {
-            // Hướng bay ra được khóa tại thời điểm boss cast Skill 2.
-            dirX = lastAimX;
-            dirY = lastAimY;
-            if (Math.abs(dirX) < 0.0001 && Math.abs(dirY) < 0.0001) {
-                dirX = 1.0;
-                dirY = 0.0;
-            }
+        Skill2SlashProjectile(double x, double y, double dirX, double dirY, Image sprite) {
+            this.x = x;
+            this.y = y;
+            this.dirX = dirX;
+            this.dirY = dirY;
+            this.sprite = sprite;
         }
 
         void update() {
             if (finished) return;
 
-            double speed = 6.5;
-            if (phase == Phase.OUT) {
-                // Giai đoạn bay ra: bay thẳng đến player theo hướng vận chiêu ban đầu.
-                x += dirX * speed;
-                y += dirY * speed;
-                traveled += speed;
+            x += dirX * SKILL2_PROJECTILE_SPEED;
+            y += dirY * SKILL2_PROJECTILE_SPEED;
+            traveled += SKILL2_PROJECTILE_SPEED;
+            updateAnimation();
 
-                if (!hitOut && intersectsPlayer()) {
-                    targetPlayer.takeDamage(SKILL2_DAMAGE, x, y);
-                    hitOut = true;
-                }
+            if (!hasHitPlayer && circleIntersectsRect(x, y, SKILL2_ITEM_HIT_RADIUS, targetPlayer.getBoundary())) {
+                targetPlayer.takeDamage(SKILL2_DAMAGE, x, y);
+                hasHitPlayer = true;
+            }
 
-                if (traveled >= GameConstants.TILE_SIZE * 5.0 || hitsWall()) {
-                    phase = Phase.RETURN;
-                }
-            } else {
-                // Giai đoạn quay về: luôn quay về tọa độ boss hiện tại, không quay về vị trí cũ.
-                double dx = centerX() - x;
-                double dy = centerY() - y;
-                double distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance <= speed) {
-                    finished = true;
-                    return;
-                }
-
-                x += (dx / distance) * speed;
-                y += (dy / distance) * speed;
-
-                if (!hitReturn && intersectsPlayer()) {
-                    targetPlayer.takeDamage(SKILL2_DAMAGE, x, y);
-                    hitReturn = true;
-                }
+            if (traveled >= SKILL2_PROJECTILE_MAX_DISTANCE || isOutsideArena()) {
+                finished = true;
             }
         }
 
-        private boolean hitsWall() {
-            return collisionChecker != null && collisionChecker.checkTile((int) x, (int) y);
+        private void updateAnimation() {
+            animationTimer++;
+            if (animationTimer >= 6) {
+                animationTimer = 0;
+                frameIndex = (frameIndex + 1) % SKILL2_ITEM_FRAMES;
+            }
         }
 
-        private boolean intersectsPlayer() {
-            return circleIntersectsRect(x, y, FLYING_SWORD_HIT_RADIUS, targetPlayer.getBoundary());
+        private boolean isOutsideArena() {
+            double margin = SKILL2_ITEM_RENDER_SIZE;
+            return x < -margin
+                    || x > GameConstants.TILE_SIZE * 17.0 + margin
+                    || y < -margin
+                    || y > GameConstants.TILE_SIZE * 10.0 + margin;
         }
 
         boolean isFinished() {
@@ -908,24 +1063,22 @@ public class FinalBoss extends Enemy {
         }
 
         void render(GraphicsContext gc) {
-            // Vẽ kiếm xoay theo hướng bay hiện tại.
+            // Vẽ vệt chém xoay theo hướng bay.
             gc.save();
             gc.translate(x, y);
-            double angle = Math.toDegrees(Math.atan2(
-                    phase == Phase.OUT ? dirY : centerY() - y,
-                    phase == Phase.OUT ? dirX : centerX() - x));
-            gc.rotate(angle);
+            gc.rotate(Math.toDegrees(Math.atan2(dirY, dirX)));
 
-            if (swordSprite != null) {
-                double frameW = swordSprite.getWidth() / 8.0;
-                double halfSize = FLYING_SWORD_RENDER_SIZE / 2.0;
-                gc.drawImage(swordSprite, 0, 0, frameW, swordSprite.getHeight(),
-                        -halfSize, -halfSize, FLYING_SWORD_RENDER_SIZE, FLYING_SWORD_RENDER_SIZE);
+            if (sprite != null) {
+                double frameW = sprite.getWidth() / SKILL2_ITEM_FRAMES;
+                double halfSize = SKILL2_ITEM_RENDER_SIZE / 2.0;
+                gc.drawImage(sprite,
+                        frameIndex * frameW, 0, frameW, sprite.getHeight(),
+                        -halfSize, -halfSize, SKILL2_ITEM_RENDER_SIZE, SKILL2_ITEM_RENDER_SIZE);
             } else {
                 gc.setFill(Color.LIGHTYELLOW);
-                gc.fillRect(-FLYING_SWORD_RENDER_SIZE / 2.0, -6, FLYING_SWORD_RENDER_SIZE, 12);
+                gc.fillRect(-SKILL2_ITEM_RENDER_SIZE / 2.0, -6, SKILL2_ITEM_RENDER_SIZE, 12);
                 gc.setStroke(Color.ORANGE);
-                gc.strokeRect(-FLYING_SWORD_RENDER_SIZE / 2.0, -6, FLYING_SWORD_RENDER_SIZE, 12);
+                gc.strokeRect(-SKILL2_ITEM_RENDER_SIZE / 2.0, -6, SKILL2_ITEM_RENDER_SIZE, 12);
             }
             gc.restore();
         }
@@ -944,24 +1097,24 @@ public class FinalBoss extends Enemy {
         private int timer = 0;
         private boolean hasDealtDamage = false;
 
-        DragonStrike(double targetX, double targetY, double radius) {
+        DragonStrike(double startX, double startY, double targetX, double targetY, double radius) {
             this.targetX = targetX;
             this.targetY = targetY;
-            this.radius = radius;
-            this.dragonX = targetX;
-            this.dragonY = targetY - GameConstants.TILE_SIZE * 7.0;
+            this.radius = Math.max(1.0, radius);
+            this.dragonX = startX;
+            this.dragonY = startY;
         }
 
         void update() {
             timer++;
             if (phase == Phase.FLYING) {
-                // Vật thể rơi thẳng từ trên xuống mục tiêu đã khóa.
+                // Rồng bay từ cổng trong boss_ultimate xuống mục tiêu đã khóa.
                 double dx = targetX - dragonX;
                 double dy = targetY - dragonY;
                 double distance = Math.sqrt(dx * dx + dy * dy);
-                double speed = 12.0;
+                double speed = DRAGON_SPEED;
 
-                if (distance <= speed || timer >= 80) {
+                if (distance <= speed || timer >= DRAGON_MAX_FLIGHT_FRAMES) {
                     dragonX = targetX;
                     dragonY = targetY;
                     phase = Phase.EXPLODING;
@@ -975,7 +1128,8 @@ public class FinalBoss extends Enemy {
             } else if (phase == Phase.EXPLODING) {
                 // Vụ nổ chỉ gây damage một lần.
                 if (!hasDealtDamage) {
-                    if (circleIntersectsRect(targetX, targetY, radius, targetPlayer.getBoundary())) {
+                    Rectangle2D playerBounds = targetPlayer != null ? targetPlayer.getBoundary() : null;
+                    if (playerBounds != null && circleIntersectsRect(targetX, targetY, radius, playerBounds)) {
                         targetPlayer.takeDamage(RAGE_DAMAGE, targetX, targetY);
                     }
                     hasDealtDamage = true;
@@ -993,6 +1147,10 @@ public class FinalBoss extends Enemy {
 
         void renderUnder(GraphicsContext gc) {
             // Vẽ vùng nổ bên dưới boss/player để player thấy nơi nguy hiểm.
+            if (gc == null || phase == Phase.DONE) {
+                return;
+            }
+
             gc.save();
             gc.setGlobalAlpha(0.35);
             gc.setFill(Color.rgb(255, 40, 20, 0.30));
@@ -1006,14 +1164,13 @@ public class FinalBoss extends Enemy {
 
         void renderOver(GraphicsContext gc) {
             // Vẽ vật thể rơi và hiệu ứng nổ bên trên màn chơi.
+            if (gc == null || phase == Phase.DONE) {
+                return;
+            }
+
             gc.save();
             if (phase == Phase.FLYING) {
-                gc.setStroke(Color.rgb(255, 185, 60));
-                gc.setLineWidth(18.0);
-                gc.strokeLine(dragonX, dragonY - 56, dragonX, dragonY + 56);
-                gc.setStroke(Color.WHITE);
-                gc.setLineWidth(5.0);
-                gc.strokeLine(dragonX, dragonY - 34, dragonX, dragonY + 34);
+                renderDragon(gc);
             } else if (phase == Phase.EXPLODING) {
                 double progress = timer / 36.0;
                 double drawRadius = radius * (0.8 + progress * 0.45);
@@ -1025,6 +1182,35 @@ public class FinalBoss extends Enemy {
                 gc.strokeOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
             }
             gc.restore();
+        }
+
+        private void renderDragon(GraphicsContext gc) {
+            if (gc == null) {
+                return;
+            }
+
+            double dx = targetX - dragonX;
+            double dy = targetY - dragonY;
+            double angle = Math.toDegrees(Math.atan2(dy, dx));
+
+            gc.translate(dragonX, dragonY);
+            gc.rotate(angle);
+
+            if (dragonSprite != null && !dragonSprite.isError() && dragonSprite.getWidth() > 0 && dragonSprite.getHeight() > 0) {
+                int dragonFrame = (timer / 6) % DRAGON_FRAMES;
+                double frameW = dragonSprite.getWidth() / DRAGON_FRAMES;
+                gc.drawImage(dragonSprite,
+                        dragonFrame * frameW, 0, frameW, dragonSprite.getHeight(),
+                        -DRAGON_RENDER_WIDTH / 2.0, -DRAGON_RENDER_HEIGHT / 2.0,
+                        DRAGON_RENDER_WIDTH, DRAGON_RENDER_HEIGHT);
+            } else {
+                gc.setStroke(Color.rgb(255, 185, 60));
+                gc.setLineWidth(18.0);
+                gc.strokeLine(-56, 0, 56, 0);
+                gc.setStroke(Color.WHITE);
+                gc.setLineWidth(5.0);
+                gc.strokeLine(-34, 0, 34, 0);
+            }
         }
     }
 
