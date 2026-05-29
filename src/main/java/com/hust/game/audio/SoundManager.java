@@ -10,8 +10,8 @@ public class SoundManager {
     public static AudioClip btnHover, btnClick;
     public static AudioClip gateBurn;
     public static AudioClip pauseSound, unpauseSound;
-    private static double sfxVolume = 1.0; // Âm lượng hiệu ứng
-    private static double bgmVolume = 1.0; // Âm lượng nhạc nền
+    private static double sfxVolume = 0; // Âm lượng hiệu ứng
+    private static double bgmVolume = 0; // Âm lượng nhạc nền
 
     public static double getSfxVolume() {
         return sfxVolume;
