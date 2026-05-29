@@ -67,12 +67,14 @@ public class CombatManager {
     private List<CritText> critTexts = new ArrayList<>();
 
     private ParticleManager particleManager = new ParticleManager();
+    private CoinRewardEffectManager coinRewardEffectManager = new CoinRewardEffectManager();
     private int hitStopFrames = 0;
     private int shakeTimer = 0;
     private double shakeAmplitude = 0;
     private boolean hasDealtDamageThisAttack = true;
     private boolean hasIncreasedComboThisAttack = false;
     private com.hust.game.collision.CollisionChecker collisionChecker;
+    private int currentLevelIndex = 1;
 
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
@@ -81,6 +83,10 @@ public class CombatManager {
 
     public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
         this.collisionChecker = checker;
+    }
+
+    public void setCurrentLevelIndex(int currentLevelIndex) {
+        this.currentLevelIndex = currentLevelIndex;
     }
 
     /**
@@ -114,6 +120,7 @@ public class CombatManager {
         }
         
         particleManager.update();
+        coinRewardEffectManager.update();
 
         // Kiểm tra xem Player có đang trong frame chém hiệu quả không
         // Mở rộng cửa sổ gây sát thương ra 2 frame animation (3 và 4) để tăng độ ổn định, tránh lỗi timing hiếm gặp
@@ -238,6 +245,7 @@ public class CombatManager {
                 
                 if (enemy.getHp() <= 0) {
                     isFinalHit = true;
+                    rewardCoinsIfEligible(enemy);
                     if (enemy instanceof com.hust.game.enemy.Tree) {
                         player.grantMergeForm(MergeFormType.TREE);
                     }
@@ -434,6 +442,10 @@ public class CombatManager {
     public ParticleManager getParticleManager() {
         return particleManager;
     }
+
+    public CoinRewardEffectManager getCoinRewardEffectManager() {
+        return coinRewardEffectManager;
+    }
     
     public int consumeHitStopFrames() {
         int frames = hitStopFrames;
@@ -451,5 +463,29 @@ public class CombatManager {
         double amp = shakeAmplitude;
         shakeAmplitude = 0;
         return amp;
+    }
+
+    private void rewardCoinsIfEligible(Enemy enemy) {
+        if (!isCoinRewardLevel() || enemy.hasCoinRewarded()) {
+            return;
+        }
+
+        enemy.markCoinRewarded();
+        player.addCoins(1);
+
+        double rewardX = enemy.getX() + enemy.getRenderWidth() / 2.0;
+        double rewardY = enemy.getY();
+        coinRewardEffectManager.spawn(rewardX, rewardY);
+        com.hust.game.ui.DamageTextManager.addText(
+                enemy,
+                rewardX - 20,
+                rewardY - 20,
+                "+1 coin",
+                javafx.scene.paint.Color.GOLD
+        );
+    }
+
+    private boolean isCoinRewardLevel() {
+        return currentLevelIndex == 1 || currentLevelIndex == 2;
     }
 }

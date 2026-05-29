@@ -13,6 +13,7 @@ public class HUD {
     private Image healthPotionSheet;
     private Image manaPotionSheet;
     private Image berserkIcon;
+    private Image coinSheet;
     private javafx.scene.text.Font pixelFont;
 
     private static final double FRAME_WIDTH = 720.0;
@@ -46,6 +47,7 @@ public class HUD {
         manaImg = loadImg("/assets/player_mana.png", RENDER_WIDTH * 6, RENDER_HEIGHT);
         healthPotionSheet = loadRawImg("/assets/items/health_potion.png");
         manaPotionSheet = loadRawImg("/assets/items/mana_potion.png");
+        coinSheet = loadRawImg("/assets/items/coin.png");
 
         // Skill icon
         berserkIcon = new Image(
@@ -95,6 +97,7 @@ public class HUD {
         gc.fillText(hpText, textX, textY);
 
         renderPotionCounts(gc, drawX, drawY);
+        renderCoins(gc, drawX, drawY);
 
         gc.restore();
 
@@ -214,6 +217,33 @@ public class HUD {
         double manaTextX = manaIconX + POTION_ICON_SIZE + POTION_TEXT_GAP;
         gc.strokeText(manaCount, manaTextX, textY);
         gc.fillText(manaCount, manaTextX, textY);
+    }
+
+    private void renderCoins(GraphicsContext gc, double drawX, double drawY) {
+        if (coinSheet == null) {
+            return;
+        }
+
+        double frameW = coinSheet.getWidth() / 6.0;
+        double frameH = coinSheet.getHeight();
+        double iconSize = 30.0;
+        double iconX = drawX + RENDER_WIDTH - 118.0;
+        double iconY = drawY + RENDER_HEIGHT + 4.0;
+
+        gc.drawImage(coinSheet, 0, 0, frameW, frameH, iconX, iconY, iconSize, iconSize);
+
+        gc.setFont(pixelFont);
+        gc.setFill(javafx.scene.paint.Color.GOLD);
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(1.0);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+
+        String coinText = "x" + player.getCoins();
+        double textX = iconX + iconSize + 6.0;
+        double textY = iconY + iconSize / 2.0;
+        gc.strokeText(coinText, textX, textY);
+        gc.fillText(coinText, textX, textY);
     }
 
     private Image loadImg(String path, double requestedWidth, double requestedHeight) {

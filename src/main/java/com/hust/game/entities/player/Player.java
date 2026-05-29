@@ -111,6 +111,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     private int healthPotionCount = 0;
     private int manaPotionCount = 0;
+    private int coins = 0;
 
     // -------------------------------------------------------
     // ATTACK COOLDOWN
@@ -690,6 +691,26 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         return healthPotionCount + manaPotionCount;
     }
 
+    public int getCoins() {
+        return coins;
+    }
+
+    public void addCoins(int amount) {
+        coins = Math.max(0, coins + amount);
+    }
+
+    public boolean canAfford(int amount) {
+        return amount >= 0 && coins >= amount;
+    }
+
+    public boolean spendCoins(int amount) {
+        if (!canAfford(amount)) {
+            return false;
+        }
+        coins -= amount;
+        return true;
+    }
+
     public boolean isPotionInventoryFull() {
         return getTotalPotionCount() >= GameConstants.MAX_POTIONS_TOTAL;
     }
@@ -821,5 +842,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     public int getMergeDurationRemaining() {
         return mergeController.getActiveTimer();
+    }
+
+    public int getMergeCooldownRemaining() {
+        return mergeController.getCooldownTimer();
     }
 }
