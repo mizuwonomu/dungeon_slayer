@@ -284,7 +284,7 @@ public class Level {
         }
         else if (lvlID == 3) {
             // Level 3 reuses level2 map. Spawn boss on row 5 so its foot hitbox is not inside crater tiles.
-            enemyManager.spawnEnemy("FinalBoss", WIDTH / 2 - 72, TILE_SIZE * 5 - 72, bossImg, 8, TILE_SIZE * 3, TILE_SIZE * 3, player);
+            enemyManager.spawnEnemy("FinalBoss", WIDTH / 2 - 72, TILE_SIZE * 5 - 72, bossImg, 5, TILE_SIZE * 3, TILE_SIZE * 3, player);
         }
     }
 

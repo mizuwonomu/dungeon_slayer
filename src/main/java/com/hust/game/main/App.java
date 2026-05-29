@@ -2,7 +2,6 @@ package com.hust.game.main;
 
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
-import com.hust.game.dev.DevSettings;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
@@ -77,7 +76,6 @@ public class App extends Application {
     private boolean isOHeld = false;
     private boolean is1Held = false;
     private boolean is2Held = false;
-    private boolean isKHeld = false;
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
@@ -721,7 +719,7 @@ public class App extends Application {
             healthPotionImg = loadImg("/assets/items/health_potion.png");
             manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
-            Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
+            Image bossImg = loadImg("/assets/enemy/boss_idle.png");
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
@@ -729,7 +727,6 @@ public class App extends Application {
                     cDown, cUp, cLeft, cRight, 
                     dDown, dUp, dLeft, dRight, 
                     swordHit, rageHit, powerUpImg, thunderImg);
-            player.configureTreeMerge(treeImg, treeSkillImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
@@ -832,16 +829,7 @@ public class App extends Application {
             isJHeld = false; // Nhả phím J ra thì reset cờ cho phép chém tiếp
         }
 
-        if (input.contains(KeyCode.K)) {
-            if (!isKHeld) {
-                player.activateStoredMergeForm();
-                isKHeld = true;
-            }
-        } else {
-            isKHeld = false;
-        }
-
-        if (input.contains(KeyCode.L) && !player.isMergeActive()) {
+        if (input.contains(KeyCode.L)) {
             combatManager.activateSkill();
         }
 
@@ -1247,17 +1235,6 @@ public class App extends Application {
     }
 
     private void showLoadingScreen(Stage stage, Scene nextScene, Runnable onLoaded) {
-        if (DevSettings.shouldSkipLoadingScreens()) {
-            if (App.this.gc != null) {
-                App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
-                App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
-                App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
-            }
-            stage.setScene(nextScene);
-            onLoaded.run();
-            return;
-        }
-
         StackPane root = new StackPane();
         root.setStyle("-fx-background-color: black;");
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
