@@ -7,6 +7,7 @@ import javafx.scene.image.Image;
 
 public class PlayerMergeController {
     private static final int TREE_FORM_DURATION_FRAMES = 300;
+    private static final int MERGE_COOLDOWN_FRAMES = 360;
     private static final int TREE_IDLE_FRAMES = 8;
     private static final int TREE_ATTACK_FRAMES = 8;
     private static final int TREE_IDLE_DELAY = 10;
@@ -20,6 +21,7 @@ public class PlayerMergeController {
     private MergeFormType storedForm;
     private MergeFormType activeForm;
     private int activeTimer;
+    private int cooldownTimer;
 
     private Image treeIdleSprite;
     private Image treeSkillSprite;
@@ -33,6 +35,9 @@ public class PlayerMergeController {
     }
 
     public void grantForm(MergeFormType formType) {
+        if (activeForm != null || cooldownTimer > 0) {
+            return;
+        }
         storedForm = formType;
     }
 
@@ -51,13 +56,17 @@ public class PlayerMergeController {
     }
 
     public void update() {
+        if (cooldownTimer > 0) {
+            cooldownTimer--;
+        }
+
         if (activeForm == null) {
             return;
         }
 
         activeTimer--;
         if (activeTimer <= 0) {
-            clearActiveForm();
+            finishActiveForm();
             return;
         }
 
@@ -94,9 +103,15 @@ public class PlayerMergeController {
         treeAnimTimer = 0;
     }
 
+    private void finishActiveForm() {
+        clearActiveForm();
+        cooldownTimer = MERGE_COOLDOWN_FRAMES;
+    }
+
     public void clearAll() {
         storedForm = null;
         clearActiveForm();
+        cooldownTimer = 0;
     }
 
     public boolean startTreeAttack() {
@@ -144,6 +159,10 @@ public class PlayerMergeController {
 
     public int getActiveTimer() {
         return activeTimer;
+    }
+
+    public int getCooldownTimer() {
+        return cooldownTimer;
     }
 
     public Rectangle2D getTreeAttackBox(double playerX, double playerY, double playerW, double playerH) {
