@@ -37,14 +37,8 @@ public class Minimap {
         // ===== MAP VIEW =====
         ImageView mapView = new ImageView(minimapImage);
 
-        // Scale map to fully fit screen width
+        // Fit map to screen width
         mapView.setFitWidth(width);
-
-// Height auto-scales from aspect ratio
-        mapView.setPreserveRatio(true);
-
-        mapView.setSmooth(false);
-
         mapView.setPreserveRatio(true);
         mapView.setSmooth(false);
 
@@ -64,30 +58,57 @@ public class Minimap {
         double worldHeight =
                 GameConstants.MAX_WORLD_ROW * GameConstants.TILE_SIZE;
 
-// ===== DISPLAYED MINIMAP SIZE =====
+        // ===== DISPLAYED MINIMAP SIZE =====
         double minimapWidth = mapView.getFitWidth();
 
         double minimapHeight =
                 minimapImage.getHeight()
                         * (mapView.getFitWidth() / minimapImage.getWidth());
 
-// ===== PLAYER POSITION =====
+        // ===== LEVEL SETTINGS =====
+        double offsetX = 0;
+        double offsetY = 0;
+
+        double miniXMultiplier = 1.0;
+        double miniYMultiplier = 1.0;
+
+        switch (mapManager.level) {
+
+            // ===== LEVEL 1 =====
+            case 1:
+                offsetX = 0;
+                offsetY = 0;
+
+                miniXMultiplier = 2.0;
+                break;
+
+            // ===== LEVEL 2 =====
+            case 2:
+                offsetX = 170;
+                offsetY = 110;
+
+                miniXMultiplier = 1.0;
+                break;
+        }
+
+        // ===== PLAYER POSITION =====
         double miniX =
                 (player.getX() / worldWidth)
-                        * minimapWidth;
+                        * minimapWidth
+                        * miniXMultiplier
+                        - offsetX;
 
         double miniY =
                 (player.getY() / worldHeight)
-                        * minimapHeight;
+                        * minimapHeight
+                        * miniYMultiplier
+                        - offsetY;
 
-// StackPane center correction
+        // Convert into StackPane-centered coordinates
         miniX -= minimapWidth / 2;
         miniY -= minimapHeight / 2;
 
-// Center icon
-        miniX += playerDot.getFitWidth() / 2;
-        miniY += playerDot.getFitHeight() / 2;
-
+        // ===== APPLY POSITION =====
         playerDot.setTranslateX(miniX);
         playerDot.setTranslateY(miniY);
 
