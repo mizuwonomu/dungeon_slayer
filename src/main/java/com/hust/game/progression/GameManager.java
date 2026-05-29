@@ -75,6 +75,15 @@ public class GameManager {
         currentLevel.init();
     }
 
+    public String getBackgroundPath() {
+        switch(currentLevelIndex) {
+            case 2:
+                return "/assets/lvl2_bg.png";
+            default:
+                return "/assets/back_screen.png";
+        }
+    }
+
     public boolean isVictory(){
         return currentLevel.isVictory();
     }

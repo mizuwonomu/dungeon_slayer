@@ -232,12 +232,15 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
-        
+
+        initializeEntities(startLevel);
+        playInGameMusic(startLevel);
+
         Image tempBackScreen = null;
         try {
-            tempBackScreen = loadImg("/assets/back_screen.png");
+            tempBackScreen = loadImg(gameManager.getBackgroundPath());
         } catch (Exception e) {
-            System.out.println("Không tìm thấy ảnh back_screen.png");
+            System.out.println("Không tìm thấy ảnh background");
         }
         final Image backScreenImg = tempBackScreen;
 
@@ -306,8 +309,7 @@ public class App extends Application {
             if (!isPaused) isMousePressed = false;
         });
 
-        initializeEntities(startLevel);
-        playInGameMusic(startLevel);
+        
         
         fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
