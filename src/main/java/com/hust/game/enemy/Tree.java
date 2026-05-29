@@ -18,7 +18,6 @@ public class Tree extends Enemy {
     private boolean hasDealtSkillDamage = false;
     private Image dieSprite;
     private boolean isDying = false;
-    private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
 
     public Tree(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer, Image skillSprite) {
@@ -49,30 +48,37 @@ public class Tree extends Enemy {
         if (!isActive) return; // Bất động khi ra ngoài camera
         
         if (this.hp <= 0) {
-            if (this.flashTimer > 0) this.flashTimer--;
-
             this.hitStunTimer = 0; 
             this.isCastingSkill = false;
             
-            if (this.flashTimer <= 54) {
-                if (!isDying) {
-                    isDying = true;
-                    if (dieSprite != null) {
-                        this.spriteSheet = dieSprite;
-                        this.numFrames = 8; 
-                        this.frameWidth = dieSprite.getWidth() / 8.0;
-                        this.frameHeight = dieSprite.getHeight();
-                    }
-                    this.frameIndex = 0;
-                    this.animationTimer = 0;
+            if (!isDying) {
+                isDying = true;
+                if (dieSprite != null) {
+                    this.spriteSheet = dieSprite;
+                    this.numFrames = 8; 
+                    this.frameWidth = dieSprite.getWidth() / 8.0;
+                    this.frameHeight = dieSprite.getHeight();
                 }
-                
+                this.frameIndex = 0;
+                this.animationTimer = 0;
+            }
+
+            // Chớp trắng 6 frame đầu tiên
+            if (this.flashTimer > 54) {
+                this.flashTimer--;
+            }
+
+            // Chạy animation chết đến frame cuối
+            if (this.frameIndex < 7) {
                 this.animationTimer++;
                 if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
                     this.animationTimer = 0;
-                    if (this.frameIndex < 7) {
-                        this.frameIndex++;
-                    }
+                    this.frameIndex++;
+                }
+            } else {
+                // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                if (this.flashTimer > 0 && this.flashTimer <= 54) {
+                    this.flashTimer--;
                 }
             }
             return;
@@ -197,15 +203,26 @@ public class Tree extends Enemy {
     public void render(GraphicsContext gc) {
         if (this.hp <= 0) {
             gc.save();
-            if (this.flashTimer > 54) gc.setEffect(WHITE_EFFECT); // Lóe trắng lúc vừa nhận đòn
-            
+            // Tính toán alpha để mờ dần (từ 54 về 0)
+            double alpha = this.flashTimer / 54.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            gc.setGlobalAlpha(alpha);
+
             double renderX = this.x;
             double renderY = this.y;
             if (this.isFlipped) renderX += this.renderWidth;
             double renderW = this.isFlipped ? -this.renderWidth : this.renderWidth;
-            
-            gc.drawImage(this.spriteSheet, this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight, renderX, renderY, renderW, this.renderHeight);
+
+            gc.drawImage(this.spriteSheet,
+                this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+                renderX, renderY, renderW, this.renderHeight);
             gc.restore();
+
+            // Chớp trắng lúc vừa nhận đòn kết liễu — draw white sprite đè lên, pixel trong suốt không bị ảnh hưởng
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
+            }
         } else {
             super.render(gc);
         }

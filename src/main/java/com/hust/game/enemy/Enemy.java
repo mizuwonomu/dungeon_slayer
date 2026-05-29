@@ -42,7 +42,64 @@ public abstract class Enemy extends MovingEntity {
     protected boolean onPath = false;
     protected int pathUpdateTimer = (int)(Math.random() * 30); // Random để các con quái không update A* cùng 1 frame
 
-    private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
+    private boolean coinRewarded = false;
+
+    // Cache bản "all-white" của spriteSheet hiện tại
+    // Pixel có alpha > 0 → trắng cùng opacity; pixel trong suốt → giữ nguyên trong suốt
+    // Cách này không đụng blend mode của canvas nên không bị ảnh hưởng bởi background đã vẽ trước đó
+    private transient javafx.scene.image.Image cachedWhiteSheet = null;
+    private transient javafx.scene.image.Image lastCachedSource = null;
+
+    /**
+     * Trả về bản white của spriteSheet hiện tại (tự động cache và regenerate khi sprite đổi).
+     */
+    protected javafx.scene.image.Image getWhiteSprite() {
+        if (cachedWhiteSheet == null || lastCachedSource != this.spriteSheet) {
+            lastCachedSource = this.spriteSheet;
+            cachedWhiteSheet = buildWhiteSprite(this.spriteSheet);
+        }
+        return cachedWhiteSheet;
+    }
+
+    /**
+     * Tạo một bản sao của ảnh gốc: mọi pixel có alpha > 0 đều bị thay bằng trắng cùng opacity.
+     * Chạy một lần duy nhất per sprite, kết quả được cache lại.
+     */
+    private static javafx.scene.image.Image buildWhiteSprite(javafx.scene.image.Image source) {
+        int w = (int) source.getWidth();
+        int h = (int) source.getHeight();
+        javafx.scene.image.WritableImage wi = new javafx.scene.image.WritableImage(w, h);
+        javafx.scene.image.PixelReader pr = source.getPixelReader();
+        javafx.scene.image.PixelWriter pw = wi.getPixelWriter();
+        for (int py = 0; py < h; py++) {
+            for (int px = 0; px < w; px++) {
+                double opacity = pr.getColor(px, py).getOpacity();
+                if (opacity > 0.0) {
+                    pw.setColor(px, py, javafx.scene.paint.Color.color(1.0, 1.0, 1.0, opacity));
+                }
+                // opacity == 0 → bỏ qua, pixel giữ nguyên trong suốt
+            }
+        }
+        return wi;
+    }
+
+    /**
+     * Vẽ lớp phủ trắng đè lên sprite đang hiển thị.
+     * Gọi SAU khi đã vẽ sprite gốc.
+     * @param gc      GraphicsContext chính
+     * @param alpha   Độ mờ của lớp phủ (0.0 – 1.0)
+     */
+    protected void applyWhiteFlash(GraphicsContext gc, double alpha) {
+        javafx.scene.image.Image ws = getWhiteSprite();
+        double rx = this.isFlipped ? this.x + this.renderWidth : this.x;
+        double rw = this.isFlipped ? -this.renderWidth : this.renderWidth;
+        gc.save();
+        gc.setGlobalAlpha(alpha);
+        gc.drawImage(ws,
+            this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+            rx, this.y, rw, this.renderHeight);
+        gc.restore();
+    }
 
     // Constructor tạm thời ở Giai đoạn 1
     public Enemy(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
@@ -255,30 +312,25 @@ public abstract class Enemy extends MovingEntity {
 
     @Override
     public void render(GraphicsContext gc) {
-        // Nếu quái vật đã chết, kích hoạt hiệu ứng mờ dần (Fade out)
         if (this.hp <= 0) {
+            // Fade out dần theo flashTimer
             gc.save();
             double alpha = (double) this.flashTimer / 60.0;
             if (alpha < 0) alpha = 0;
             if (alpha > 1) alpha = 1;
-            
             gc.setGlobalAlpha(alpha);
-            
-            // Chớp trắng trong 6 frame đầu tiên khi vừa nhận đòn kết liễu (flashTimer từ 55 đến 60)
-            if (this.flashTimer > 54) {
-                gc.setEffect(WHITE_EFFECT);
-            }
-            super.render(gc); // Vẽ quái vật với độ mờ giảm dần
+            super.render(gc);
             gc.restore();
+
+            // Chớp trắng trong 6 frame đầu tiên khi vừa nhận đòn kết liễu
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
+            }
         } else {
-            // Quái còn sống và đang bị thương -> Chớp trắng
+            super.render(gc);
+            // Quái còn sống và đang bị thương → chớp trắng
             if (this.flashTimer > 0) {
-                gc.save();
-                gc.setEffect(WHITE_EFFECT);
-                super.render(gc);
-                gc.restore();
-            } else {
-                super.render(gc); // Vẽ bình thường
+                applyWhiteFlash(gc, 0.9);
             }
         }
     }
@@ -303,6 +355,14 @@ public abstract class Enemy extends MovingEntity {
     // Kiểm tra xem quái vật đã chết và chạy xong hiệu ứng nhấp nháy báo tử chưa
     public boolean isReadyToRemove() {
         return this.hp <= 0 && this.flashTimer <= 0;
+    }
+
+    public boolean hasCoinRewarded() {
+        return coinRewarded;
+    }
+
+    public void markCoinRewarded() {
+        coinRewarded = true;
     }
 
     public void setActive(boolean active) {

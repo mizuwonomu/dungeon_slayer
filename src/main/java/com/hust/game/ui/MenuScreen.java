@@ -1,6 +1,7 @@
 package com.hust.game.ui;
 
 import com.hust.game.constants.GameConstants;
+import com.hust.game.dev.DevSettings;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -78,7 +79,9 @@ public class MenuScreen {
         Image buttonSheet  = loadImg("/assets/button.png");
         Image settingSheet = loadImg("/assets/setting.png");
 
-        int[]    phase   = { hasPlayedIntro ? 1 : 0 };
+        boolean skipMenuIntro = DevSettings.shouldSkipMenuIntro();
+        boolean skipLoadingScreens = DevSettings.shouldSkipLoadingScreens();
+        int[]    phase   = { (hasPlayedIntro || skipMenuIntro) ? 1 : 0 };
         double[] bgAlpha = { 1.0 };
 
         String[] hints = {
@@ -155,8 +158,8 @@ public class MenuScreen {
         VBox btnBox = new VBox(5, startBtn, bottomRow);
         btnBox.setAlignment(Pos.BOTTOM_LEFT);
         
-        btnBox.setOpacity(hasPlayedIntro ? 1.0 : 0.0);
-        btnBox.setMouseTransparent(!hasPlayedIntro); // Fix lỗi: chưa hiện nút đã bấm được
+        btnBox.setOpacity((hasPlayedIntro || skipMenuIntro) ? 1.0 : 0.0);
+        btnBox.setMouseTransparent(!(hasPlayedIntro || skipMenuIntro)); // Fix lỗi: chưa hiện nút đã bấm được
 
         HBox levelRow = new HBox(40, tutorialBtn, lvl1Btn, lvl2Btn, lvl3Btn);
         levelRow.setAlignment(Pos.CENTER);
@@ -286,6 +289,12 @@ public class MenuScreen {
                     levelRow.setMouseTransparent(true);
                     backBtn.setVisible(false);
                     backBtn.setMouseTransparent(true);
+
+                    if (skipLoadingScreens) {
+                        menuLoopHolder[0].stop();
+                        onStart.accept(selectedLevel[0]);
+                        return;
+                    }
                     
                     loadingTimer[0]++;
                     hintTimer[0]++;

@@ -9,7 +9,6 @@ public class Slime extends Enemy {
     private int damageTick = 0;
     private Image dieSprite;
     private boolean isDying = false;
-    private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
 
     private Rectangle2D[] frameHitboxes = new Rectangle2D[8]; // Lưu cache hitbox riêng cho từng frame
 
@@ -127,17 +126,22 @@ public class Slime extends Enemy {
     public void render(GraphicsContext gc) {
         if (this.hp <= 0) {
             gc.save();
-            if (this.flashTimer > 54) gc.setEffect(WHITE_EFFECT); // Lóe trắng lúc vừa nhận đòn kết liễu
-            
             double renderX = this.x;
             double renderY = this.y;
             if (this.isFlipped) renderX += this.renderWidth;
             double renderW = this.isFlipped ? -this.renderWidth : this.renderWidth;
-            
-            gc.drawImage(this.spriteSheet, this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight, renderX, renderY, renderW, this.renderHeight);
+
+            gc.drawImage(this.spriteSheet,
+                this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+                renderX, renderY, renderW, this.renderHeight);
             gc.restore();
+
+            // Chớp trắng lúc vừa nhận đòn kết liễu — draw white sprite đè lên, pixel trong suốt không bị ảnh hưởng
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
+            }
         } else {
-            super.render(gc); // Lúc sống vẫn xài render gốc có chớp trắng khi nhận sát thương bình thường
+            super.render(gc); // Lúc sống dùng Enemy.render() có sẵn flash handling
         }
     }
 

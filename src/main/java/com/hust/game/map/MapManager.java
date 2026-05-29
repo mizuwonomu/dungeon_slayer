@@ -17,6 +17,7 @@ public class MapManager {
     private static final int POTION_MANA_COUNT = 2;
     public Map<Integer, Tile> tiles;
     public int[][] mapTileNum;
+    public int[][] mapTileNumLayer2;
     public int level;
     public List<int[]> gatePositions;
     public List<com.hust.game.entities.base.BaseEntity> mapEntities; // Danh sách các vật thể cứng trên Map
@@ -29,11 +30,17 @@ public class MapManager {
         gatePositions = new ArrayList<>();
         mapEntities = new ArrayList<>();
         mapTileNum = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
+        mapTileNumLayer2 = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
         
         // Tái sử dụng map Level 2 cho màn Final Boss (Level 3)
         String mapPath = (level == 3) ? "/assets/maps/level2.txt" : "/assets/maps/level" + level + ".txt";
         loadMap(mapPath);
+        
+        String layer2Path = (level == 3) ? null : "/assets/maps/level" + level + "_layer2.txt";
+        if (layer2Path != null) {
+            loadMapLayer2(layer2Path);
+        }
     }
 
     public void loadTiles() {
@@ -110,6 +117,62 @@ public class MapManager {
             }
 
             spawnPotions();
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public void loadMapLayer2(String filePath) {
+        try {
+            java.io.InputStream is = getClass().getResourceAsStream(filePath);
+            if (is == null) {
+                System.out.println("Không tìm thấy file map layer 2 " + filePath + ", bỏ qua.");
+                return;
+            }
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
+                String line = br.readLine();
+                if (line == null) break;
+                
+                line = line.replace("\uFEFF", "").trim();
+                if (line.isEmpty()) { row--; continue; } 
+                
+                String[] numbers = line.split("\\s+");
+                for (int col = 0; col < GameConstants.MAX_WORLD_COL && col < numbers.length; col++) {
+                    int val = Integer.parseInt(numbers[col].trim());
+                    // Chỉ ghi đè lên ô trống (0), không ghi đè lên các ô đã được đánh dấu (-15)
+                    if (val != 0 && mapTileNumLayer2[row][col] == 0) {
+                        mapTileNumLayer2[row][col] = val;
+                    }
+                }
+            }
+            br.close();
+            
+            // Tạo các Entity tĩnh từ những ô map layer 2 cần hiệu ứng 3D
+            for (int row = 0; row < GameConstants.MAX_WORLD_ROW; row++) {
+                for (int col = 0; col < GameConstants.MAX_WORLD_COL; col++) {
+                    int tileId = mapTileNumLayer2[row][col];
+                    if (tileId <= 0) continue; // Bỏ qua ô trống hoặc ô đã xử lý (-15)
+                    
+                    Tile t = tiles.get(tileId);
+                    if (t == null || t.image == null) continue;
+
+                    // Vật cản (nhà, hàng rào) hoặc bụi cây (cần vẽ đè player) đều là StaticEntity
+                    if (t.collision || tileId == 14) { // 14 là BUSH
+                        if (tileId == 15) { // HOUSE là 2x2, (row, col) là góc DƯỚI-TRÁI
+                            int w = GameConstants.TILE_SIZE * 2;
+                            int h = GameConstants.TILE_SIZE * 2;
+                            // Đánh dấu 3 ô còn lại là vật cản ảo để không sinh thêm entity
+                            if (row - 1 >= 0) mapTileNumLayer2[row-1][col] = -15;
+                            if (col + 1 < GameConstants.MAX_WORLD_COL) mapTileNumLayer2[row][col+1] = -15;
+                            if (row - 1 >= 0 && col + 1 < GameConstants.MAX_WORLD_COL) mapTileNumLayer2[row-1][col+1] = -15;
+
+                            // Tạo StaticEntity, vị trí vẽ là góc TRÊN-TRÁI
+                            mapEntities.add(new com.hust.game.entities.base.StaticEntity(col * GameConstants.TILE_SIZE, (row - 1) * GameConstants.TILE_SIZE, t.image, 1, w, h));
+                        } else { // Các vật thể 1x1 khác (VD: Fence, Bush)
+                            mapEntities.add(new com.hust.game.entities.base.StaticEntity(col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE, t.image, 1, GameConstants.TILE_SIZE, GameConstants.TILE_SIZE));
+                        }
+                    }
+                }
+            }
         } catch (Exception e) { e.printStackTrace(); }
     }
 
@@ -199,6 +262,16 @@ public class MapManager {
                 if (t != null && !t.collision && t.image != null) {
                     gc.drawImage(t.image, col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE,
                                  GameConstants.TILE_SIZE, GameConstants.TILE_SIZE);
+                }
+                
+                // Vẽ layer 2: Chỉ vẽ các tile trang trí không phải là entity 3D
+                int tileId2 = mapTileNumLayer2[row][col];
+                if (tileId2 > 0) {
+                    Tile t2 = tiles.get(tileId2);
+                    // Chỉ vẽ nếu nó không phải vật cản VÀ không phải là bụi cây (vì chúng đã là entity)
+                    if (t2 != null && !t2.collision && tileId2 != 14 && t2.image != null) {
+                        gc.drawImage(t2.image, col * GameConstants.TILE_SIZE, row * GameConstants.TILE_SIZE, GameConstants.TILE_SIZE, GameConstants.TILE_SIZE);
+                    }
                 }
             }
         }

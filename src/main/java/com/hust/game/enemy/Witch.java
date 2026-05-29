@@ -25,6 +25,8 @@ public class Witch extends Enemy {
     private boolean isSummoning = false;
     private boolean isCastingCircle = false;
     private boolean hasTeleported = false;
+    private Image dieSprite;
+    private boolean isDying = false;
 
     // Quản lý Vòng lửa
     private double circleX, circleY;
@@ -43,6 +45,8 @@ public class Witch extends Enemy {
         this.summonSprite = idleImg; // witch_summon.png
         
         try {
+            this.dieSprite = new javafx.scene.image.Image(
+                    getClass().getResourceAsStream("/assets/enemy/witch_die.png"));
             this.circleSprite = new javafx.scene.image.Image(
                     getClass().getResourceAsStream("/assets/enemy/witch_circle.png"));
             this.circleAtkSprite = new javafx.scene.image.Image(
@@ -133,14 +137,53 @@ public class Witch extends Enemy {
         this.lastX = this.x;
         this.lastY = this.y;
 
-        if (this.flashTimer > 0) {
-            this.flashTimer--;
-        }
-        if (this.hitStunTimer > 0) {
-            this.hitStunTimer--;
+        if (this.hp > 0) {
+            if (this.flashTimer > 0) {
+                this.flashTimer--;
+            }
+            if (this.hitStunTimer > 0) {
+                this.hitStunTimer--;
+            }
         }
 
         if (this.hp <= 0) {
+            this.hitStunTimer = 0;
+            this.isCastingCircle = false;
+            this.isSummoning = false;
+
+            if (!isDying) {
+                isDying = true;
+                if (dieSprite != null) {
+                    this.spriteSheet = dieSprite;
+                    this.numFrames = 11;
+                    this.frameWidth = dieSprite.getWidth() / 11.0;
+                    this.frameHeight = dieSprite.getHeight();
+                    
+                    // Cập nhật lại tỷ lệ kích thước cho ảnh chết, giữ tâm đứng yên
+                    double oldCenterX = this.x + this.renderWidth / 2.0;
+                    this.renderHeight = 150;
+                    this.renderWidth = this.renderHeight * (this.frameWidth / this.frameHeight);
+                    this.x = oldCenterX - this.renderWidth / 2.0;
+                }
+                this.frameIndex = 0;
+                this.animationTimer = 0;
+            }
+
+            if (this.flashTimer > 54) {
+                this.flashTimer--;
+            }
+
+            if (this.frameIndex < 10) {
+                this.animationTimer++;
+                if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
+                    this.animationTimer = 0;
+                    this.frameIndex++;
+                }
+            } else {
+                if (this.flashTimer > 0 && this.flashTimer <= 54) {
+                    this.flashTimer--;
+                }
+            }
             return;
         }
 
@@ -281,29 +324,51 @@ public class Witch extends Enemy {
 
     @Override
     public void render(GraphicsContext gc) {
-        super.render(gc);
+        if (this.hp <= 0) {
+            gc.save();
+            double alpha = this.flashTimer / 54.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            gc.setGlobalAlpha(alpha);
 
-        // Render Vòng lửa dựa theo bộ đếm circleTimer
-        if (isCastingCircle && circleTimer > 60) {
-            Image currentCircle;
-            int cFrames;
-            int cIndex;
+            double renderX = this.x;
+            double renderY = this.y;
+            if (this.isFlipped) renderX += this.renderWidth;
+            double renderW = this.isFlipped ? -this.renderWidth : this.renderWidth;
 
-            if (circleTimer > 210) {
-                // Vòng nổ
-                currentCircle = circleAtkSprite;
-                cFrames = 8;
-                cIndex = ((circleTimer - 210) / 2) % cFrames;
-            } else {
-                // Vòng đang xoay
-                currentCircle = circleSprite;
-                cFrames = 1;
-                cIndex = ((circleTimer - 60) / 5) % cFrames;
+            gc.drawImage(this.spriteSheet,
+                this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+                renderX, renderY, renderW, this.renderHeight);
+            gc.restore();
+
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
             }
+        } else {
+            super.render(gc);
 
-            double cWidth = currentCircle.getWidth() / cFrames;
-            gc.drawImage(currentCircle, cIndex * cWidth, 0, cWidth, currentCircle.getHeight(),
-                    circleX, circleY + 5, 64, 64);
+            // Render Vòng lửa dựa theo bộ đếm circleTimer
+            if (isCastingCircle && circleTimer > 60) {
+                Image currentCircle;
+                int cFrames;
+                int cIndex;
+
+                if (circleTimer > 210) {
+                    // Vòng nổ
+                    currentCircle = circleAtkSprite;
+                    cFrames = 8;
+                    cIndex = ((circleTimer - 210) / 2) % cFrames;
+                } else {
+                    // Vòng đang xoay
+                    currentCircle = circleSprite;
+                    cFrames = 1;
+                    cIndex = ((circleTimer - 60) / 5) % cFrames;
+                }
+
+                double cWidth = currentCircle.getWidth() / cFrames;
+                gc.drawImage(currentCircle, cIndex * cWidth, 0, cWidth, currentCircle.getHeight(),
+                        circleX, circleY + 5, 64, 64);
+            }
         }
     }
 

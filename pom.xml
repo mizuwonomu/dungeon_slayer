@@ -79,4 +79,23 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <id>dev</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-maven-plugin</artifactId>
+            <configuration>
+              <options>
+                <option>-Dgame.devMode=true</option>
+              </options>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
 </project>

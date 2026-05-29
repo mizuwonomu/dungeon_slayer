@@ -1,35 +1,1230 @@
 package com.hust.game.enemy;
 
+import com.hust.game.constants.GameConstants;
+import com.hust.game.entities.Direction;
+import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.player.Player;
-import javafx.scene.image.Image;
 import javafx.geometry.Rectangle2D;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.paint.Color;
+
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 public class FinalBoss extends Enemy {
+    // Bộ trạng thái của boss: mỗi thời điểm chỉ chạy một trạng thái để tránh spam/chồng chiêu.
+    private enum BossState {
+        CHASE,
+        SKILL1_TELEPORT,
+        SKILL1_SLASH1,
+        SKILL1_GAP,
+        SKILL1_SLASH2,
+        SKILL2_CAST,
+        RAGE_TELEGRAPH,
+        RAGE_DRAGON,
+        RECOVERY,
+        DEAD
+    }
 
-    public FinalBoss(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight, Player targetPlayer) {
+    private static final int BOSS_MAX_HP = 500;
+    private static final int SKILL1_DAMAGE = 30;
+    private static final int SKILL2_DAMAGE = 20;
+    private static final int RAGE_DAMAGE = 50;
+
+    // Số frame phải khớp số cột trong từng spritesheet.
+    private static final int IDLE_FRAMES = 5;
+    private static final int ATTACK_1_FRAMES = 21;
+    private static final int ATTACK_2_FRAMES = 40;
+    private static final int TELE_FRAMES = 11;
+    private static final int WALK_FRAMES = 10;
+    private static final int ULTIMATE_FRAMES = 50;
+    private static final int DRAGON_FRAMES = 3;
+    private static final int SKILL2_ITEM_FRAMES = 2;
+    private static final double ULTIMATE_SAFE_FRAME_SIZE = 160.0;
+    private static final double ULTIMATE_FRAME_CACHE_SIZE = 384.0;
+
+    // Bộ đếm thời gian tính theo 60 FPS: 120 frame = 2 giây, 30 frame = 0.5 giây.
+    private static final int ACTION_DELAY_FRAMES = 120;
+    private static final int SKILL1_TELEPORT_FRAMES = 40;
+    private static final int SKILL1_SLASH_FRAMES = 30;
+    private static final int SKILL1_GAP_FRAMES = 20;
+    private static final int SKILL1_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
+    private static final int SKILL2_CAST_FRAMES = ATTACK_2_FRAMES * 3;
+    private static final int SKILL2_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
+    private static final int RAGE_TELEGRAPH_FRAMES = ULTIMATE_FRAMES * 3;
+
+    private static final int TELEPORT_APPLY_FRAME = 5;
+    private static final int SKILL2_VOLLEY_1_FRAME = 8;
+    private static final int SKILL2_VOLLEY_2_FRAME = 20;
+    private static final int SKILL2_VOLLEY_3_FRAME = 32;
+    private static final int RAGE_DRAGON_RELEASE_FRAME = 24;
+
+    private static final int SKILL1_COOLDOWN_FRAMES = 330;
+    private static final int SKILL2_COOLDOWN_FRAMES = 300;
+
+    private static final double SKILL1_RADIUS_MULTIPLIER = 1.5;
+    private static final double RAGE_RADIUS_MULTIPLIER = 4.0;
+    private static final double SKILL2_ITEM_RENDER_SIZE = 96.0;
+    private static final double SKILL2_ITEM_HIT_RADIUS = 30.0;
+    private static final double SKILL2_PROJECTILE_SPEED = 9.0;
+    private static final double SKILL2_PROJECTILE_MAX_DISTANCE = GameConstants.TILE_SIZE * 18.0;
+    private static final double SKILL2_SPREAD_ANGLE_DEGREES = 60.0;
+    private static final double SKILL2_BOSS_RENDER_SCALE = 2.0;
+    private static final double ULTIMATE_BOSS_RENDER_SCALE = 4.0;
+    private static final double DRAGON_SPEED = 8.0;
+    private static final int DRAGON_MAX_FLIGHT_FRAMES = 120;
+    private static final double DRAGON_RENDER_WIDTH = 288.0;
+    private static final double DRAGON_RENDER_HEIGHT = 198.0;
+    private static final double WANDER_SPEED = 1.0;
+
+    // Level 3 đang dùng lại level2.txt. Tâm arena đi được nằm quanh hàng 5,
+    // không phải tâm cửa sổ vì tâm cửa sổ bị dính vùng hố có va chạm.
+    private static final double ARENA_CENTER_X = GameConstants.TILE_SIZE * 8.5;
+    private static final double ARENA_CENTER_Y = GameConstants.TILE_SIZE * 5.0;
+
+    private final Image idleSprite;
+    private final int idleFrames;
+    private final Image attackSprite1;
+    private final Image attackSprite2;
+    private final Image teleSprite;
+    private final Image walkSprite;
+    private final Image ultiSprite;
+    private final Image[] ultiFrameSprites;
+    private final Image dragonSprite;
+    private final Image skill2Item1Sprite;
+    private final Image skill2Item2Sprite;
+
+    private BossState bossState = BossState.CHASE;
+    private int stateTimer = 0;
+    private int skill1CooldownTimer = 120;
+    private int skill2CooldownTimer = 80;
+    private int attackCountSinceRage = 0;
+    private boolean rageQueued = false;
+    private boolean hasTeleportedThisSkill = false;
+    private boolean hasFiredSkill2Volley = false;
+    private int currentSkill2VolleyCount = 1;
+    private int nextSkill2VolleyCount = 1;
+
+    private double teleportTargetX = 0;
+    private double teleportTargetY = 0;
+    private double lastAimX = 1;
+    private double lastAimY = 0;
+    private double recoveryWanderX = 0;
+    private double recoveryWanderY = 0;
+    private int recoveryWanderTimer = 0;
+    private double rageTargetX = ARENA_CENTER_X;
+    private double rageTargetY = ARENA_CENTER_Y;
+
+    private CircleHitbox activeHitbox;
+    private DragonStrike dragonStrike;
+    private final List<Skill2SlashProjectile> skill2Projectiles = new ArrayList<>();
+
+    public FinalBoss(double x, double y, Image spriteSheet, int numFrames,
+            double renderWidth, double renderHeight, Player targetPlayer) {
         super(x, y, spriteSheet, numFrames, renderWidth, renderHeight, targetPlayer);
-        this.maxHp = 10000;
+
+        // Chỉ số chính của boss.
+        this.maxHp = BOSS_MAX_HP;
         this.hp = maxHp;
-        this.damage = 0; // Để test combat, không gây sát thương
-        this.knockback = 1; // Knockback rất nhẹ
-        this.speed = 0;
-        this.isImmobile = true; // Chỉ đứng im
-        this.animationDelay = 12; // Tốc độ chạy animation nhàn rỗi
+        this.damage = 0;
+        this.knockback = 1;
+        this.speed = 1.15;
+        this.isImmobile = false;
+        this.animationDelay = 10;
+
+        // Boss tự load các animation riêng. spriteSheet truyền vào chỉ làm ảnh dự phòng.
+        Image bossIdleSprite = loadOptionalImage("/assets/enemy/boss_idle.png");
+        this.idleSprite = bossIdleSprite != null ? bossIdleSprite : spriteSheet;
+        this.idleFrames = bossIdleSprite != null ? IDLE_FRAMES : Math.max(1, numFrames);
+        this.attackSprite1 = loadOptionalImage("/assets/enemy/boss_atk_1.png");
+        this.attackSprite2 = loadOptionalImage("/assets/enemy/boss_atk_2.png");
+        this.teleSprite = loadOptionalImage("/assets/enemy/boss_tele.png");
+        this.walkSprite = loadOptionalImage("/assets/enemy/boss_walk.png");
+        // Ảnh ulti gốc rộng 38400px. Nếu vẽ trực tiếp, JavaFX Canvas có thể ném NullPointerException do vượt giới hạn texture GPU.
+        this.ultiSprite = loadOptionalImage("/assets/enemy/boss_ultimate.png",
+                ULTIMATE_SAFE_FRAME_SIZE * ULTIMATE_FRAMES, ULTIMATE_SAFE_FRAME_SIZE);
+        this.ultiFrameSprites = loadOptionalFrames("/assets/enemy/boss_ultimate.png",
+                ULTIMATE_FRAMES, (int) ULTIMATE_FRAME_CACHE_SIZE, (int) ULTIMATE_FRAME_CACHE_SIZE);
+        this.dragonSprite = loadOptionalImage("/assets/enemy/dragon.png");
+        this.skill2Item1Sprite = loadOptionalImage("/assets/enemy/atk_2_item_1.png");
+        this.skill2Item2Sprite = loadOptionalImage("/assets/enemy/atk_2_item_2.png");
+    }
+
+    @Override
+    public void update() {
+        // Boss luôn active để không bị cơ chế tắt quái ngoài camera làm ngắt AI ở phòng boss.
+        this.isActive = true;
+
+        if (this.hp <= 0) {
+            updateDeath();
+            return;
+        }
+
+        this.lastX = this.x;
+        this.lastY = this.y;
+
+        // Bộ đếm/hồi chiêu/vật thể bay được update trước trạng thái hiện tại.
+        updateCommonTimers();
+        if (shouldTrackPlayer()) {
+            updateFacingToPlayer();
+        } else {
+            isFlipped = lastAimX < 0;
+        }
+        updateProjectiles();
+
+        switch (bossState) {
+            case CHASE -> updateChase();
+            case SKILL1_TELEPORT -> updateSkill1Teleport();
+            case SKILL1_SLASH1 -> updateActiveCircleHitbox(BossState.SKILL1_GAP, SKILL1_GAP_FRAMES);
+            case SKILL1_GAP -> updateTimedState(BossState.SKILL1_SLASH2, SKILL1_SLASH_FRAMES, () ->
+                    activeHitbox = createSlashHitbox(SKILL1_DAMAGE, playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER, SKILL1_SLASH_FRAMES));
+            case SKILL1_SLASH2 -> updateActiveCircleHitbox(BossState.RECOVERY, SKILL1_RECOVERY_FRAMES);
+            case SKILL2_CAST -> updateSkill2Cast();
+            case RAGE_TELEGRAPH -> updateRageTelegraph();
+            case RAGE_DRAGON -> updateRageDragon();
+            case RECOVERY -> updateRecovery();
+            case DEAD -> updateDeath();
+        }
+
+        animateCurrentSprite();
+    }
+
+    private void updateCommonTimers() {
+        // Giảm cooldown mỗi frame.
+        if (flashTimer > 0) flashTimer--;
+        if (skill1CooldownTimer > 0) skill1CooldownTimer--;
+        if (skill2CooldownTimer > 0) skill2CooldownTimer--;
+
+        // Knockback nhẹ để boss không bị stun-lock.
+        if (kbTimer > 0) {
+            double multiplier = kbTimer / 5.0;
+            kbTimer--;
+            x += kbVectorX * multiplier;
+            y += kbVectorY * multiplier;
+        }
+    }
+
+    private void updateChase() {
+        // State mặc định: đuổi player và chọn chiêu nếu cooldown đã sẵn sàng.
+        setSprite(idleSprite, idleFrames, 10);
+
+        if (rageQueued) {
+            startRage();
+            return;
+        }
+
+        double distance = distanceToPlayerCenter();
+        double preferredDistance = renderWidth * 0.55 + playerZoneRadius();
+
+        // Giữ khoảng cách đủ gần để đánh, nhưng không ép boss đứng đè lên player.
+        if (distance > preferredDistance && !isImmobile) {
+            moveTowardPlayer(distance);
+        }
+
+        // Boss không có đánh thường: chỉ chọn Skill 1, Skill 2 hoặc chiêu nộ.
+        if (skill1CooldownTimer <= 0 && distance <= GameConstants.TILE_SIZE * 6.0) {
+            startSkill1();
+        } else if (skill2CooldownTimer <= 0) {
+            startSkill2();
+        }
+    }
+
+    private void updateSkill1Teleport() {
+        // Skill 1: chạy animation tele, sau đó dịch chuyển thẳng sát player.
+        setSprite(teleSprite != null ? teleSprite : idleSprite,
+                teleSprite != null ? TELE_FRAMES : idleFrames, 5);
+
+        // Tele không gây damage. Sau khi animation tele xong thì vào chém ngay, không chờ delay.
+        if (!hasTeleportedThisSkill && frameIndex >= TELEPORT_APPLY_FRAME) {
+            x = teleportTargetX;
+            y = teleportTargetY;
+            hasTeleportedThisSkill = true;
+            lockAimToPlayer();
+        }
+
+        if (--stateTimer <= 0) {
+            changeState(BossState.SKILL1_SLASH1, SKILL1_SLASH_FRAMES);
+            activeHitbox = createSlashHitbox(SKILL1_DAMAGE, playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER, SKILL1_SLASH_FRAMES);
+        }
+    }
+
+    private void updateSkill2Cast() {
+        // Skill 2: mỗi lần cast chỉ bắn một pattern. Các lần cast sau tăng 1 -> 2 -> 3 vệt.
+        setSprite(attackSprite2 != null ? attackSprite2 : idleSprite,
+                attackSprite2 != null ? ATTACK_2_FRAMES : idleFrames, 3);
+
+        if (!hasFiredSkill2Volley && frameIndex >= skill2FireFrame(currentSkill2VolleyCount)) {
+            spawnSkill2Volley(currentSkill2VolleyCount);
+            hasFiredSkill2Volley = true;
+        }
+
+        if (--stateTimer <= 0) {
+            skill2CooldownTimer = SKILL2_COOLDOWN_FRAMES;
+            changeState(BossState.RECOVERY, SKILL2_RECOVERY_FRAMES);
+        }
+    }
+
+    private void updateRageTelegraph() {
+        // Chiêu nộ dùng boss_ultimate.png. Cổng mở ở frame 24-45, rồng chui ra từ cổng ở frame 24.
+        setSprite(ultiSprite != null ? ultiSprite : idleSprite,
+                ultiSprite != null ? ULTIMATE_FRAMES : idleFrames, 3);
+
+        if (dragonStrike == null && frameIndex >= RAGE_DRAGON_RELEASE_FRAME) {
+            dragonStrike = new DragonStrike(centerX(), centerY() - renderHeight * 0.45,
+                    rageTargetX, rageTargetY, playerZoneRadius() * RAGE_RADIUS_MULTIPLIER);
+        }
+        if (dragonStrike != null && !dragonStrike.isDone()) {
+            dragonStrike.update();
+        }
+
+        if (--stateTimer <= 0) {
+            if (dragonStrike != null && !dragonStrike.isDone()) {
+                changeState(BossState.RAGE_DRAGON, 0);
+            } else {
+                dragonStrike = null;
+                changeState(BossState.RECOVERY, ACTION_DELAY_FRAMES);
+            }
+        }
+    }
+
+    private void updateRageDragon() {
+        // Sau cảnh báo, vật thể nộ rơi xuống và nổ tại rageTarget.
+        if (dragonStrike != null) {
+            dragonStrike.update();
+            if (dragonStrike.isDone()) {
+                dragonStrike = null;
+                changeState(BossState.RECOVERY, ACTION_DELAY_FRAMES);
+            }
+        } else {
+            changeState(BossState.CHASE, 0);
+        }
+    }
+
+    private void updateRecovery() {
+        // Delay 2 giây giữa các chiêu: boss đi lang thang bằng animation walk.
+        setSprite(walkSprite != null ? walkSprite : idleSprite,
+                walkSprite != null ? WALK_FRAMES : idleFrames, 8);
+
+        if (!isImmobile) {
+            if (recoveryWanderTimer <= 0) {
+                chooseRecoveryWanderDirection();
+            }
+
+            if (Math.abs(recoveryWanderX) > 0.1) {
+                isFlipped = recoveryWanderX < 0;
+            }
+            moveByWithCollision(recoveryWanderX * WANDER_SPEED, recoveryWanderY * WANDER_SPEED);
+            recoveryWanderTimer--;
+        }
+
+        if (--stateTimer <= 0) {
+            changeState(BossState.CHASE, 0);
+        }
+    }
+
+    private void updateTimedState(BossState nextState, int nextTimer, Runnable onEnterNextState) {
+        // Hàm phụ cho các trạng thái chỉ cần đếm thời gian rồi chuyển sang trạng thái kế tiếp.
+        if (--stateTimer <= 0) {
+            changeState(nextState, nextTimer);
+            if (onEnterNextState != null) {
+                onEnterNextState.run();
+            }
+        }
+    }
+
+    private void updateActiveCircleHitbox(BossState nextState, int nextTimer) {
+        // Vùng đánh dạng tròn tồn tại nhiều frame nhưng tự chặn damage lặp lên player.
+        setSprite(attackSprite1 != null ? attackSprite1 : idleSprite,
+                attackSprite1 != null ? ATTACK_1_FRAMES : idleFrames, 3);
+
+        if (activeHitbox != null) {
+            activeHitbox.update();
+            if (activeHitbox.isExpired()) {
+                activeHitbox = null;
+            }
+        }
+
+        if (--stateTimer <= 0) {
+            activeHitbox = null;
+            changeState(nextState, nextTimer);
+        }
+    }
+
+    private void updateProjectiles() {
+        // Cập nhật tất cả vệt chém bay và xóa vật thể bay đã kết thúc.
+        Iterator<Skill2SlashProjectile> iterator = skill2Projectiles.iterator();
+        while (iterator.hasNext()) {
+            Skill2SlashProjectile slash = iterator.next();
+            slash.update();
+            if (slash.isFinished()) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private void updateDeath() {
+        // Dọn toàn bộ hitbox/effect khi boss chết.
+        bossState = BossState.DEAD;
+        activeHitbox = null;
+        dragonStrike = null;
+        skill2Projectiles.clear();
+        if (flashTimer > 0) {
+            flashTimer--;
+        }
+        animateCurrentSprite();
+    }
+
+    private void startSkill1() {
+        // Bắt đầu Skill 1: tele tới gần player rồi chém 2 lần.
+        registerBossAttackAction();
+        lockAimToPlayer();
+        skill1CooldownTimer = SKILL1_COOLDOWN_FRAMES;
+        hasTeleportedThisSkill = false;
+
+        // Boss tele thẳng sát player, không kiểm tra vùng va chạm theo yêu cầu.
+        prepareTeleportNearPlayer();
+
+        changeState(BossState.SKILL1_TELEPORT, SKILL1_TELEPORT_FRAMES);
+    }
+
+    private void startSkill2() {
+        // Bắt đầu Skill 2: mỗi lần cast chỉ chọn một pattern 1/2/3 vệt, rồi lần sau tăng cấp.
+        registerBossAttackAction();
+        lockAimToPlayer();
+        currentSkill2VolleyCount = nextSkill2VolleyCount;
+        nextSkill2VolleyCount = nextSkill2VolleyCount % 3 + 1;
+        hasFiredSkill2Volley = false;
+        skill2CooldownTimer = SKILL2_COOLDOWN_FRAMES;
+        changeState(BossState.SKILL2_CAST, SKILL2_CAST_FRAMES);
+    }
+
+    private void spawnSkill2Volley(int volleyCount) {
+        // Sinh pattern vệt chém theo cấp hiện tại của Skill 2.
+        double[] aim = directionToPlayerNow();
+        Image projectileSprite = volleyCount == 1 ? skill2Item1Sprite : skill2Item2Sprite;
+        if (projectileSprite == null) {
+            projectileSprite = skill2Item1Sprite;
+        }
+
+        if (volleyCount == 1) {
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+        } else if (volleyCount == 2) {
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+            spawnSkill2Projectile(-aim[0], -aim[1], projectileSprite);
+        } else {
+            double[] left = rotateVector(aim[0], aim[1], Math.toRadians(SKILL2_SPREAD_ANGLE_DEGREES));
+            double[] right = rotateVector(aim[0], aim[1], Math.toRadians(-SKILL2_SPREAD_ANGLE_DEGREES));
+            spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
+            spawnSkill2Projectile(left[0], left[1], projectileSprite);
+            spawnSkill2Projectile(right[0], right[1], projectileSprite);
+        }
+    }
+
+    private void spawnSkill2Projectile(double dirX, double dirY, Image projectileSprite) {
+        double spawnX = centerX() + dirX * renderWidth * 0.35;
+        double spawnY = centerY() + dirY * renderHeight * 0.35;
+        skill2Projectiles.add(new Skill2SlashProjectile(spawnX, spawnY, dirX, dirY, projectileSprite));
+    }
+
+    private int skill2FireFrame(int volleyCount) {
+        // Dùng đúng nhịp animation trong boss_atk_2 cho pattern 1/2/3.
+        return switch (volleyCount) {
+            case 2 -> SKILL2_VOLLEY_2_FRAME;
+            case 3 -> SKILL2_VOLLEY_3_FRAME;
+            default -> SKILL2_VOLLEY_1_FRAME;
+        };
+    }
+
+    private void startRage() {
+        // Chiêu nộ khóa vị trí hiện tại của player để vẽ cảnh báo rồi mới rơi xuống.
+        lockAimToPlayer();
+        rageTargetX = playerCenterX();
+        rageTargetY = playerCenterY();
+        dragonStrike = null;
+        rageQueued = false;
+        changeState(BossState.RAGE_TELEGRAPH, RAGE_TELEGRAPH_FRAMES);
+    }
+
+    private void registerBossAttackAction() {
+        // Sau mỗi 5 hành động bất kỳ, boss xếp hàng chiêu nộ. Chiêu nộ chạy khi boss về CHASE.
+        attackCountSinceRage++;
+        if (attackCountSinceRage >= 5) {
+            attackCountSinceRage = 0;
+            rageQueued = true;
+        }
+    }
+
+    private void changeState(BossState newState, int timer) {
+        // Mỗi lần đổi state đều reset animation để frame đầu khớp với chiêu mới.
+        bossState = newState;
+        stateTimer = timer;
+        animationTimer = 0;
+        frameIndex = 0;
+
+        if (newState == BossState.RECOVERY) {
+            chooseRecoveryWanderDirection();
+        }
+    }
+
+    private void moveTowardPlayer(double distance) {
+        // Di chuyển thường có kiểm tra va chạm để boss không đi xuyên tường.
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        if (distance <= 0.0001) return;
+
+        moveX = (dx / distance) * speed;
+        moveY = (dy / distance) * speed;
+        moveByWithCollision(moveX, moveY);
+    }
+
+    private void updateFacingToPlayer() {
+        // Cập nhật hướng nhìn và vector aim liên tục khi boss đang theo dõi player.
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        double distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance > 0.0001) {
+            lastAimX = dx / distance;
+            lastAimY = dy / distance;
+        }
+        isFlipped = dx < 0;
+    }
+
+    private boolean shouldTrackPlayer() {
+        // Một số trạng thái phải khóa hướng từ lúc vận chiêu, nên không cập nhật aim liên tục.
+        return bossState == BossState.CHASE
+                || bossState == BossState.RECOVERY;
+    }
+
+    private void lockAimToPlayer() {
+        // Khóa hướng từ boss tới player tại đúng thời điểm bắt đầu chiêu.
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        double distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0.0001) {
+            lastAimX = dx / distance;
+            lastAimY = dy / distance;
+        }
+        isFlipped = lastAimX < 0;
+    }
+
+    private double[] directionToPlayerNow() {
+        // Lấy hướng mới nhất từ boss tới player để mỗi nhịp Skill 2 có thể nhắm lại.
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        double distance = Math.sqrt(dx * dx + dy * dy);
+        if (distance <= 0.0001) {
+            return new double[]{lastAimX, lastAimY};
+        }
+        return new double[]{dx / distance, dy / distance};
+    }
+
+    private double[] rotateVector(double x, double y, double angle) {
+        // Xoay vector để tạo pattern tam giác đều cho nhịp 3 vệt chém.
+        double cos = Math.cos(angle);
+        double sin = Math.sin(angle);
+        return new double[]{x * cos - y * sin, x * sin + y * cos};
+    }
+
+    private void prepareTeleportNearPlayer() {
+        // Tìm vị trí sát player nhưng vẫn đặt được chân boss, tránh tele kẹt vào tường.
+        double stopDistance = playerZoneRadius() + renderWidth * 0.38;
+        double baseAngle = Math.atan2(-lastAimY, -lastAimX);
+        double[] angleOffsets = {
+                0.0,
+                Math.toRadians(30.0), Math.toRadians(-30.0),
+                Math.toRadians(60.0), Math.toRadians(-60.0),
+                Math.toRadians(90.0), Math.toRadians(-90.0),
+                Math.toRadians(120.0), Math.toRadians(-120.0),
+                Math.PI
+        };
+
+        for (int ring = 0; ring < 4; ring++) {
+            double candidateDistance = stopDistance + ring * GameConstants.TILE_SIZE * 0.35;
+            for (double offset : angleOffsets) {
+                double angle = baseAngle + offset;
+                double candidateCenterX = playerCenterX() + Math.cos(angle) * candidateDistance;
+                double candidateCenterY = playerCenterY() + Math.sin(angle) * candidateDistance;
+                double candidateX = candidateCenterX - renderWidth / 2.0;
+                double candidateY = candidateCenterY - renderHeight / 2.0;
+
+                if (canOccupy(candidateX, candidateY)) {
+                    teleportTargetX = candidateX;
+                    teleportTargetY = candidateY;
+                    return;
+                }
+            }
+        }
+
+        // Nếu quanh player đều kín, boss giữ nguyên vị trí để không bị nhét vào tile solid.
+        teleportTargetX = x;
+        teleportTargetY = y;
+    }
+
+    private void chooseRecoveryWanderDirection() {
+        // Khi đang quá gần player, boss ưu tiên lùi ra để player nhìn rõ delay.
+        double dxFromPlayer = centerX() - playerCenterX();
+        double dyFromPlayer = centerY() - playerCenterY();
+        double distanceFromPlayer = Math.sqrt(dxFromPlayer * dxFromPlayer + dyFromPlayer * dyFromPlayer);
+
+        if (distanceFromPlayer > 0.0001 && distanceFromPlayer < closePlayerWanderRange()) {
+            recoveryWanderX = dxFromPlayer / distanceFromPlayer;
+            recoveryWanderY = dyFromPlayer / distanceFromPlayer;
+            recoveryWanderTimer = 30 + (int) (Math.random() * 45);
+            return;
+        }
+
+        double dxToCenter = ARENA_CENTER_X - centerX();
+        double dyToCenter = ARENA_CENTER_Y - centerY();
+        double distanceToCenter = Math.sqrt(dxToCenter * dxToCenter + dyToCenter * dyToCenter);
+
+        if (distanceToCenter > GameConstants.TILE_SIZE * 3.5) {
+            recoveryWanderX = dxToCenter / distanceToCenter;
+            recoveryWanderY = dyToCenter / distanceToCenter;
+        } else {
+            double angle = Math.random() * Math.PI * 2.0;
+            recoveryWanderX = Math.cos(angle);
+            recoveryWanderY = Math.sin(angle);
+        }
+
+        recoveryWanderTimer = 30 + (int) (Math.random() * 45);
+    }
+
+    private void moveByWithCollision(double dx, double dy) {
+        // Chia chuyển động thành nhiều bước nhỏ để không xuyên qua tile solid khi đi nhanh.
+        if (Math.abs(dx) < 0.0001 && Math.abs(dy) < 0.0001) {
+            return;
+        }
+
+        int steps = Math.max(1, (int) Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)) / 8.0));
+        double stepX = dx / steps;
+        double stepY = dy / steps;
+
+        for (int i = 0; i < steps; i++) {
+            double nextX = x + stepX;
+            if (canOccupy(nextX, y)) {
+                x = nextX;
+            } else {
+                recoveryWanderTimer = 0;
+            }
+
+            double nextY = y + stepY;
+            if (canOccupy(x, nextY)) {
+                y = nextY;
+            } else {
+                recoveryWanderTimer = 0;
+            }
+        }
+    }
+
+    private boolean canOccupy(double nextX, double nextY) {
+        // Kiểm tra 4 góc của hitbox chân với tile có va chạm.
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        // Trừ 1 ở cạnh max để đứng đúng mép tile không bị tính sang tile kế bên.
+        Rectangle2D bounds = collisionBoundaryAt(nextX, nextY);
+        double bx = bounds.getMinX();
+        double by = bounds.getMinY();
+        double right = bounds.getMaxX() - 1.0;
+        double bottom = bounds.getMaxY() - 1.0;
+
+        return !collisionChecker.checkTile((int) bx, (int) by)
+                && !collisionChecker.checkTile((int) right, (int) by)
+                && !collisionChecker.checkTile((int) bx, (int) bottom)
+                && !collisionChecker.checkTile((int) right, (int) bottom);
+    }
+
+    private Rectangle2D collisionBoundaryAt(double entityX, double entityY) {
+        // Va chạm vật lý chỉ lấy phần chân, không lấy toàn bộ sprite lớn của boss.
+        double w = renderWidth * 0.5;
+        double h = renderHeight * 0.3;
+        double bx = entityX + (renderWidth - w) / 2.0;
+        double by = entityY + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
+    }
+
+    private CircleHitbox createSlashHitbox(int hitDamage, double radius, int life) {
+        // Hitbox chém nằm phía trước boss theo hướng lastAim đã khóa.
+        double offset = renderWidth * 0.55;
+        return new CircleHitbox(
+                centerX() + lastAimX * offset,
+                centerY() + lastAimY * offset,
+                radius,
+                hitDamage,
+                life
+        );
+    }
+
+    private double playerZoneRadius() {
+        // Bán kính vùng quanh player theo yêu cầu: player.renderWidth / 2.
+        return targetPlayer.getRenderWidth() / 2.0;
+    }
+
+    private double closePlayerWanderRange() {
+        // Khi recovery mà đứng quá sát player thì boss lùi nhẹ để người chơi đọc animation skill kế tiếp.
+        return renderWidth * 0.55 + playerZoneRadius() * 2.0;
+    }
+
+    private double centerX() {
+        return x + renderWidth / 2.0;
+    }
+
+    private double centerY() {
+        return y + renderHeight / 2.0;
+    }
+
+    private double playerCenterX() {
+        return targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0;
+    }
+
+    private double playerCenterY() {
+        return targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0;
+    }
+
+    private double distanceToPlayerCenter() {
+        double dx = playerCenterX() - centerX();
+        double dy = playerCenterY() - centerY();
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    private void setSprite(Image sprite, int frames, int delay) {
+        // Đổi spritesheet hiện tại và reset frame khi animation thay đổi.
+        if (sprite == null) {
+            sprite = idleSprite;
+            frames = idleFrames;
+        }
+        if (sprite == null) {
+            return;
+        }
+
+        int safeFrames = Math.max(1, frames);
+        int safeDelay = Math.max(1, delay);
+
+        if (this.spriteSheet != sprite || this.numFrames != safeFrames) {
+            this.spriteSheet = sprite;
+            this.numFrames = safeFrames;
+            this.frameWidth = sprite.getWidth() / safeFrames;
+            this.frameHeight = sprite.getHeight();
+            this.frameIndex = 0;
+            this.animationTimer = 0;
+        }
+        this.animationDelay = safeDelay;
+    }
+
+    private void animateCurrentSprite() {
+        // Animation ngang một hàng: tăng frameIndex theo animationDelay.
+        if (spriteSheet == null || numFrames <= 1) return;
+
+        animationTimer++;
+        if (animationTimer >= animationDelay) {
+            animationTimer = 0;
+            frameIndex++;
+            if (frameIndex >= numFrames) {
+                frameIndex = 0;
+            }
+        }
+    }
+
+    private Image loadOptionalImage(String path) {
+        return loadOptionalImage(path, 0, 0);
+    }
+
+    private Image loadOptionalImage(String path, double requestedWidth, double requestedHeight) {
+        // Load asset phụ của boss. Thiếu asset không làm crash game, chỉ dùng animation dự phòng.
+        try {
+            java.io.InputStream stream = getClass().getResourceAsStream(path);
+            if (stream == null) {
+                System.err.println("Missing boss asset: " + path);
+                return null;
+            }
+            if (requestedWidth > 0 && requestedHeight > 0) {
+                return new Image(stream, requestedWidth, requestedHeight, true, false);
+            }
+            return new Image(stream);
+        } catch (Exception e) {
+            System.err.println("Failed to load boss asset: " + path);
+            return null;
+        }
+    }
+
+    private Image[] loadOptionalFrames(String path, int frames, int targetWidth, int targetHeight) {
+        // Tách spritesheet quá rộng thành từng frame nhỏ để Canvas không phải vẽ texture ngang 38400px.
+        try (java.io.InputStream stream = getClass().getResourceAsStream(path)) {
+            if (stream == null) {
+                System.err.println("Missing boss frame asset: " + path);
+                return null;
+            }
+
+            BufferedImage sheet = ImageIO.read(stream);
+            if (sheet == null || frames <= 0) {
+                System.err.println("Invalid boss frame asset: " + path);
+                return null;
+            }
+
+            int sourceFrameWidth = sheet.getWidth() / frames;
+            int sourceFrameHeight = sheet.getHeight();
+            if (sourceFrameWidth <= 0 || sourceFrameHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+                return null;
+            }
+
+            Image[] result = new Image[frames];
+            for (int frame = 0; frame < frames; frame++) {
+                WritableImage frameImage = new WritableImage(targetWidth, targetHeight);
+                PixelWriter writer = frameImage.getPixelWriter();
+                int sourceOffsetX = frame * sourceFrameWidth;
+
+                for (int y = 0; y < targetHeight; y++) {
+                    int sourceY = Math.min(sourceFrameHeight - 1, y * sourceFrameHeight / targetHeight);
+                    for (int x = 0; x < targetWidth; x++) {
+                        int sourceX = sourceOffsetX + Math.min(sourceFrameWidth - 1, x * sourceFrameWidth / targetWidth);
+                        writer.setArgb(x, y, sheet.getRGB(sourceX, sourceY));
+                    }
+                }
+
+                result[frame] = frameImage;
+            }
+            return result;
+        } catch (Exception e) {
+            System.err.println("Failed to split boss frames: " + path);
+            return null;
+        }
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        // Vẽ cảnh báo bên dưới entity trước, sau đó mới vẽ boss/vật thể bay bên trên.
+        DragonStrike currentDragonStrike = dragonStrike;
+        if (currentDragonStrike != null && !currentDragonStrike.isDone()) {
+            currentDragonStrike.renderUnder(gc);
+        } else if (bossState == BossState.RAGE_TELEGRAPH) {
+            renderRageTelegraph(gc);
+        }
+
+        if (this.hp <= 0) {
+            gc.save();
+            double alpha = Math.max(0.0, Math.min(1.0, flashTimer / 60.0));
+            gc.setGlobalAlpha(alpha);
+            super.render(gc);
+            gc.restore();
+        } else if (bossState == BossState.SKILL2_CAST && spriteSheet == attackSprite2) {
+            renderScaledBossSprite(gc, SKILL2_BOSS_RENDER_SCALE);
+        } else if (bossState == BossState.RAGE_TELEGRAPH && spriteSheet == ultiSprite) {
+            renderScaledBossSprite(gc, ULTIMATE_BOSS_RENDER_SCALE);
+        } else {
+            super.render(gc);
+        }
+
+        for (Skill2SlashProjectile slash : skill2Projectiles) {
+            slash.render(gc);
+        }
+
+        if (currentDragonStrike != null && !currentDragonStrike.isDone()) {
+            currentDragonStrike.renderOver(gc);
+        }
+    }
+
+    private void renderScaledBossSprite(GraphicsContext gc, double scale) {
+        // Một số animation có frame lớn hơn 192px nên cần phóng to riêng khi render.
+        if (gc == null || spriteSheet == null || numFrames <= 0 || frameWidth <= 0 || frameHeight <= 0) {
+            return;
+        }
+
+        int safeFrameIndex = Math.max(0, Math.min(frameIndex, numFrames - 1));
+        if (bossState == BossState.RAGE_TELEGRAPH && hasUltimateFrame(safeFrameIndex)) {
+            renderSingleBossFrame(gc, ultiFrameSprites[safeFrameIndex], scale);
+            return;
+        }
+
+        double drawW = renderWidth * scale;
+        double drawH = renderHeight * scale;
+        double drawCenterX = x + renderWidth / 2.0;
+        double drawCenterY = y + renderHeight / 2.0;
+        double drawX = drawCenterX - drawW / 2.0;
+        double drawY = drawCenterY - drawH / 2.0;
+
+        if (isFlipped) {
+            gc.drawImage(spriteSheet,
+                    safeFrameIndex * frameWidth, 0, frameWidth, frameHeight,
+                    drawCenterX + drawW / 2.0, drawY, -drawW, drawH);
+        } else {
+            gc.drawImage(spriteSheet,
+                    safeFrameIndex * frameWidth, 0, frameWidth, frameHeight,
+                    drawX, drawY, drawW, drawH);
+        }
+    }
+
+    private boolean hasUltimateFrame(int index) {
+        return ultiFrameSprites != null
+                && index >= 0
+                && index < ultiFrameSprites.length
+                && ultiFrameSprites[index] != null;
+    }
+
+    private void renderSingleBossFrame(GraphicsContext gc, Image frame, double scale) {
+        // Render 1 frame đã tách sẵn, tránh drawImage trên spritesheet quá rộng.
+        if (gc == null || frame == null) {
+            return;
+        }
+
+        double drawW = renderWidth * scale;
+        double drawH = renderHeight * scale;
+        double drawCenterX = x + renderWidth / 2.0;
+        double drawCenterY = y + renderHeight / 2.0;
+        double drawX = drawCenterX - drawW / 2.0;
+        double drawY = drawCenterY - drawH / 2.0;
+
+        if (isFlipped) {
+            gc.drawImage(frame, drawCenterX + drawW / 2.0, drawY, -drawW, drawH);
+        } else {
+            gc.drawImage(frame, drawX, drawY, drawW, drawH);
+        }
+    }
+
+    private void renderRageTelegraph(GraphicsContext gc) {
+        // Vùng cảnh báo chiêu nộ: player có 1 giây để né khỏi vòng tròn.
+        double radius = playerZoneRadius() * RAGE_RADIUS_MULTIPLIER;
+        if (gc == null || radius <= 0) {
+            return;
+        }
+        double pulse = 0.35 + 0.25 * Math.sin(stateTimer * 0.35);
+
+        gc.save();
+        gc.setGlobalAlpha(pulse);
+        gc.setFill(Color.rgb(255, 70, 30, 0.30));
+        gc.fillOval(rageTargetX - radius, rageTargetY - radius, radius * 2.0, radius * 2.0);
+        gc.setGlobalAlpha(0.85);
+        gc.setStroke(Color.ORANGE);
+        gc.setLineWidth(3.0);
+        gc.strokeOval(rageTargetX - radius, rageTargetY - radius, radius * 2.0, radius * 2.0);
+        gc.strokeLine(rageTargetX, rageTargetY - GameConstants.TILE_SIZE * 5.0, rageTargetX, rageTargetY + 12);
+        gc.restore();
+    }
+
+    @Override
+    public void setActive(boolean active) {
+        // Boss không bị tắt update bởi culling camera.
+        this.isActive = true;
+    }
+
+    @Override
+    public void applyKnockback(Direction dir) {
+        // Boss chỉ nhận knockback rất nhẹ để vẫn phản hồi khi bị đánh.
+        if (this.hp <= 0) return;
+
+        this.kbVectorX = 0;
+        this.kbVectorY = 0;
+        double kbSpeed = this.knockback;
+        switch (dir) {
+            case UP -> this.kbVectorY = -kbSpeed;
+            case DOWN -> this.kbVectorY = kbSpeed;
+            case LEFT -> this.kbVectorX = -kbSpeed;
+            case RIGHT -> this.kbVectorX = kbSpeed;
+        }
+        this.kbTimer = 2;
+    }
+
+    @Override
+    public void onCollision(BaseEntity other) {
+        // Trong các state boss cần giữ vị trí sát player, không kéo boss về lastX/lastY.
+        if (other == targetPlayer && shouldIgnorePlayerCollisionReset()) {
+            return;
+        }
+        super.onCollision(other);
+    }
+
+    private boolean shouldIgnorePlayerCollisionReset() {
+        // Các trạng thái này chủ động đứng sát player; va chạm chung không được hủy vị trí đó.
+        return bossState == BossState.RECOVERY
+                || bossState == BossState.SKILL1_TELEPORT
+                || bossState == BossState.SKILL1_SLASH1
+                || bossState == BossState.SKILL1_GAP
+                || bossState == BossState.SKILL1_SLASH2;
     }
 
     @Override
     public Rectangle2D getBoundary() {
-        double paddingX = this.renderWidth * 0.25;
-        double paddingY = this.renderHeight * 0.2;
+        // Vùng nhận damage nhỏ hơn sprite để không bị trúng đòn ở vùng trong suốt.
+        double paddingX = this.renderWidth * 0.12;
+        double paddingY = this.renderHeight * 0.08;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
     }
 
     @Override
     public Rectangle2D getCollisionBoundary() {
-        double w = renderWidth * 0.4;
-        double h = renderHeight * 0.2;
+        // Va chạm vật lý chỉ lấy chân để boss có thể đứng sát tường/đồ vật tự nhiên hơn.
+        double w = renderWidth * 0.5;
+        double h = renderHeight * 0.3;
         double bx = x + (renderWidth - w) / 2.0;
         double by = y + renderHeight - h;
         return new Rectangle2D(bx, by, w, h);
+    }
+
+    private class CircleHitbox {
+        // Hitbox tròn dùng cho các nhát chém. Mỗi hitbox tự nhớ đã đánh player chưa.
+        private final double centerX;
+        private final double centerY;
+        private final double radius;
+        private final int damage;
+        private int life;
+        private boolean hasHitPlayer = false;
+
+        CircleHitbox(double centerX, double centerY, double radius, int damage, int life) {
+            this.centerX = centerX;
+            this.centerY = centerY;
+            this.radius = radius;
+            this.damage = damage;
+            this.life = life;
+        }
+
+        void update() {
+            // Chỉ gây damage một lần trong suốt vòng đời hitbox.
+            if (!hasHitPlayer && intersectsPlayer()) {
+                targetPlayer.takeDamage(damage, centerX, centerY);
+                hasHitPlayer = true;
+            }
+            life--;
+        }
+
+        boolean intersectsPlayer() {
+            return circleIntersectsRect(centerX, centerY, radius, targetPlayer.getBoundary());
+        }
+
+        boolean isExpired() {
+            return life <= 0;
+        }
+
+    }
+
+    private class Skill2SlashProjectile {
+        // Vệt chém bay thẳng ra khỏi màn, không quay về tay boss nữa.
+        private double x;
+        private double y;
+        private final double dirX;
+        private final double dirY;
+        private final Image sprite;
+        private double traveled = 0;
+        private int animationTimer = 0;
+        private int frameIndex = 0;
+        private boolean hasHitPlayer = false;
+        private boolean finished = false;
+
+        Skill2SlashProjectile(double x, double y, double dirX, double dirY, Image sprite) {
+            this.x = x;
+            this.y = y;
+            this.dirX = dirX;
+            this.dirY = dirY;
+            this.sprite = sprite;
+        }
+
+        void update() {
+            if (finished) return;
+
+            x += dirX * SKILL2_PROJECTILE_SPEED;
+            y += dirY * SKILL2_PROJECTILE_SPEED;
+            traveled += SKILL2_PROJECTILE_SPEED;
+            updateAnimation();
+
+            if (!hasHitPlayer && circleIntersectsRect(x, y, SKILL2_ITEM_HIT_RADIUS, targetPlayer.getBoundary())) {
+                targetPlayer.takeDamage(SKILL2_DAMAGE, x, y);
+                hasHitPlayer = true;
+            }
+
+            if (traveled >= SKILL2_PROJECTILE_MAX_DISTANCE || isOutsideArena()) {
+                finished = true;
+            }
+        }
+
+        private void updateAnimation() {
+            animationTimer++;
+            if (animationTimer >= 6) {
+                animationTimer = 0;
+                frameIndex = (frameIndex + 1) % SKILL2_ITEM_FRAMES;
+            }
+        }
+
+        private boolean isOutsideArena() {
+            double margin = SKILL2_ITEM_RENDER_SIZE;
+            return x < -margin
+                    || x > GameConstants.TILE_SIZE * 17.0 + margin
+                    || y < -margin
+                    || y > GameConstants.TILE_SIZE * 10.0 + margin;
+        }
+
+        boolean isFinished() {
+            return finished;
+        }
+
+        void render(GraphicsContext gc) {
+            // Vẽ vệt chém xoay theo hướng bay.
+            gc.save();
+            gc.translate(x, y);
+            gc.rotate(Math.toDegrees(Math.atan2(dirY, dirX)));
+
+            if (sprite != null) {
+                double frameW = sprite.getWidth() / SKILL2_ITEM_FRAMES;
+                double halfSize = SKILL2_ITEM_RENDER_SIZE / 2.0;
+                gc.drawImage(sprite,
+                        frameIndex * frameW, 0, frameW, sprite.getHeight(),
+                        -halfSize, -halfSize, SKILL2_ITEM_RENDER_SIZE, SKILL2_ITEM_RENDER_SIZE);
+            } else {
+                gc.setFill(Color.LIGHTYELLOW);
+                gc.fillRect(-SKILL2_ITEM_RENDER_SIZE / 2.0, -6, SKILL2_ITEM_RENDER_SIZE, 12);
+                gc.setStroke(Color.ORANGE);
+                gc.strokeRect(-SKILL2_ITEM_RENDER_SIZE / 2.0, -6, SKILL2_ITEM_RENDER_SIZE, 12);
+            }
+            gc.restore();
+        }
+    }
+
+    private class DragonStrike {
+        // Chiêu nộ: cảnh báo trước, sau đó vật thể rơi xuống và nổ một lần.
+        private enum Phase { FLYING, EXPLODING, DONE }
+
+        private Phase phase = Phase.FLYING;
+        private final double targetX;
+        private final double targetY;
+        private final double radius;
+        private double dragonX;
+        private double dragonY;
+        private int timer = 0;
+        private boolean hasDealtDamage = false;
+
+        DragonStrike(double startX, double startY, double targetX, double targetY, double radius) {
+            this.targetX = targetX;
+            this.targetY = targetY;
+            this.radius = Math.max(1.0, radius);
+            this.dragonX = startX;
+            this.dragonY = startY;
+        }
+
+        void update() {
+            timer++;
+            if (phase == Phase.FLYING) {
+                // Rồng bay từ cổng trong boss_ultimate xuống mục tiêu đã khóa.
+                double dx = targetX - dragonX;
+                double dy = targetY - dragonY;
+                double distance = Math.sqrt(dx * dx + dy * dy);
+                double speed = DRAGON_SPEED;
+
+                if (distance <= speed || timer >= DRAGON_MAX_FLIGHT_FRAMES) {
+                    dragonX = targetX;
+                    dragonY = targetY;
+                    phase = Phase.EXPLODING;
+                    timer = 0;
+                    com.hust.game.main.App.triggerScreenShake(18, 0.8);
+                    return;
+                }
+
+                dragonX += (dx / distance) * speed;
+                dragonY += (dy / distance) * speed;
+            } else if (phase == Phase.EXPLODING) {
+                // Vụ nổ chỉ gây damage một lần.
+                if (!hasDealtDamage) {
+                    Rectangle2D playerBounds = targetPlayer != null ? targetPlayer.getBoundary() : null;
+                    if (playerBounds != null && circleIntersectsRect(targetX, targetY, radius, playerBounds)) {
+                        targetPlayer.takeDamage(RAGE_DAMAGE, targetX, targetY);
+                    }
+                    hasDealtDamage = true;
+                }
+
+                if (timer >= 36) {
+                    phase = Phase.DONE;
+                }
+            }
+        }
+
+        boolean isDone() {
+            return phase == Phase.DONE;
+        }
+
+        void renderUnder(GraphicsContext gc) {
+            // Vẽ vùng nổ bên dưới boss/player để player thấy nơi nguy hiểm.
+            if (gc == null || phase == Phase.DONE) {
+                return;
+            }
+
+            gc.save();
+            gc.setGlobalAlpha(0.35);
+            gc.setFill(Color.rgb(255, 40, 20, 0.30));
+            gc.fillOval(targetX - radius, targetY - radius, radius * 2.0, radius * 2.0);
+            gc.setGlobalAlpha(0.9);
+            gc.setStroke(Color.RED);
+            gc.setLineWidth(3.0);
+            gc.strokeOval(targetX - radius, targetY - radius, radius * 2.0, radius * 2.0);
+            gc.restore();
+        }
+
+        void renderOver(GraphicsContext gc) {
+            // Vẽ vật thể rơi và hiệu ứng nổ bên trên màn chơi.
+            if (gc == null || phase == Phase.DONE) {
+                return;
+            }
+
+            gc.save();
+            if (phase == Phase.FLYING) {
+                renderDragon(gc);
+            } else if (phase == Phase.EXPLODING) {
+                double progress = timer / 36.0;
+                double drawRadius = radius * (0.8 + progress * 0.45);
+                gc.setGlobalAlpha(Math.max(0.0, 1.0 - progress));
+                gc.setFill(Color.rgb(255, 110, 30, 0.75));
+                gc.fillOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
+                gc.setStroke(Color.YELLOW);
+                gc.setLineWidth(4.0);
+                gc.strokeOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
+            }
+            gc.restore();
+        }
+
+        private void renderDragon(GraphicsContext gc) {
+            if (gc == null) {
+                return;
+            }
+
+            double dx = targetX - dragonX;
+            double dy = targetY - dragonY;
+            double angle = Math.toDegrees(Math.atan2(dy, dx));
+
+            gc.translate(dragonX, dragonY);
+            gc.rotate(angle);
+
+            if (dragonSprite != null && !dragonSprite.isError() && dragonSprite.getWidth() > 0 && dragonSprite.getHeight() > 0) {
+                int dragonFrame = (timer / 6) % DRAGON_FRAMES;
+                double frameW = dragonSprite.getWidth() / DRAGON_FRAMES;
+                gc.drawImage(dragonSprite,
+                        dragonFrame * frameW, 0, frameW, dragonSprite.getHeight(),
+                        -DRAGON_RENDER_WIDTH / 2.0, -DRAGON_RENDER_HEIGHT / 2.0,
+                        DRAGON_RENDER_WIDTH, DRAGON_RENDER_HEIGHT);
+            } else {
+                gc.setStroke(Color.rgb(255, 185, 60));
+                gc.setLineWidth(18.0);
+                gc.strokeLine(-56, 0, 56, 0);
+                gc.setStroke(Color.WHITE);
+                gc.setLineWidth(5.0);
+                gc.strokeLine(-34, 0, 34, 0);
+            }
+        }
+    }
+
+    private boolean circleIntersectsRect(double circleX, double circleY, double radius, Rectangle2D rect) {
+        // Collision giữa hitbox tròn và rectangle: lấy điểm gần nhất của rect với tâm tròn.
+        double nearestX = clamp(circleX, rect.getMinX(), rect.getMaxX());
+        double nearestY = clamp(circleY, rect.getMinY(), rect.getMaxY());
+        double dx = circleX - nearestX;
+        double dy = circleY - nearestY;
+        return dx * dx + dy * dy <= radius * radius;
+    }
+
+    private double clamp(double value, double min, double max) {
+        // Giới hạn value trong khoảng [min, max].
+        return Math.max(min, Math.min(max, value));
     }
 }
