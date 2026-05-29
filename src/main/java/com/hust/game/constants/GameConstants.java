@@ -27,7 +27,7 @@ public class GameConstants {
     public static final int PLAYER_NUM_FRAMES = 8;
     public static final double PLAYER_SPEED = 3.0;
     public static final int PLAYER_ANIMATION_DELAY = 10;
-    public static final int PLAYER_MAX_HP = 100;
+    public static final int PLAYER_MAX_HP = 1000;
     public static final int PLAYER_MAX_MANA = 50;
 
     // Potions
