@@ -3,9 +3,11 @@ package com.hust.game.main;
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
+import com.hust.game.entities.interfaces.Interactable;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
 import com.hust.game.enemy.Knight;
@@ -39,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.List;
+import java.util.Iterator;
 
 public class App extends Application {
     // kích thước cửa sổ
@@ -50,8 +53,8 @@ public class App extends Application {
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
 
-    // Độ zoom camera (1.5 = phóng to 50%)
-    private static final double ZOOM = 1.5;
+    // Độ zoom camera (1.0 = gốc)
+    private static final double ZOOM = 1.0;
 
     private GraphicsContext gc;
     private Player player;
@@ -68,9 +71,16 @@ public class App extends Application {
     private Set<KeyCode> input = new HashSet<>();
 
     private boolean isJHeld = false; // Ngăn chặn đè phím J (buộc phải nhấp nhả)
+    private boolean isEHeld = false;
+    private boolean isRHeld = false;
+    private boolean isHHeld = false;
+    private boolean isOHeld = false;
+    private boolean is1Held = false;
+    private boolean is2Held = false;
     private int screenShakeTimer = 0; // Bộ đếm rung màn hình
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
+    private boolean isMousePressed = false;
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
@@ -87,6 +97,9 @@ public class App extends Application {
     private javafx.scene.media.MediaPlayer menuMusicPlayer;
     private javafx.scene.media.MediaPlayer inGameMusicPlayer;
     private static App instance;
+
+    private Image healthPotionImg;
+    private Image manaPotionImg;
 
     public static void triggerScreenShake(int timer, double amplitude) {
         if (instance != null) {
@@ -222,12 +235,15 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
-        
+
+        initializeEntities(startLevel);
+        playInGameMusic(startLevel);
+
         Image tempBackScreen = null;
         try {
-            tempBackScreen = loadImg("/assets/back_screen.png");
+            tempBackScreen = loadImg(gameManager.getBackgroundPath());
         } catch (Exception e) {
-            System.out.println("Không tìm thấy ảnh back_screen.png");
+            System.out.println("Không tìm thấy ảnh background");
         }
         final Image backScreenImg = tempBackScreen;
 
@@ -297,9 +313,17 @@ public class App extends Application {
                 input.remove(e.getCode());
             }
         });
+        
+        scene.setOnMousePressed(e -> {
+            if (fadeInTimer > 0) return;
+            if (!isPaused) isMousePressed = true;
+        });
+        scene.setOnMouseReleased(e -> {
+            if (fadeInTimer > 0) return;
+            if (!isPaused) isMousePressed = false;
+        });
 
-        initializeEntities(startLevel);
-        playInGameMusic(startLevel);
+        
         
         fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
@@ -321,42 +345,56 @@ public class App extends Application {
                     if (hitStopTimer > 0) {
                         hitStopTimer--;
                     } else {
-                        handleInput();
-                        
-                        int stopFrames = combatManager.consumeHitStopFrames();
-                        if (stopFrames > 0) {
-                            hitStopTimer = stopFrames;
+                        Npc npc = getActiveNpc();
+                        if (npc != null) {
+                            npc.update(player);
+                            handleNpcInput(npc);
                         }
-                        
-                        int sTimer = combatManager.consumeShakeTimer();
-                        if (sTimer > 0) {
-                            screenShakeTimer = sTimer;
-                            screenShakeAmplitude = combatManager.consumeShakeAmplitude();
-                        }
-                        
-                        if (tutorialManager != null) {
-                            tutorialManager.update(player, input);
+                        boolean isNpcInteractionOpen = npc != null && npc.isInteractionOpen();
+
+                        if (isNpcInteractionOpen) {
+                            player.savePosition();
+                            player.setState(EntityState.IDLE);
+                        } else {
+                            handleInput();
                         }
 
                         player.update();
-                        combatManager.update();
-                        gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
-                        
                         updateCamera(); // Tính toán vị trí Camera trước để có toạ độ chuẩn
-                        
-                        // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
-                        double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
-                        for (Enemy e : enemyManager.getEnemyList()) {
-                            boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
-                                               e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
-                                               e.getY() + e.getRenderHeight() >= cameraY - margin &&
-                                               e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
-                            e.setActive(onScreen);
-                        }
 
-                        enemyManager.updateAll();
-                        checkCollisions();
-                        com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                        if (!isNpcInteractionOpen) {
+                            int stopFrames = combatManager.consumeHitStopFrames();
+                            if (stopFrames > 0) {
+                                hitStopTimer = stopFrames;
+                            }
+
+                            int sTimer = combatManager.consumeShakeTimer();
+                            if (sTimer > 0) {
+                                screenShakeTimer = sTimer;
+                                screenShakeAmplitude = combatManager.consumeShakeAmplitude();
+                            }
+
+                            if (tutorialManager != null) {
+                                tutorialManager.update(player, input, isMousePressed);
+                            }
+
+                            combatManager.update();
+                            gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
+
+                            // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
+                            double margin = GameConstants.TILE_SIZE * 2; // Vùng đệm 2 ô để quái kích hoạt mượt mà
+                            for (Enemy e : enemyManager.getEnemyList()) {
+                                boolean onScreen = e.getX() + e.getRenderWidth() >= cameraX - margin &&
+                                                   e.getX() <= cameraX + (WIDTH / ZOOM) + margin &&
+                                                   e.getY() + e.getRenderHeight() >= cameraY - margin &&
+                                                   e.getY() <= cameraY + (HEIGHT / ZOOM) + margin;
+                                e.setActive(onScreen);
+                            }
+
+                            enemyManager.updateAll();
+                            checkCollisions();
+                            com.hust.game.ui.DamageTextManager.update(); // Cập nhật toạ độ và thời gian tồn tại của chữ bay
+                        }
                     }
                 }
 
@@ -401,6 +439,11 @@ public class App extends Application {
                 if (gameManager.getGates() != null) {
                     renderList.addAll(gameManager.getGates());
                 }
+
+                Npc npc = getActiveNpc();
+                if (npc != null) {
+                    renderList.add(npc);
+                }
                 
                 // Thêm Tường/Vật cản từ Map (áp dụng Culling để tối ưu hiệu năng)
                 if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
@@ -437,6 +480,10 @@ public class App extends Application {
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
                 hud.render(gc);
+
+                if (npc != null) {
+                    npc.renderOverlay(gc);
+                }
                 
                 if (tutorialManager != null) {
                     tutorialManager.render(gc);
@@ -712,6 +759,9 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            healthPotionImg = loadImg("/assets/items/health_potion.png");
+            manaPotionImg = loadImg("/assets/items/mana_potion.png");
+
             Image bossImg = loadImg("/assets/enemy/final_boss_idle.png");
 
             // Khai báo Player trước khi đưa cho Quái
@@ -826,11 +876,84 @@ public class App extends Application {
             combatManager.activateSkill();
         }
 
+        if (input.contains(KeyCode.E)) {
+            if (!isEHeld) {
+                player.useHealthPotion();
+                isEHeld = true;
+            }
+        } else {
+            isEHeld = false;
+        }
+
+        if (input.contains(KeyCode.Q)) {
+            if (!isRHeld) {
+                player.useManaPotion();
+                isRHeld = true;
+            }
+        } else {
+            isRHeld = false;
+        }
+
         if (isAnyKeyPressed) {
             player.setState(EntityState.RUNNING);
         } else {
             player.setState(EntityState.IDLE);
         }
+    }
+
+    private void handleNpcInput(Npc npc) {
+        if (input.contains(KeyCode.H)) {
+            if (!isHHeld) {
+                npc.startInteraction();
+                isHHeld = true;
+            }
+        } else {
+            isHHeld = false;
+        }
+
+        boolean onePressed = input.contains(KeyCode.DIGIT1) || input.contains(KeyCode.NUMPAD1);
+        if (onePressed) {
+            if (!is1Held) {
+                if (npc.isInteractionOpen()) {
+                    npc.handleOptionOne(player);
+                }
+                is1Held = true;
+            }
+        } else {
+            is1Held = false;
+        }
+
+        boolean twoPressed = input.contains(KeyCode.DIGIT2) || input.contains(KeyCode.NUMPAD2);
+        if (twoPressed) {
+            if (!is2Held) {
+                if (npc.isInteractionOpen()) {
+                    npc.handleOptionTwo(player);
+                }
+                is2Held = true;
+            }
+        } else {
+            is2Held = false;
+        }
+
+        if (input.contains(KeyCode.O)) {
+            if (!isOHeld) {
+                npc.closeInteraction();
+                isOHeld = true;
+            }
+        } else {
+            isOHeld = false;
+        }
+        
+        if (input.contains(KeyCode.SPACE) || isMousePressed) {
+            npc.skipDialogue();
+        }
+    }
+
+    private Npc getActiveNpc() {
+        if (gameManager == null || gameManager.getCurrentLevelIndex() != 1) {
+            return null;
+        }
+        return gameManager.getNpc();
     }
 
     private void checkCollisions() {
@@ -849,8 +972,19 @@ public class App extends Application {
         int top = (int) pCol.getMinY();
         int bottom = (int) pCol.getMaxY();
 
-        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+        boolean hitX = collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+                       collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom);
+
+        if (!hitX && gameManager.getGates() != null) {
+            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                if (gate.isSolid() && pCol.intersects(gate.getBoundary())) { // Dùng getBoundary() để lấy trọn khối 48x48
+                    hitX = true;
+                    break;
+                }
+            }
+        }
+
+        if (hitX) {
             player.setX(lastX); // Chạm tường trục X -> Hủy di chuyển X
         }
 
@@ -862,21 +996,36 @@ public class App extends Application {
         top = (int) pCol.getMinY();
         bottom = (int) pCol.getMaxY();
 
-        if (collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
-            collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom)) {
+        boolean hitY = collisionChecker.checkTile(left, top) || collisionChecker.checkTile(right, top) ||
+                       collisionChecker.checkTile(left, bottom) || collisionChecker.checkTile(right, bottom);
+
+        if (!hitY && gameManager.getGates() != null) {
+            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
+                if (gate.isSolid() && pCol.intersects(gate.getBoundary())) {
+                    hitY = true;
+                    break;
+                }
+            }
+        }
+
+        if (hitY) {
             player.setY(lastY); // Chạm tường trục Y -> Hủy di chuyển Y
         }
 
-        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond)
+        // Kiểm tra va chạm cho tất cả Enemy với địa hình (Wall, Pond, Gate)
         if (enemyManager != null) {
             List<Enemy> enemies = enemyManager.getEnemyList();
 
             // Bước 1: Tính toán lực đẩy (Soft Collision) giữa các quái vật trước
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
                 for (int j = i + 1; j < enemies.size(); j++) {
                     Enemy otherEnemy = enemies.get(j);
+                    if (!otherEnemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                    
                     if (enemy.getCollisionBoundary().intersects(otherEnemy.getCollisionBoundary())) {
                         // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt
                         // thành 1 cục)
@@ -910,51 +1059,28 @@ public class App extends Application {
             // giật ngược lại vị trí an toàn
             for (int i = 0; i < enemies.size(); i++) {
                 Enemy enemy = enemies.get(i);
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 javafx.geometry.Rectangle2D eCol = enemy.getCollisionBoundary();
                 int eLeft = (int) eCol.getMinX();
                 int eRight = (int) eCol.getMaxX();
                 int eTop = (int) eCol.getMinY();
                 int eBottom = (int) eCol.getMaxY();
 
-                if (collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
-                        collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom)) {
-                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
-                }
+                boolean eHit = collisionChecker.checkTile(eLeft, eTop) || collisionChecker.checkTile(eRight, eTop) ||
+                               collisionChecker.checkTile(eLeft, eBottom) || collisionChecker.checkTile(eRight, eBottom);
 
-                // KIỂM TRA VA CHẠM CỦA QUÁI VẬT VỚI CỬA (GATE)
-                if (gameManager.getGates() != null) {
+                if (!eHit && gameManager.getGates() != null) {
                     for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                        if (gate.isSolid() && enemy.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
-                            enemy.onCollision(gate); // Nếu cửa chưa mở -> Quái vật bị dội ngược lại
+                        if (gate.isSolid() && eCol.intersects(gate.getBoundary())) {
+                            eHit = true;
+                            break;
                         }
                     }
                 }
-            }
-        }
-        
-        // Kiểm tra va chạm với Gate (Cửa màn Tutorial)
-        if (gameManager.getGates() != null) {
-            for (com.hust.game.entities.environment.Gate gate : gameManager.getGates()) {
-                if (gate.isSolid() && player.getCollisionBoundary().intersects(gate.getCollisionBoundary())) {
-                    player.onCollision(gate);
-                }
-            }
-        }
-
-        // 2. Kiểm tra va chạm với các vật cản khác (obstacles)
-        for (BaseEntity wall : obstacles) {
-            if (player.getCollisionBoundary().intersects(wall.getCollisionBoundary())) {
-                player.onCollision(wall);
-                break;
-            }
-        }
-
-        // 3. Kiểm tra va chạm với các StaticEntity (Cây lớn, nhà cửa, tường) trên map
-        if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
-            for (BaseEntity entity : gameManager.getMap().mapEntities) {
-                if (player.getCollisionBoundary().intersects(entity.getCollisionBoundary())) {
-                    player.onCollision(entity);
-                    break;
+                
+                if (eHit) {
+                    enemy.onCollision(null); // Trở về lastX, lastY ban đầu (Bên ngoài tường)
                 }
             }
         }
@@ -962,6 +1088,8 @@ public class App extends Application {
         if (enemyManager != null) {
             List<Enemy> enemies = enemyManager.getEnemyList();
             for (Enemy enemy : enemies) {
+                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+                
                 // Phải soi xem nó có đụng Player không đã!
                 if (enemy.getCollisionBoundary().intersects(player.getCollisionBoundary())) {
 
@@ -974,6 +1102,32 @@ public class App extends Application {
                         enemy.onCollision(player);
                     }
 
+                }
+            }
+        }
+
+        // KIỂM TRA NHẶT VẬT PHẨM (Interactable)
+        if (gameManager.getMap() != null && gameManager.getMap().mapEntities != null) {
+            double pX = player.getX();
+            double pY = player.getY();
+            Iterator<BaseEntity> it = gameManager.getMap().mapEntities.iterator();
+            while (it.hasNext()) {
+                BaseEntity entity = it.next();
+                
+                // Tối ưu culling: Chỉ kiểm tra va chạm với những vật thể nằm rất gần Player (Khoảng ~3 ô)
+                if (Math.abs(entity.getX() - pX) > 150 || Math.abs(entity.getY() - pY) > 150) {
+                    continue;
+                }
+
+                if (entity instanceof Interactable) {
+                    // Player dẫm lên vật phẩm (so sánh 2 hitbox)
+                    if (player.getCollisionBoundary().intersects(entity.getBoundary())) {
+                        boolean pickedUp = ((Interactable) entity).onInteract(player);
+                        if (pickedUp) {
+                            it.remove(); // Xóa vật phẩm khỏi bản đồ nếu nhặt thành công
+                            com.hust.game.audio.SoundManager.playButtonHoverSound(); // Tạm dùng âm thanh này làm hiệu ứng nhặt đồ
+                        }
+                    }
                 }
             }
         }

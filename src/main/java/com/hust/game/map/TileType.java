@@ -1,6 +1,8 @@
 package com.hust.game.map;
 
 public enum TileType {
+    EMPTY(0, null, true),
+
     T0_WALL(-1, "wall.png", true),
     T1_GROUND_1(1, "ground_1.png", false),
     T3_GROUND_2(2, "ground_2.png", false),
@@ -52,7 +54,9 @@ public enum TileType {
     BRICKWALL_4(-42, "brickwall_4.png", true),
     BRICK_BLOOD(-43, "blood.png", false),
     BRICK_BLOOD_2(-44, "blood_2.png", false),
-    ROCK(-45, "rock.png", false);
+    ROCK(-45, "rock.png", false),
+    BRICKWALL_CORNER_RIGHT(-46, "brickwall_conner_right.png", true),
+    BRICKWALL_CONNER_LEFT(-47, "brickwall_conner_left.png", true);
 
     private final int id;
     private final String imageName;

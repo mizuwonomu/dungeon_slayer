@@ -2,6 +2,7 @@ package com.hust.game.progression;
 
 import com.hust.game.map.MapManager;
 import com.hust.game.enemy.*;
+import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
 import com.hust.game.constants.GameConstants;
 
@@ -9,6 +10,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import com.hust.game.entities.environment.Gate;
 
 
@@ -17,6 +19,8 @@ public class Level {
     private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 624; // 13 * 48
     private static final int TILE_SIZE = GameConstants.TILE_SIZE;
+    private static final int LEVEL1_TEST_ENEMY_LIMIT = 2;
+    private static final long LEVEL1_NPC_SEED = 1001L;
 
     private int lvlID;
 
@@ -36,6 +40,7 @@ public class Level {
     private List<Gate> gates = new ArrayList<>();
     private Image gateImg;
     private Image hangingTreeImg;
+    private Npc npc;
 
     public Level(int lvlID,
                  EnemyManager enemyManager,
@@ -76,6 +81,7 @@ public class Level {
         spawnEnemy();
         spawnGates();
         spawnDecorations();
+        spawnNpc();
     }
 
     void draw(GraphicsContext gc) {
@@ -170,6 +176,10 @@ public class Level {
         return gates;
     }
 
+    public Npc getNpc() {
+        return npc;
+    }
+
     void spawnEnemy(){
         if (lvlID == 0) {
             // Phòng 2: Slime bất động
@@ -221,9 +231,11 @@ public class Level {
                 }
             }
             
+            int spawnedForTest = 0;
+
             // 2. Quét map theo các vùng 7x7 để phát hiện "Phòng" và bỏ qua "Hành lang"
-            for (int r = 0; r < GameConstants.MAX_WORLD_ROW; r += 7) {
-                for (int c = 15; c < GameConstants.MAX_WORLD_COL; c += 7) { // c >= 15 để chừa trống phòng spawn đầu tiên
+            for (int r = 0; r < GameConstants.MAX_WORLD_ROW && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; r += 7) {
+                for (int c = 15; c < GameConstants.MAX_WORLD_COL && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; c += 7) { // c >= 15 để chừa trống phòng spawn đầu tiên
                     int reachableCount = 0;
                     List<int[]> roomTiles = new ArrayList<>();
                     for (int i = 0; i < 7; i++) {
@@ -239,7 +251,7 @@ public class Level {
                     
                     // Nếu vùng 7x7 có >= 28 ô đi được -> Đủ rộng để coi là Phòng (Hành lang 3 ô chỉ có tối đa ~21 ô)
                     if (reachableCount >= 28) {
-                        int numEnemies = 4 + (int)(Math.random() * 3); // 4-6 quái (trung bình 5 con)
+                        int numEnemies = LEVEL1_TEST_ENEMY_LIMIT - spawnedForTest;
                         for (int k = 0; k < numEnemies && !roomTiles.isEmpty(); k++) {
                             int randIdx = (int)(Math.random() * roomTiles.size());
                             int[] pos = roomTiles.get(randIdx);
@@ -250,10 +262,13 @@ public class Level {
                             
                             // Tỉ lệ 50% ra Cây, 50% ra Slime
                             if (Math.random() > 0.5) {
-                                enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, 96, 96, player, treeSkillImg);
+                                // Ảnh Tree cao 96px (2 ô), mà điểm xét tường là dưới chân. 
+                                // Phải lùi Y lên 1 ô (-48) để chân Tree đáp đúng vào ô trống đã quét được
+                                enemyManager.spawnEnemy("Tree", spawnX, spawnY - 48, treeImg, 8, 96, 96, player, treeSkillImg);
                             } else {
                                 enemyManager.spawnEnemy("Slime", spawnX, spawnY, slimeImg, 8, 51, 31.5, player);
                             }
+                            spawnedForTest++;
                         }
                     }
                 }
@@ -264,7 +279,7 @@ public class Level {
                                     player, knightSkillImg);
             enemyManager.spawnEnemy("Knight", WIDTH / 2 + 50 , HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
                                     player, knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 250 , HEIGHT / 2 , witchImg, 25, TILE_SIZE, TILE_SIZE,
+            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 100, HEIGHT / 2 - 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
                                     player, witchSkillImg);
         }
         else if (lvlID == 3) {
@@ -280,5 +295,81 @@ public class Level {
 
     public MapManager getMap() {
         return map;
+    }
+
+    private void spawnNpc() {
+        if (lvlID != 1) {
+            npc = null;
+            return;
+        }
+
+        Image idle1 = loadFirstAvailableImage("/assets/npc/Idle.png", "/assets/npc/Idle.png");
+        Image idle2 = loadOptionalImage("/assets/npc/Idle_2.png");
+        Image idle3 = loadOptionalImage("/assets/npc/Idle_3.png");
+        Image dialogue = loadOptionalImage("/assets/npc/Dialogue.png");
+        Image approval = loadOptionalImage("/assets/npc/Approval.png");
+        Image manaPotion = loadOptionalImage("/assets/items/mana_potion.png");
+        Image healthPotion = loadOptionalImage("/assets/items/health_potion.png");
+
+        if (idle1 == null || idle2 == null || dialogue == null || manaPotion == null || healthPotion == null) {
+            System.err.println("Không thể sinh NPC level 1 vì thiếu sprite sheet NPC hoặc item.");
+            npc = null;
+            return;
+        }
+
+        int[] tile = chooseNpcTile();
+        double x = tile[0] * TILE_SIZE;
+        double y = tile[1] * TILE_SIZE;
+        npc = new Npc(x, y, idle1, idle2, idle3, dialogue, approval, manaPotion, healthPotion);
+    }
+
+    private int[] chooseNpcTile() {
+        List<int[]> candidates = new ArrayList<>();
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        int playerSpawnCol = 4;
+        int playerSpawnRow = 16;
+        int minDistance = 8;
+
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                int tileId = map.mapTileNum[row][col];
+                com.hust.game.map.Tile tile = map.tiles.get(tileId);
+                if (tile == null || tile.collision) {
+                    continue;
+                }
+                int distance = Math.abs(col - playerSpawnCol) + Math.abs(row - playerSpawnRow);
+                if (distance < minDistance) {
+                    continue;
+                }
+                candidates.add(new int[]{col, row});
+            }
+        }
+
+        if (candidates.isEmpty()) {
+            return new int[]{playerSpawnCol + 4, playerSpawnRow};
+        }
+
+        Random random = new Random(LEVEL1_NPC_SEED);
+        return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private Image loadOptionalImage(String path) {
+        try {
+            java.io.InputStream stream = getClass().getResourceAsStream(path);
+            if (stream == null) {
+                System.err.println("Không tìm thấy ảnh: " + path);
+                return null;
+            }
+            return new Image(stream);
+        } catch (Exception e) {
+            System.err.println("Lỗi load ảnh: " + path);
+            return null;
+        }
+    }
+
+    private Image loadFirstAvailableImage(String primaryPath, String fallbackPath) {
+        Image image = loadOptionalImage(primaryPath);
+        return image != null ? image : loadOptionalImage(fallbackPath);
     }
 }

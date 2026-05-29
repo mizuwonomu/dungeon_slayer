@@ -107,6 +107,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
 
+    private int healthPotionCount = 0;
+    private int manaPotionCount = 0;
+
     // -------------------------------------------------------
     // ATTACK COOLDOWN
     // Sau mỗi lần tấn công, phải chờ ATTACK_COOLDOWN_MAX frame
@@ -133,7 +136,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         super(x, y,
                 idleDown,
                 GameConstants.PLAYER_NUM_FRAMES,
-                GameConstants.TILE_SIZE, GameConstants.TILE_SIZE,
+                64, 64,
                 GameConstants.PLAYER_SPEED);
 
         // Lưu tất cả 8 sprite sheet vào field
@@ -395,10 +398,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
 
         if (isDashing) {
-            // Tỷ lệ gốc của Player là 48x48 (tương ứng file 32x32 sau upscale 1.5). 
-            // Bằng cách này ảnh 40x40 sẽ được nội suy tự động lên 60x60 và ôm trọn tâm của Player
-            double drawW = this.frameWidth * (this.renderWidth / 32.0); 
-            double drawH = this.frameHeight * (this.renderHeight / 32.0);
+            // Tính toán khung hình lướt sao cho ôm trọn tâm Player dựa trên kích thước gốc 64x64
+            double drawW = this.frameWidth * (this.renderWidth / 64.0); 
+            double drawH = this.frameHeight * (this.renderHeight / 64.0);
             
             double centerX = this.x + this.renderWidth / 2.0;
             double centerY = this.y + this.renderHeight / 2.0;
@@ -659,6 +661,64 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         return currentMana;
     }
 
+    public int getHealthPotionCount() {
+        return healthPotionCount;
+    }
+
+    public int getManaPotionCount() {
+        return manaPotionCount;
+    }
+
+    public int getTotalPotionCount() {
+        return healthPotionCount + manaPotionCount;
+    }
+
+    public boolean isPotionInventoryFull() {
+        return getTotalPotionCount() >= GameConstants.MAX_POTIONS_TOTAL;
+    }
+
+    public boolean addHealthPotion() {
+        if (isPotionInventoryFull() || healthPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        healthPotionCount++;
+        return true;
+    }
+
+    public boolean addManaPotion() {
+        if (isPotionInventoryFull() || manaPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        manaPotionCount++;
+        return true;
+    }
+
+    public boolean useHealthPotion() {
+        if (healthPotionCount <= 0 || currentHp >= maxHp) {
+            return false;
+        }
+        healthPotionCount--;
+        healHp(GameConstants.POTION_HEAL_AMOUNT);
+        return true;
+    }
+
+    public boolean useManaPotion() {
+        if (manaPotionCount <= 0 || currentMana >= maxMana) {
+            return false;
+        }
+        manaPotionCount--;
+        restoreMana(GameConstants.POTION_MANA_AMOUNT);
+        return true;
+    }
+
+    private void healHp(int amount) {
+        currentHp = Math.min(maxHp, currentHp + amount);
+    }
+
+    private void restoreMana(int amount) {
+        currentMana = Math.min(maxMana, currentMana + amount);
+    }
+
     /** Trả về true khi máu = 0 → game over */
     @Override
     public boolean isDead() {
@@ -696,6 +756,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
         this.currentHp = maxHp;
         this.currentMana = maxMana;
+        this.healthPotionCount = 0;
+        this.manaPotionCount = 0;
         resetAttackCooldown();
     }
 }

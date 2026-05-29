@@ -38,6 +38,10 @@ public abstract class Enemy extends MovingEntity {
 
     protected com.hust.game.collision.CollisionChecker collisionChecker;
 
+    protected PathFinder pathFinder;
+    protected boolean onPath = false;
+    protected int pathUpdateTimer = (int)(Math.random() * 30); // Random để các con quái không update A* cùng 1 frame
+
     private static final javafx.scene.effect.ColorAdjust WHITE_EFFECT = new javafx.scene.effect.ColorAdjust(0, 0, 1.0, 0);
 
     // Constructor tạm thời ở Giai đoạn 1
@@ -69,35 +73,73 @@ public abstract class Enemy extends MovingEntity {
             this.x += kbVectorX * multiplier;
             this.y += kbVectorY * multiplier;
         } else if (hp > 0 && attackPauseTimer <= 0 && hitStunTimer <= 0 && targetPlayer != null && !isImmobile) {
-            // Trạng thái: AI hoạt động (đuổi theo player)
-            double playerX = targetPlayer.getX();
-            double playerY = targetPlayer.getY();
+            // Đồng bộ A* xuống HITBOX DƯỚI CHÂN thay vì tâm của bức ảnh
+            javafx.geometry.Rectangle2D pCol = targetPlayer.getCollisionBoundary();
+            double pCenterX = pCol.getMinX() + pCol.getWidth() / 2.0;
+            double pCenterY = pCol.getMinY() + pCol.getHeight() / 2.0;
 
-            // Thuật toán nội suy tìm tọa độ Player
-            double diffX = playerX - this.x;
-            double diffY = playerY - this.y;
+            javafx.geometry.Rectangle2D bounds = this.getCollisionBoundary();
+            double currentCenterX = bounds.getMinX() + bounds.getWidth() / 2.0;
+            double currentCenterY = bounds.getMinY() + bounds.getHeight() / 2.0;
 
+            // Cập nhật đường đi A* mỗi 30 frame (~0.5 giây) để giảm tải CPU
+            pathUpdateTimer++;
+            if (pathUpdateTimer >= 30) {
+                pathUpdateTimer = 0;
+                int goalCol = (int) (pCenterX / com.hust.game.constants.GameConstants.TILE_SIZE);
+                int goalRow = (int) (pCenterY / com.hust.game.constants.GameConstants.TILE_SIZE);
+                searchPath(goalCol, goalRow);
+            }
+
+            double diffX = pCenterX - currentCenterX;
+            double diffY = pCenterY - currentCenterY;
             double distance = Math.sqrt(diffX * diffX + diffY * diffY);
 
             this.moveX = 0;
             this.moveY = 0;
 
             if (distance > 0) {
-                // Nếu đang trong trạng thái lách vật cản, ưu tiên đi men theo 1 trục
                 if (dodgeTimer > 0) {
+                    // Lách vật cản nhẹ khi dính nhau (Soft Collision)
                     dodgeTimer--;
                     this.moveX = dodgeDirX * speed;
                     this.moveY = dodgeDirY * speed;
+                    
+                    if (dodgeDirX < 0) this.isFlipped = true;
+                    else if (dodgeDirX > 0) this.isFlipped = false;
+                    
+                } else if (onPath && pathFinder.pathList.size() > 0) {
+                    // ĐI THEO ĐƯỜNG DẪN A* TÌM ĐƯỢC
+                    int nextCol = pathFinder.pathList.get(0).col;
+                    int nextRow = pathFinder.pathList.get(0).row;
+                    
+                    // Điểm đến là tâm của ô lưới tiếp theo
+                    double tileCenterX = nextCol * com.hust.game.constants.GameConstants.TILE_SIZE + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    double tileCenterY = nextRow * com.hust.game.constants.GameConstants.TILE_SIZE + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    
+                    double dx = tileCenterX - currentCenterX;
+                    double dy = tileCenterY - currentCenterY;
+                    double distToNext = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distToNext > speed) {
+                        this.moveX = (dx / distToNext) * speed;
+                        this.moveY = (dy / distToNext) * speed;
+                    } else {
+                        // Đã đến node hiện tại, lấy node tiếp theo
+                        pathFinder.pathList.remove(0);
+                    }
+                    
+                    // Hướng mặt
+                    if (this.moveX < 0) this.isFlipped = true;
+                    else if (this.moveX > 0) this.isFlipped = false;
+
                 } else {
+                    // TRƯỜNG HỢP FALLBACK: Di chuyển đường thẳng (Đang rất gần, hoặc đường cụt)
                     this.moveX = (diffX / distance) * speed;
                     this.moveY = (diffY / distance) * speed;
-                }
-
-                // Xoay mặt nhìn theo Player (Mirror ảnh ngang)
-                if (diffX < 0) {
-                    this.isFlipped = true; // Đi sang trái thì lật mặt
-                } else if (diffX > 0) {
-                    this.isFlipped = false; // Đi sang phải thì giữ nguyên
+                    
+                    if (diffX < 0) this.isFlipped = true;
+                    else if (diffX > 0) this.isFlipped = false;
                 }
             }
             this.x += this.moveX;
@@ -146,6 +188,26 @@ public abstract class Enemy extends MovingEntity {
 
     public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
         this.collisionChecker = checker;
+        if (checker != null) {
+            this.pathFinder = new PathFinder(checker);
+        }
+    }
+
+    public void searchPath(int goalCol, int goalRow) {
+        if (pathFinder == null) return;
+        
+        javafx.geometry.Rectangle2D bounds = this.getCollisionBoundary();
+        int startCol = (int) ((bounds.getMinX() + bounds.getWidth() / 2.0) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        int startRow = (int) ((bounds.getMinY() + bounds.getHeight() / 2.0) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        
+        // Đã đứng chung mâm với Player thì không cần tìm đường A*
+        if (startCol == goalCol && startRow == goalRow) {
+            onPath = false;
+            return;
+        }
+
+        pathFinder.setNodes(startCol, startRow, goalCol, goalRow);
+        onPath = pathFinder.search(); // Trả về true nếu có đường đi
     }
 
     // --- GETTERS DÀNH CHO TRƯỢT TƯỜNG (SLIDING) TẠI APP.JAVA ---

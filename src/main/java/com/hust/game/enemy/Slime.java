@@ -175,13 +175,9 @@ public class Slime extends Enemy {
                     double scaleX = this.renderWidth / fw;
                     double scaleY = this.renderHeight / fh;
                     
-                    // Cắt bớt 15% ở viền để Slime không quá dễ chạm trúng người chơi
                     double boxW = (maxX - minX + 1) * scaleX;
                     double boxH = (maxY - minY + 1) * scaleY;
-                    double padX = boxW * 0.15;
-                    double padY = boxH * 0.15;
-                    
-                    frameHitboxes[idx] = new Rectangle2D(minX * scaleX + padX, minY * scaleY + padY, boxW - 2 * padX, boxH - 2 * padY);
+                    frameHitboxes[idx] = new Rectangle2D(minX * scaleX, minY * scaleY, boxW, boxH);
                 } else {
                     frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
                 }

@@ -172,22 +172,6 @@ public class Tree extends Enemy {
             return false;
         }
         
-        // CHỐNG CHÉM XUYÊN TƯỜNG (Raycast từ tâm Quái tới tâm Player)
-        if (collisionChecker != null) {
-            double pCenterX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0;
-            double pCenterY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0;
-            double eCenterX = this.x + this.renderWidth / 2.0;
-            double eCenterY = this.y + this.renderHeight / 2.0;
-            
-            for (int i = 1; i <= 5; i++) {
-                int checkX = (int) (eCenterX + (pCenterX - eCenterX) * i / 5.0);
-                int checkY = (int) (eCenterY + (pCenterY - eCenterY) * i / 5.0);
-                if (collisionChecker.checkTile(checkX, checkY)) {
-                    return false; // Có tường chắn ở giữa
-                }
-            }
-        }
-        
         return true;
     }
 
@@ -230,8 +214,20 @@ public class Tree extends Enemy {
     @Override
     public Rectangle2D getBoundary() {
         // Cắt hitbox lại 30% bề ngang, 20% bề dọc vì frame 96x96 vẫn có viền trống
-        double paddingX = this.renderWidth * 0.3;
-        double paddingY = this.renderHeight * 0.2;
+        // Giảm bớt padding để hitbox lớn hơn, dễ trúng hơn.
+        double paddingX = this.renderWidth * 0.15;
+        double paddingY = this.renderHeight * 0.1;
         return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+    }
+
+    @Override
+    public Rectangle2D getCollisionBoundary() {
+        // Thu nhỏ vùng va chạm dưới chân (giống các quái khác) để Tree lọt vừa qua ô gạch (48px)
+        // Từ đó thuật toán tìm đường A* mới có thể dẫn nó đi xuyên qua các hành lang hẹp mà không bị kẹt.
+        double w = renderWidth * 0.4;
+        double h = renderHeight * 0.2;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
     }
 }
