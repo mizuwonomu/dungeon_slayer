@@ -64,28 +64,27 @@ public class Minimap {
         double worldHeight =
                 GameConstants.MAX_WORLD_ROW * GameConstants.TILE_SIZE;
 
-        // ===== DISPLAYED MINIMAP SIZE =====
-        double minimapWidth =
-                mapView.getBoundsInParent().getWidth();
+// ===== DISPLAYED MINIMAP SIZE =====
+        double minimapWidth = mapView.getFitWidth();
 
         double minimapHeight =
-                mapView.getBoundsInParent().getHeight();
+                minimapImage.getHeight()
+                        * (mapView.getFitWidth() / minimapImage.getWidth());
 
-        // ===== PLAYER POSITION ON MINIMAP =====
+// ===== PLAYER POSITION =====
         double miniX =
                 (player.getX() / worldWidth)
-                        * minimapWidth
-                        * 2.0;
+                        * minimapWidth;
 
         double miniY =
                 (player.getY() / worldHeight)
                         * minimapHeight;
 
-        // StackPane center correction
+// StackPane center correction
         miniX -= minimapWidth / 2;
         miniY -= minimapHeight / 2;
 
-        // Center icon
+// Center icon
         miniX += playerDot.getFitWidth() / 2;
         miniY += playerDot.getFitHeight() / 2;
 
