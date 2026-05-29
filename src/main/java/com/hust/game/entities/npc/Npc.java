@@ -26,6 +26,8 @@ public class Npc extends StaticEntity {
     private static final int ANIMATION_DELAY = 10;
     private static final int DIALOGUE_DELAY = 2;
     private static final int APPROVAL_FRAMES = 8 * ANIMATION_DELAY; // Approval có 8 frames
+    private static final int POTION_PRICE_COINS = 2;
+    private static final int COIN_FRAMES = 6;
     private static final double INTERACTION_RANGE = GameConstants.TILE_SIZE;
 
     private final Image idle1;
@@ -35,6 +37,7 @@ public class Npc extends StaticEntity {
     private final Image approval;
     private final Image manaPotion;
     private final Image healthPotion;
+    private final Image coin;
     private final Font font;
     private Image cmtBox;
 
@@ -70,6 +73,7 @@ public class Npc extends StaticEntity {
         this.approval = approval;
         this.manaPotion = manaPotion;
         this.healthPotion = healthPotion;
+        this.coin = loadOptionalImage("/assets/items/coin.png");
 
         java.io.InputStream fontStream = getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf");
         Font loadedFont = fontStream != null ? Font.loadFont(fontStream, 24) : null;
@@ -172,7 +176,7 @@ public class Npc extends StaticEntity {
             dialogueTimer = 0;
             setSheet(idle1);
         } else if (state == State.SHOP) {
-            showFeedback(player.addManaPotion() ? "Đã nhận Mana Potion" : "Túi đồ đã đầy");
+            buyPotion(player, true);
         }
     }
 
@@ -181,8 +185,29 @@ public class Npc extends StaticEntity {
             state = State.SHOP;
             setSheet(dialogue);
         } else if (state == State.SHOP) {
-            showFeedback(player.addHealthPotion() ? "Đã nhận Health Potion" : "Túi đồ đã đầy");
+            buyPotion(player, false);
         }
+    }
+
+    private void buyPotion(Player player, boolean mana) {
+        if (player.isPotionInventoryFull()) {
+            showFeedback("Túi đồ đã đầy");
+            return;
+        }
+
+        if (!player.spendCoins(POTION_PRICE_COINS)) {
+            showFeedback("Không đủ xu");
+            return;
+        }
+
+        boolean added = mana ? player.addManaPotion() : player.addHealthPotion();
+        if (!added) {
+            player.addCoins(POTION_PRICE_COINS);
+            showFeedback("Túi đồ đã đầy");
+            return;
+        }
+
+        showFeedback(mana ? "Đã mua Mana Potion" : "Đã mua Health Potion");
     }
 
     public void skipDialogue() {
@@ -311,6 +336,8 @@ public class Npc extends StaticEntity {
         double iconY = yPos + 110; // yPos is the top of the panel, text starts at y+88, so this is ~line 1
         drawPotion(gc, manaPotion, 560, iconY);
         drawPotion(gc, healthPotion, 560, iconY + 34);
+        drawPrice(gc, 610, iconY);
+        drawPrice(gc, 610, iconY + 34);
 
         if (!feedbackText.isEmpty()) {
             gc.setFont(font);
@@ -328,6 +355,26 @@ public class Npc extends StaticEntity {
         double frameW = sheet.getWidth() / 8.0;
         double frameH = sheet.getHeight();
         gc.drawImage(sheet, 0, 0, frameW, frameH, x, y - 24, 32, 32);
+    }
+
+    private void drawPrice(GraphicsContext gc, double x, double y) {
+        if (coin != null) {
+            double frameW = coin.getWidth() / COIN_FRAMES;
+            double frameH = coin.getHeight();
+            gc.drawImage(coin, 0, 0, frameW, frameH, x, y - 24, 28, 28);
+        }
+
+        gc.setFont(Font.font(font.getFamily(), FontWeight.BOLD, 22));
+        gc.setTextAlign(TextAlignment.LEFT);
+        drawOutlinedText(gc, "x" + POTION_PRICE_COINS, x + 34, y - 2, Color.WHITE);
+    }
+
+    private Image loadOptionalImage(String path) {
+        try (java.io.InputStream stream = getClass().getResourceAsStream(path)) {
+            return stream != null ? new Image(stream) : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void drawOutlinedText(GraphicsContext gc, String text, double x, double y, Color fill) {

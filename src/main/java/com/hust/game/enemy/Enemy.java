@@ -42,6 +42,8 @@ public abstract class Enemy extends MovingEntity {
     protected boolean onPath = false;
     protected int pathUpdateTimer = (int)(Math.random() * 30); // Random để các con quái không update A* cùng 1 frame
 
+    private boolean coinRewarded = false;
+
     // Cache bản "all-white" của spriteSheet hiện tại
     // Pixel có alpha > 0 → trắng cùng opacity; pixel trong suốt → giữ nguyên trong suốt
     // Cách này không đụng blend mode của canvas nên không bị ảnh hưởng bởi background đã vẽ trước đó
@@ -353,6 +355,14 @@ public abstract class Enemy extends MovingEntity {
     // Kiểm tra xem quái vật đã chết và chạy xong hiệu ứng nhấp nháy báo tử chưa
     public boolean isReadyToRemove() {
         return this.hp <= 0 && this.flashTimer <= 0;
+    }
+
+    public boolean hasCoinRewarded() {
+        return coinRewarded;
+    }
+
+    public void markCoinRewarded() {
+        coinRewarded = true;
     }
 
     public void setActive(boolean active) {
