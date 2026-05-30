@@ -7,9 +7,11 @@ public class SoundManager {
     public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
     public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon, witchDmgTaken, witchDied;
+    public static AudioClip bossStart, bossTele1, bossTele2, bossSkill2, bossUlti;
     public static AudioClip btnHover, btnClick;
     public static AudioClip gateBurn;
     public static AudioClip pauseSound, unpauseSound;
+    public static AudioClip transformSound;
     private static double sfxVolume = 1.0; // Âm lượng hiệu ứng
     private static double bgmVolume = 1.0; // Âm lượng nhạc nền
 
@@ -50,6 +52,11 @@ public class SoundManager {
         applyVolume(witchSummon, 0.8);
         applyVolume(witchDmgTaken, 1.0);
         applyVolume(witchDied, 1.0);
+        applyVolume(bossStart, 1.0);
+        applyVolume(bossTele1, 0.9);
+        applyVolume(bossTele2, 0.9);
+        applyVolume(bossSkill2, 1.0);
+        applyVolume(bossUlti, 1.0);
         applyVolume(gateBurn, 1.0);
         applyVolume(btnHover, 0.8);
         applyVolume(btnClick, 1.0);
@@ -86,12 +93,18 @@ public class SoundManager {
         witchSummon = loadSound("summon.wav", 0.8);
         witchDmgTaken = loadSound("witch_dmg_taken.wav", 1.0);
         witchDied = loadSound("witch_died.wav", 1.0);
+        bossStart = loadSound("start.wav", 1.0);
+        bossTele1 = loadSound("tele1.wav", 0.9);
+        bossTele2 = loadSound("tele2.wav", 0.9);
+        bossSkill2 = loadSound("skill2.wav", 1.0);
+        bossUlti = loadSound("ulti.wav", 1.0);
         gateBurn = loadSound("gate_burn.wav", 1.0);
         btnHover = loadSound("button_hold.wav", 0.8);
         btnClick = loadSound("button_click.wav", 1.0);
         
         pauseSound = loadSound("pause.wav", 1.0);
         unpauseSound = loadSound("button_click.wav", 1.0); // Đổi sang dùng chung âm thanh với button click
+        transformSound = loadSound("transform.wav", 1.0);
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -108,6 +121,10 @@ public class SoundManager {
             System.err.println("Lỗi load âm thanh " + fileName + ": " + e.getMessage());
         }
         return null;
+    }
+
+    public static void playTransformSound() {
+        if (transformSound != null) { transformSound.stop(); transformSound.play(); }
     }
 
     public static void playNsMissSound() { 
@@ -203,12 +220,37 @@ public class SoundManager {
         if (unpauseSound != null) { unpauseSound.stop(); unpauseSound.play(); }
     }
 
+    public static void playBossStartSound() {
+        if (bossStart != null) { bossStart.stop(); bossStart.play(); }
+    }
+
+    public static void playBossTeleport1Sound() {
+        if (bossTele1 != null) { bossTele1.stop(); bossTele1.play(); }
+    }
+
+    public static void playBossTeleport2Sound() {
+        if (bossTele2 != null) { bossTele2.stop(); bossTele2.play(); }
+    }
+
+    public static void playBossSkill2Sound() {
+        if (bossSkill2 != null) { bossSkill2.stop(); bossSkill2.play(); }
+    }
+
+    public static void playBossUltimateSound() {
+        if (bossUlti != null) { bossUlti.stop(); bossUlti.play(); }
+    }
+
     public static void stopEnemySounds() {
         if (slimeMove != null) { slimeMove.stop(); }
         if (knightAtk != null) { knightAtk.stop(); }
         if (knightReady != null) { knightReady.stop(); }
         if (treeMoving != null) { treeMoving.stop(); }
         if (treeAtk != null) { treeAtk.stop(); }
+        if (bossStart != null) { bossStart.stop(); }
+        if (bossTele1 != null) { bossTele1.stop(); }
+        if (bossTele2 != null) { bossTele2.stop(); }
+        if (bossSkill2 != null) { bossSkill2.stop(); }
+        if (bossUlti != null) { bossUlti.stop(); }
     }
 
     public static void stopGameplaySounds() {
@@ -229,5 +271,10 @@ public class SoundManager {
         if (witchDmgTaken != null) { witchDmgTaken.stop(); }
         if (witchDied != null) { witchDied.stop(); }
         if (gateBurn != null) { gateBurn.stop(); }
+        if (bossStart != null) { bossStart.stop(); }
+        if (bossTele1 != null) { bossTele1.stop(); }
+        if (bossTele2 != null) { bossTele2.stop(); }
+        if (bossSkill2 != null) { bossSkill2.stop(); }
+        if (bossUlti != null) { bossUlti.stop(); }
     }
 }

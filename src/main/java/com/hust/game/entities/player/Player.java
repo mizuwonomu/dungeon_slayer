@@ -173,8 +173,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
     }
 
-    public void configureTreeMerge(Image treeImg, Image treeSkillImg) {
-        mergeController.configureTreeSprites(treeImg, treeSkillImg);
+    public void configureTreeMerge(Image treeImg, Image treeSkillImg, Image transformImg) {
+        mergeController.configureTreeSprites(treeImg, treeSkillImg, transformImg);
     }
 
     // -------------------------------------------------------
@@ -399,29 +399,41 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     public void render(GraphicsContext gc) {
         // Hiệu ứng đỏ khi bị thương đã được loại bỏ theo yêu cầu.
 
-        if (mergeController.isActive()) {
+        if (mergeController.shouldRenderTree()) {
             mergeController.render(gc, x, y, renderWidth, renderHeight, direction);
-        } else if (isDashing) {
-            // Tính toán khung hình lướt sao cho ôm trọn tâm Player.
-            // Ảnh dash được thiết kế gốc cho 64x64, nay Player thu nhỏ còn 48x48 nên ta lấy tỷ lệ / 64.0
-            double drawW = this.frameWidth * (this.renderWidth / 64.0);
-            double drawH = this.frameHeight * (this.renderHeight / 64.0);
-            
-            double centerX = this.x + this.renderWidth / 2.0;
-            double centerY = this.y + this.renderHeight / 2.0;
-            
-            double drawX = centerX - drawW / 2.0;
-            double drawY = centerY - drawH / 2.0;
-            
-            double sx = this.frameIndex * this.frameWidth;
-            
-            if (this.isFlipped) {
-                gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX + drawW, drawY, -drawW, drawH);
+        }
+
+        if (mergeController.shouldRenderPlayer()) {
+            if (isDashing) {
+                // Tính toán khung hình lướt sao cho ôm trọn tâm Player.
+                // Ảnh dash được thiết kế gốc cho 64x64, nay Player thu nhỏ còn 48x48 nên ta lấy tỷ lệ / 64.0
+                double drawW = this.frameWidth * (this.renderWidth / 64.0);
+                double drawH = this.frameHeight * (this.renderHeight / 64.0);
+                
+                double centerX = this.x + this.renderWidth / 2.0;
+                double centerY = this.y + this.renderHeight / 2.0;
+                
+                double drawX = centerX - drawW / 2.0;
+                double drawY = centerY - drawH / 2.0;
+                
+                double sx = this.frameIndex * this.frameWidth;
+                
+                if (this.isFlipped) {
+                    gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX + drawW, drawY, -drawW, drawH);
+                } else {
+                    gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX, drawY, drawW, drawH);
+                }
             } else {
-                gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX, drawY, drawW, drawH);
+                super.render(gc);
             }
-        } else {
-            super.render(gc);
+        }
+
+        if (mergeController.isTransforming()) {
+            double effectSize = 288.0;
+            double effectX = x + (renderWidth / 2.0) - (effectSize / 2.0);
+            double effectY = y + (renderHeight / 2.0) - (effectSize / 2.0);
+
+            mergeController.renderTransform(gc, effectX, effectY, effectSize, effectSize);
         }
 
         // Vẽ hiệu ứng Power Up đè lên Player
@@ -775,7 +787,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     /** Chỉ cho tấn công khi cooldown đã về 0 */
     @Override
     public boolean canAttack() {
-        return attackCooldown == 0 && !isDashing && !isThrusting && !isTreeMergeAttacking(); // Không được chém khi đang lướt/chọc
+        return attackCooldown == 0 && !isDashing && !isThrusting && !isTreeMergeAttacking() && !mergeController.isTransforming(); // Không được chém khi đang lướt/chọc/biến hình
     }
 
     public void resetAttackCooldown(int cooldown) {

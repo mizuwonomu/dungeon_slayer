@@ -54,8 +54,8 @@ public class App extends Application {
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
 
-    // Độ zoom camera (1.0 = gốc)
-    private static final double ZOOM = 1.0;
+    // Độ zoom camera (Sẽ thay đổi theo màn chơi)
+    private static double ZOOM = 1.0;
 
     private GraphicsContext gc;
     private Player player;
@@ -88,6 +88,8 @@ public class App extends Application {
     private PauseScreen pauseScreen;
     private boolean isMinimapOpen = false;
     private Minimap minimapUI;
+    private boolean isCutsceneActive = false;
+    private com.hust.game.ui.DialogBox globalDialog;
 
     // Camera position
     private double cameraX = 0;
@@ -107,6 +109,18 @@ public class App extends Application {
         if (instance != null) {
             instance.screenShakeTimer = timer;
             instance.screenShakeAmplitude = amplitude;
+        }
+    }
+
+    public static void setCutsceneActive(boolean active) {
+        if (instance != null) {
+            instance.isCutsceneActive = active;
+        }
+    }
+
+    public static void showDialog(String text, int durationFrames) {
+        if (instance != null && instance.globalDialog != null) {
+            instance.globalDialog.show(text, durationFrames);
         }
     }
 
@@ -240,6 +254,8 @@ public class App extends Application {
 
         initializeEntities(startLevel);
         playInGameMusic(startLevel);
+        updateCameraZoom(startLevel);
+        globalDialog = new com.hust.game.ui.DialogBox();
 
         Image tempBackScreen = null;
         try {
@@ -354,7 +370,7 @@ public class App extends Application {
                         }
                         boolean isNpcInteractionOpen = npc != null && npc.isInteractionOpen();
 
-                        if (isNpcInteractionOpen) {
+                        if (isNpcInteractionOpen || isCutsceneActive) {
                             player.savePosition();
                             player.setState(EntityState.IDLE);
                         } else {
@@ -378,6 +394,10 @@ public class App extends Application {
 
                             if (tutorialManager != null) {
                                 tutorialManager.update(player, input, isMousePressed);
+                            }
+
+                            if (globalDialog != null) {
+                                globalDialog.update();
                             }
 
                             combatManager.update();
@@ -492,6 +512,10 @@ public class App extends Application {
                     tutorialManager.render(gc);
                 }
 
+                if (globalDialog != null) {
+                    globalDialog.render(gc);
+                }
+
                 // --- VẼ HIỆU ỨNG FADE-IN TỪ ĐEN SANG GAME ---
                 if (fadeInTimer > 0) {
                     gc.setFill(javafx.scene.paint.Color.BLACK);
@@ -517,6 +541,7 @@ public class App extends Application {
                                     combatManager.resetSkill();
                                     input.clear(); // Chống kẹt nút
                                     fadeInTimer = 120;
+                                updateCameraZoom(1);
                                     playInGameMusic(1);
                                     gameLoop.start();
                                 });
@@ -549,6 +574,7 @@ public class App extends Application {
                                     combatManager.resetSkill();
                                     input.clear(); // Xóa các phím đang đè để tránh kẹt nút
                                     fadeInTimer = 120; // Kích hoạt lại hiệu ứng mờ dần sáng lên khi vào màn mới
+                                updateCameraZoom(gameManager.getCurrentLevelIndex());
                                     playInGameMusic(gameManager.getCurrentLevelIndex());
                                     gameLoop.start();
                                 });
@@ -584,32 +610,28 @@ public class App extends Application {
                     gc.setFont(finishFont);
                     gc.setStroke(javafx.scene.paint.Color.WHITE);
                     gc.setLineWidth(4);
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                    gc.setTextBaseline(javafx.geometry.VPos.CENTER);
 
                     if (isVictory) {
                         String text = "VICTORY!";
-                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
-                        tempText.setFont(gc.getFont());
-                        double textWidth = tempText.getLayoutBounds().getWidth();
-                        double textHeight = tempText.getLayoutBounds().getHeight();
-                        double x = (WIDTH - textWidth) / 2;
-                        double y = (HEIGHT + textHeight) / 2 - 50;
+                        double x = WIDTH / 2.0;
+                        double y = HEIGHT / 2.0 - 50;
 
                         gc.setFill(javafx.scene.paint.Color.GOLD);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
                         gc.fillText(text, x, y);   // Vẽ chữ màu vàng gold
                     } else { // isGameOver
                         String text = "DEFEAT";
-                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
-                        tempText.setFont(gc.getFont());
-                        double textWidth = tempText.getLayoutBounds().getWidth();
-                        double textHeight = tempText.getLayoutBounds().getHeight();
-                        double x = (WIDTH - textWidth) / 2;
-                        double y = (HEIGHT + textHeight) / 2 - 50;
+                        double x = WIDTH / 2.0;
+                        double y = HEIGHT / 2.0 - 50;
 
                         gc.setFill(javafx.scene.paint.Color.GRAY);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
                         gc.fillText(text, x, y);   // Vẽ chữ màu xám
                     }
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                    gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
 
                     if (!isEndUIShown) {
                         gameLoop.stop();
@@ -639,6 +661,10 @@ public class App extends Application {
             }
         };
         return scene;
+    }
+
+    private void updateCameraZoom(int level) {
+        ZOOM = (level == 3) ? 0.8 : 1.0; // Thu nhỏ góc nhìn ở phòng Boss để bao quát được toàn bộ sàn đấu
     }
 
     private void updateCamera() {
@@ -755,6 +781,7 @@ public class App extends Application {
 
             Image treeImg = loadImg("/assets/enemy/tree.png");
             Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
+            Image transformImg = loadImg("/assets/player/transform.png");
             Image slimeImg = loadImg("/assets/enemy/slime.png");
             Image knightImg = loadImg("/assets/enemy/knight_idle.png");
             Image knightSkillImg = loadImg("/assets/enemy/knight_attack.png");
@@ -775,7 +802,7 @@ public class App extends Application {
                     cDown, cUp, cLeft, cRight, 
                     dDown, dUp, dLeft, dRight, 
                     swordHit, rageHit, powerUpImg, thunderImg);
-            player.configureTreeMerge(treeImg, treeSkillImg);
+            player.configureTreeMerge(treeImg, treeSkillImg, transformImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
@@ -881,7 +908,9 @@ public class App extends Application {
 
         if (input.contains(KeyCode.K)) {
             if (!isKHeld) {
-                player.activateStoredMergeForm();
+                if (player.activateStoredMergeForm()) {
+                    com.hust.game.audio.SoundManager.playTransformSound();
+                }
                 isKHeld = true;
             }
         } else {

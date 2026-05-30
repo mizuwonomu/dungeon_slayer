@@ -25,13 +25,20 @@ public class PlayerMergeController {
 
     private Image treeIdleSprite;
     private Image treeSkillSprite;
+    private Image transformSprite;
+    private int transformMode = 0; // 0=None, 1=In, 2=Out
+    private int transformFrameIndex;
+    private int transformAnimTimer;
+    private static final int TRANSFORM_DELAY = 4;
+
     private int treeFrameIndex;
     private int treeAnimTimer;
     private boolean treeAttacking;
 
-    public void configureTreeSprites(Image treeIdleSprite, Image treeSkillSprite) {
+    public void configureTreeSprites(Image treeIdleSprite, Image treeSkillSprite, Image transformSprite) {
         this.treeIdleSprite = treeIdleSprite;
         this.treeSkillSprite = treeSkillSprite;
+        this.transformSprite = transformSprite;
     }
 
     public void grantForm(MergeFormType formType) {
@@ -52,6 +59,10 @@ public class PlayerMergeController {
         treeFrameIndex = 0;
         treeAnimTimer = 0;
         treeAttacking = false;
+        
+        transformMode = 1;
+        transformFrameIndex = 0;
+        transformAnimTimer = 0;
         return true;
     }
 
@@ -64,14 +75,34 @@ public class PlayerMergeController {
             return;
         }
 
-        activeTimer--;
-        if (activeTimer <= 0) {
-            finishActiveForm();
-            return;
+        if (transformMode > 0) {
+            transformAnimTimer++;
+            if (transformAnimTimer >= TRANSFORM_DELAY) {
+                transformAnimTimer = 0;
+                transformFrameIndex++;
+                int totalFrames = (transformSprite != null) ? (int) (transformSprite.getWidth() / 288.0) : 12;
+                if (transformFrameIndex >= totalFrames) {
+                    if (transformMode == 2) {
+                        finishActiveForm();
+                        return; // Ended OUT
+                    }
+                    transformMode = 0;
+                }
+            }
         }
 
-        if (activeForm == MergeFormType.TREE) {
-            updateTreeAnimation();
+        if (transformMode != 2) {
+            activeTimer--;
+            if (activeTimer <= 0) {
+                transformMode = 2; // Start OUT
+                transformFrameIndex = 0;
+                transformAnimTimer = 0;
+                com.hust.game.audio.SoundManager.playTransformSound();
+                return;
+            }
+            if (activeForm == MergeFormType.TREE && (transformMode == 0 || transformFrameIndex >= 12)) {
+                updateTreeAnimation();
+            }
         }
     }
 
@@ -101,6 +132,7 @@ public class PlayerMergeController {
         treeAttacking = false;
         treeFrameIndex = 0;
         treeAnimTimer = 0;
+        transformMode = 0;
     }
 
     private void finishActiveForm() {
@@ -173,6 +205,41 @@ public class PlayerMergeController {
                 treeBounds.getWidth() + TREE_ATTACK_RANGE * 2,
                 treeBounds.getHeight() + TREE_ATTACK_RANGE * 2
         );
+    }
+
+    public boolean isTransforming() {
+        return transformMode > 0;
+    }
+
+    public boolean shouldRenderPlayer() {
+        if (activeForm == null) return true;
+        if (transformMode == 1 && transformFrameIndex < 12) return true;
+        if (transformMode == 2 && transformFrameIndex >= 12) return true;
+        return false;
+    }
+
+    public boolean shouldRenderTree() {
+        if (activeForm == MergeFormType.TREE) {
+            if (transformMode == 1 && transformFrameIndex < 12) return false;
+            if (transformMode == 2 && transformFrameIndex >= 12) return false;
+            return true;
+        }
+        return false;
+    }
+
+    public void renderTransform(GraphicsContext gc, double effectX, double effectY, double effectW, double effectH) {
+        if (transformMode == 0 || transformSprite == null) {
+            return;
+        }
+
+        double frameWidth = 288.0;
+        double frameHeight = 288.0;
+        double sx = transformFrameIndex * frameWidth;
+
+        gc.drawImage(transformSprite,
+                sx, 0, frameWidth, frameHeight,
+                effectX, effectY,
+                effectW, effectH);
     }
 
     public void render(GraphicsContext gc, double playerX, double playerY, double playerW, double playerH,

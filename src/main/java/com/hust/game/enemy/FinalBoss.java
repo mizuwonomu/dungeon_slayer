@@ -20,6 +20,8 @@ import java.util.List;
 public class FinalBoss extends Enemy {
     // Bộ trạng thái của boss: mỗi thời điểm chỉ chạy một trạng thái để tránh spam/chồng chiêu.
     private enum BossState {
+        WAITING,
+        INTRO,
         CHASE,
         SKILL1_TELEPORT,
         SKILL1_SLASH1,
@@ -53,7 +55,8 @@ public class FinalBoss extends Enemy {
     private static final int SKILL1_TELEPORT_FRAMES = TELE_FRAMES * BOSS_FRAME_DELAY;
     private static final int SKILL1_SLASH_FRAMES = ATTACK_1_FRAMES * BOSS_FRAME_DELAY;
     private static final int SKILL1_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
-    private static final int SKILL1_HIT_FRAME = 8;
+    private static final int SKILL1_HIT_FRAME_1 = 5;
+    private static final int SKILL1_HIT_FRAME_2 = 9;
     private static final int SKILL1_HITBOX_ACTIVE_FRAMES = 12;
     private static final int SKILL2_CAST_FRAMES = ATTACK_2_FRAMES * BOSS_FRAME_DELAY;
     private static final int SKILL2_RECOVERY_FRAMES = ACTION_DELAY_FRAMES;
@@ -72,7 +75,7 @@ public class FinalBoss extends Enemy {
     private static final double SKILL2_ITEM_RENDER_SIZE = 96.0;
     private static final double SKILL2_ITEM_HIT_RADIUS = 30.0;
     private static final double SKILL2_PROJECTILE_SPEED = 9.0;
-    private static final double SKILL2_PROJECTILE_MAX_DISTANCE = GameConstants.TILE_SIZE * 18.0;
+    private static final double SKILL2_PROJECTILE_MAX_DISTANCE = GameConstants.TILE_SIZE * 40.0;
     private static final double SKILL2_PROJECTILE_ROTATION_OFFSET_DEGREES = 60.0;
     private static final double SKILL2_SPREAD_ANGLE_DEGREES = 60.0;
     private static final double SKILL2_BOSS_RENDER_SCALE = 2.0;
@@ -86,10 +89,9 @@ public class FinalBoss extends Enemy {
     private static final double DRAGON_RENDER_HEIGHT = 198.0;
     private static final double WANDER_SPEED = 1.0;
 
-    // Level 3 đang dùng lại level2.txt. Tâm arena đi được nằm quanh hàng 5,
-    // không phải tâm cửa sổ vì tâm cửa sổ bị dính vùng hố có va chạm.
-    private static final double ARENA_CENTER_X = GameConstants.TILE_SIZE * 8.5;
-    private static final double ARENA_CENTER_Y = GameConstants.TILE_SIZE * 5.0;
+    // Tâm sàn đấu của map Level 3 (Nằm giữa điểm spawn của Player và Boss tại Y=19)
+    private static final double ARENA_CENTER_X = GameConstants.TILE_SIZE * 15.5;
+    private static final double ARENA_CENTER_Y = GameConstants.TILE_SIZE * 19.0;
 
     private final Image idleSprite;
     private final int idleFrames;
@@ -102,7 +104,7 @@ public class FinalBoss extends Enemy {
     private final Image dragonSprite;
     private final Image skill2Item2Sprite;
 
-    private BossState bossState = BossState.CHASE;
+    private BossState bossState = BossState.WAITING;
     private int stateTimer = 0;
     private int skill1CooldownTimer = 120;
     private int skill2CooldownTimer = 80;
@@ -112,8 +114,12 @@ public class FinalBoss extends Enemy {
     private boolean hasFiredSkill2Volley1 = false;
     private boolean hasFiredSkill2Volley2 = false;
     private boolean hasFiredSkill2Volley3 = false;
-    private boolean hasTeleportedThisSkill = false;
+    private boolean hasSpawnedSkill1Hitbox1 = false;
+    private boolean hasSpawnedSkill1Hitbox2 = false;
     private boolean hasSpawnedSkill1Hitbox = false;
+    private boolean hasTeleportedThisSkill = false;
+    private boolean hasSoundedSkill1 = false;
+    private boolean hasSoundedSkill2 = false;
 
     private double teleportTargetX = 0;
     private double teleportTargetY = 0;
@@ -182,6 +188,8 @@ public class FinalBoss extends Enemy {
         updateProjectiles();
 
         switch (bossState) {
+            case WAITING -> updateWaiting();
+            case INTRO -> updateIntro();
             case CHASE -> updateChase();
             case SKILL1_TELEPORT -> updateSkill1Teleport();
             case SKILL1_SLASH1 -> updateActiveCircleHitbox(BossState.RECOVERY, SKILL1_RECOVERY_FRAMES);
@@ -210,6 +218,27 @@ public class FinalBoss extends Enemy {
         }
     }
 
+    private void updateWaiting() {
+        setSprite(idleSprite, idleFrames, BOSS_FRAME_DELAY);
+        
+        // Đợi player bước vào vùng kích hoạt (Bán kính 7 ô)
+        if (distanceToPlayerCenter() <= GameConstants.TILE_SIZE * 7.0) {
+            changeState(BossState.INTRO, 300); // 5 giây (300 frame ở 60 FPS)
+            com.hust.game.main.App.setCutsceneActive(true);
+            com.hust.game.main.App.showDialog("Hừ, có cố gắng,\nnhưng đây là thứ thuộc về ta!", 300);
+            com.hust.game.audio.SoundManager.playBossStartSound();
+        }
+    }
+
+    private void updateIntro() {
+        setSprite(idleSprite, idleFrames, BOSS_FRAME_DELAY);
+        
+        if (--stateTimer <= 0) {
+            com.hust.game.main.App.setCutsceneActive(false);
+            changeState(BossState.CHASE, 0);
+        }
+    }
+
     private void updateChase() {
         // State mac dinh: chon skill theo pattern co dinh, khong luot sat player truoc khi danh.
         setSprite(idleSprite, idleFrames, BOSS_FRAME_DELAY);
@@ -233,6 +262,12 @@ public class FinalBoss extends Enemy {
         // Skill 2: đứng im chạy đủ boss_atk_2, lần lượt bắn 1/2/3 volley ở frame 12/16/24.
         setSprite(attackSprite2 != null ? attackSprite2 : idleSprite,
                 attackSprite2 != null ? ATTACK_2_FRAMES : idleFrames, BOSS_FRAME_DELAY);
+
+        // Phát âm thanh đúng vào lúc bắt đầu hoạt ảnh chém Skill 2
+        if (!hasSoundedSkill2) {
+            com.hust.game.audio.SoundManager.playBossSkill2Sound();
+            hasSoundedSkill2 = true;
+        }
 
         if (!hasFiredSkill2Volley1 && frameIndex >= SKILL2_VOLLEY_1_FRAME) {
             spawnSkill2Volley(1);
@@ -326,12 +361,29 @@ public class FinalBoss extends Enemy {
         setSprite(attackSprite1 != null ? attackSprite1 : idleSprite,
                 attackSprite1 != null ? ATTACK_1_FRAMES : idleFrames, BOSS_FRAME_DELAY);
 
-        if (!hasSpawnedSkill1Hitbox && frameIndex >= SKILL1_HIT_FRAME) {
+        // Phát âm thanh đúng vào lúc bắt đầu hoạt ảnh chém (được gán nhảy cóc frameIndex = 5 từ trước)
+        if (!hasSoundedSkill1 && frameIndex >= 5) {
+            if (Math.random() > 0.5) {
+                com.hust.game.audio.SoundManager.playBossTeleport1Sound();
+            } else {
+                com.hust.game.audio.SoundManager.playBossTeleport2Sound();
+            }
+            hasSoundedSkill1 = true;
+        }
+
+        if (!hasSpawnedSkill1Hitbox1 && frameIndex >= SKILL1_HIT_FRAME_1) {
             activeHitbox = createSlashHitbox(
                     SKILL1_DAMAGE,
                     playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER,
                     SKILL1_HITBOX_ACTIVE_FRAMES);
-            hasSpawnedSkill1Hitbox = true;
+            hasSpawnedSkill1Hitbox1 = true;
+        }
+        if (!hasSpawnedSkill1Hitbox2 && frameIndex >= SKILL1_HIT_FRAME_2) {
+            activeHitbox = createSlashHitbox(
+                    SKILL1_DAMAGE,
+                    playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER,
+                    SKILL1_HITBOX_ACTIVE_FRAMES);
+            hasSpawnedSkill1Hitbox2 = true;
         }
 
         if (activeHitbox != null) {
@@ -389,10 +441,14 @@ public class FinalBoss extends Enemy {
         }
 
         if (--stateTimer <= 0) {
-            hasSpawnedSkill1Hitbox = false;
-            changeState(BossState.SKILL1_SLASH1, SKILL1_SLASH_FRAMES);
+            hasSpawnedSkill1Hitbox1 = false;
+            hasSpawnedSkill1Hitbox2 = false;
+
+            // Cắt đi 5 frame thời gian của state vì đã nhảy cóc frame animation
+            changeState(BossState.SKILL1_SLASH1, SKILL1_SLASH_FRAMES - 5 * BOSS_FRAME_DELAY);
             setSprite(attackSprite1 != null ? attackSprite1 : idleSprite,
                     attackSprite1 != null ? ATTACK_1_FRAMES : idleFrames, BOSS_FRAME_DELAY);
+            this.frameIndex = 5; // Bắt đầu hoạt ảnh trực tiếp ở frame 5
         }
     }
 
@@ -402,6 +458,7 @@ public class FinalBoss extends Enemy {
         advanceSkillPattern();
         skill1CooldownTimer = SKILL1_COOLDOWN_FRAMES;
         hasTeleportedThisSkill = false;
+        hasSoundedSkill1 = false;
 
         changeState(BossState.SKILL1_TELEPORT, SKILL1_TELEPORT_FRAMES);
     }
@@ -415,6 +472,7 @@ public class FinalBoss extends Enemy {
         hasFiredSkill2Volley2 = false;
         hasFiredSkill2Volley3 = false;
         skill2CooldownTimer = SKILL2_COOLDOWN_FRAMES;
+        hasSoundedSkill2 = false;
         changeState(BossState.SKILL2_CAST, SKILL2_CAST_FRAMES);
     }
 
@@ -422,6 +480,9 @@ public class FinalBoss extends Enemy {
         // Tất cả volley của Skill 2 dùng chung atk_2_item_2 để hình ảnh đồng bộ.
         double[] aim = directionToPlayerNow();
         Image projectileSprite = skill2Item2Sprite;
+
+        // Rung màn hình nhẹ khi phóng ra mỗi đợt kiếm khí
+        com.hust.game.main.App.triggerScreenShake(6, 0.3);
 
         if (volleyCount == 1) {
             spawnSkill2Projectile(aim[0], aim[1], projectileSprite);
@@ -450,6 +511,7 @@ public class FinalBoss extends Enemy {
         rageTargetY = playerCenterY();
         dragonStrike = null;
         rageQueued = false;
+        com.hust.game.audio.SoundManager.playBossUltimateSound();
         changeState(BossState.RAGE_TELEGRAPH, RAGE_TELEGRAPH_FRAMES);
     }
 
@@ -513,7 +575,9 @@ public class FinalBoss extends Enemy {
     private boolean shouldTrackPlayer() {
         // Một số trạng thái phải khóa hướng từ lúc vận chiêu, nên không cập nhật aim liên tục.
         return bossState == BossState.CHASE
-                || bossState == BossState.RECOVERY;
+                || bossState == BossState.RECOVERY
+                || bossState == BossState.WAITING
+                || bossState == BossState.INTRO;
     }
 
     private void lockAimToPlayer() {
@@ -1033,19 +1097,19 @@ public class FinalBoss extends Enemy {
 
     @Override
     public void applyKnockback(Direction dir) {
-        // Boss chỉ nhận knockback rất nhẹ để vẫn phản hồi khi bị đánh.
         if (this.hp <= 0) return;
-
+        // Boss chỉ nhận knockback vật lý nhẹ, không bị stun hay reset frame
+        this.kbTimer = 3;
+        double kbSpeed = this.knockback * 1.0;
         this.kbVectorX = 0;
         this.kbVectorY = 0;
-        double kbSpeed = this.knockback;
         switch (dir) {
-            case UP -> this.kbVectorY = -kbSpeed;
-            case DOWN -> this.kbVectorY = kbSpeed;
-            case LEFT -> this.kbVectorX = -kbSpeed;
-            case RIGHT -> this.kbVectorX = kbSpeed;
+            case UP: this.kbVectorY = -kbSpeed; break;
+            case DOWN: this.kbVectorY = kbSpeed; break;
+            case LEFT: this.kbVectorX = -kbSpeed; break;
+            case RIGHT: this.kbVectorX = kbSpeed; break;
         }
-        this.kbTimer = 2;
+        // KHÔNG set hitStunTimer, KHÔNG reset frameIndex
     }
 
     @Override
@@ -1168,9 +1232,9 @@ public class FinalBoss extends Enemy {
         private boolean isOutsideArena() {
             double margin = SKILL2_ITEM_RENDER_SIZE;
             return x < -margin
-                    || x > GameConstants.TILE_SIZE * 17.0 + margin
+                    || x > GameConstants.TILE_SIZE * GameConstants.MAX_WORLD_COL + margin
                     || y < -margin
-                    || y > GameConstants.TILE_SIZE * 10.0 + margin;
+                    || y > GameConstants.TILE_SIZE * GameConstants.MAX_WORLD_ROW + margin;
         }
 
         boolean isFinished() {
@@ -1252,7 +1316,8 @@ public class FinalBoss extends Enemy {
                 if (timer >= DRAGON_IMPACT_DELAY_FRAMES) {
                     phase = Phase.EXPLODING;
                     timer = 0;
-                    com.hust.game.main.App.triggerScreenShake(18, 0.8);
+                    // Rung màn hình mạnh hơn khi rồng chạm đất phát nổ
+                    com.hust.game.main.App.triggerScreenShake(24, 1.2);
                 }
             } else if (phase == Phase.EXPLODING) {
                 // Vụ nổ chỉ gây damage một lần.
