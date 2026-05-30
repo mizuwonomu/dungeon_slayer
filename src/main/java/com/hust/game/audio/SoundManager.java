@@ -12,6 +12,7 @@ public class SoundManager {
     public static AudioClip gateBurn;
     public static AudioClip pauseSound, unpauseSound;
     public static AudioClip transformSound;
+    public static AudioClip dragonRoar, explosion, playerIdle, swordSwing, swordSwing1, swordSwing2, tele, ultiReady, whoosh;
     private static double sfxVolume = 1.0; // Âm lượng hiệu ứng
     private static double bgmVolume = 1.0; // Âm lượng nhạc nền
 
@@ -62,6 +63,16 @@ public class SoundManager {
         applyVolume(btnClick, 1.0);
         applyVolume(pauseSound, 1.0);
         applyVolume(unpauseSound, 1.0);
+        
+        applyVolume(dragonRoar, 1.0);
+        applyVolume(explosion, 1.0);
+        applyVolume(playerIdle, 1.0);
+        applyVolume(swordSwing, 1.0);
+        applyVolume(swordSwing1, 1.0);
+        applyVolume(swordSwing2, 1.0);
+        applyVolume(tele, 1.0);
+        applyVolume(ultiReady, 1.0);
+        applyVolume(whoosh, 1.0);
     }
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
@@ -105,6 +116,16 @@ public class SoundManager {
         pauseSound = loadSound("pause.wav", 1.0);
         unpauseSound = loadSound("button_click.wav", 1.0); // Đổi sang dùng chung âm thanh với button click
         transformSound = loadSound("transform.wav", 1.0);
+        
+        dragonRoar = loadSound("dragon_roar.wav", 1.0);
+        explosion = loadSound("explosion.wav", 1.0);
+        playerIdle = loadSound("player_idle.wav", 1.0);
+        swordSwing = loadSound("sword_swing.wav", 1.0);
+        swordSwing1 = loadSound("sword_swing_1.wav", 1.0);
+        swordSwing2 = loadSound("sword_swing_2.wav", 1.0);
+        tele = loadSound("tele.wav", 1.0);
+        ultiReady = loadSound("ulti_ready.wav", 1.0);
+        whoosh = loadSound("whoosh.wav", 1.0);
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -240,6 +261,42 @@ public class SoundManager {
         if (bossUlti != null) { bossUlti.stop(); bossUlti.play(); }
     }
 
+    public static void playDragonRoarSound() {
+        if (dragonRoar != null) { dragonRoar.stop(); dragonRoar.play(); }
+    }
+
+    public static void playExplosionSound() {
+        if (explosion != null) { explosion.stop(); explosion.play(); }
+    }
+
+    public static void playPlayerIdleSound() {
+        if (playerIdle != null) { playerIdle.stop(); playerIdle.play(); }
+    }
+
+    public static void playSwordSwingSound() {
+        if (swordSwing != null) { swordSwing.stop(); swordSwing.play(); }
+    }
+
+    public static void playSwordSwing1Sound() {
+        if (swordSwing1 != null) { swordSwing1.stop(); swordSwing1.play(); }
+    }
+
+    public static void playSwordSwing2Sound() {
+        if (swordSwing2 != null) { swordSwing2.stop(); swordSwing2.play(); }
+    }
+
+    public static void playTeleSound() {
+        if (tele != null) { tele.stop(); tele.play(); }
+    }
+
+    public static void playUltiReadySound() {
+        if (ultiReady != null) { ultiReady.stop(); ultiReady.play(); }
+    }
+
+    public static void playWhooshSound() {
+        if (whoosh != null) { whoosh.stop(); whoosh.play(); }
+    }
+
     public static void stopEnemySounds() {
         if (slimeMove != null) { slimeMove.stop(); }
         if (knightAtk != null) { knightAtk.stop(); }
@@ -251,6 +308,11 @@ public class SoundManager {
         if (bossTele2 != null) { bossTele2.stop(); }
         if (bossSkill2 != null) { bossSkill2.stop(); }
         if (bossUlti != null) { bossUlti.stop(); }
+        if (dragonRoar != null) { dragonRoar.stop(); }
+        if (explosion != null) { explosion.stop(); }
+        if (ultiReady != null) { ultiReady.stop(); }
+        if (tele != null) { tele.stop(); }
+        if (whoosh != null) { whoosh.stop(); }
     }
 
     public static void stopGameplaySounds() {
@@ -276,5 +338,14 @@ public class SoundManager {
         if (bossTele2 != null) { bossTele2.stop(); }
         if (bossSkill2 != null) { bossSkill2.stop(); }
         if (bossUlti != null) { bossUlti.stop(); }
+        if (dragonRoar != null) { dragonRoar.stop(); }
+        if (explosion != null) { explosion.stop(); }
+        if (ultiReady != null) { ultiReady.stop(); }
+        if (tele != null) { tele.stop(); }
+        if (whoosh != null) { whoosh.stop(); }
+        if (swordSwing != null) { swordSwing.stop(); }
+        if (swordSwing1 != null) { swordSwing1.stop(); }
+        if (swordSwing2 != null) { swordSwing2.stop(); }
+        if (playerIdle != null) { playerIdle.stop(); }
     }
 }

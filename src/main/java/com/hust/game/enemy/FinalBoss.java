@@ -65,13 +65,12 @@ public class FinalBoss extends Enemy {
     private static final int SKILL2_VOLLEY_1_FRAME = 12;
     private static final int SKILL2_VOLLEY_2_FRAME = 16;
     private static final int SKILL2_VOLLEY_3_FRAME = 24;
-    private static final int RAGE_DRAGON_RELEASE_FRAME = 24;
+    private static final int RAGE_DRAGON_RELEASE_FRAME = 32;
 
     private static final int SKILL1_COOLDOWN_FRAMES = 330;
     private static final int SKILL2_COOLDOWN_FRAMES = 300;
 
     private static final double SKILL1_RADIUS_MULTIPLIER = 1.5;
-    private static final double RAGE_RADIUS_MULTIPLIER = 4.0;
     private static final double SKILL2_ITEM_RENDER_SIZE = 96.0;
     private static final double SKILL2_ITEM_HIT_RADIUS = 30.0;
     private static final double SKILL2_PROJECTILE_SPEED = 9.0;
@@ -80,14 +79,18 @@ public class FinalBoss extends Enemy {
     private static final double SKILL2_SPREAD_ANGLE_DEGREES = 60.0;
     private static final double SKILL2_BOSS_RENDER_SCALE = 2.0;
     private static final double ULTIMATE_BOSS_RENDER_SCALE = 4.0;
-    private static final double DRAGON_SPEED = 8.0;
+    private static final double DRAGON_SPEED = 20.0;
     private static final int DRAGON_MAX_FLIGHT_FRAMES = 120;
     private static final int DRAGON_IMPACT_DELAY_FRAMES = 15;
     private static final double DRAGON_DIVE_TILT_DEGREES = 24.0;
-    private static final double DRAGON_LANDING_Y_OFFSET = -24.0;
     private static final double DRAGON_RENDER_WIDTH = 288.0;
     private static final double DRAGON_RENDER_HEIGHT = 198.0;
     private static final double WANDER_SPEED = 1.0;
+
+    private static final int DANGER_ZONE_FRAMES = 10;
+    private static final int DANGER_ZONE_FRAME_DELAY = 6; // 100ms mỗi frame (6 frame game tại 60 FPS)
+    private static final double DANGER_ZONE_WIDTH = 236.0;
+    private static final double DANGER_ZONE_HEIGHT = 145.0;
 
     // Tâm sàn đấu của map Level 3 (Nằm giữa điểm spawn của Player và Boss tại Y=19)
     private static final double ARENA_CENTER_X = GameConstants.TILE_SIZE * 15.5;
@@ -103,6 +106,8 @@ public class FinalBoss extends Enemy {
     private final Image[] ultiFrameSprites;
     private final Image dragonSprite;
     private final Image skill2Item2Sprite;
+    private final Image explosionSprite;
+    private final Image dangerZoneSprite;
 
     private BossState bossState = BossState.WAITING;
     private int stateTimer = 0;
@@ -120,6 +125,10 @@ public class FinalBoss extends Enemy {
     private boolean hasTeleportedThisSkill = false;
     private boolean hasSoundedSkill1 = false;
     private boolean hasSoundedSkill2 = false;
+    private boolean hasSoundedTele = false;
+    private boolean hasSoundedWhoosh = false;
+    private boolean hasSoundedUltiSwing = false;
+    private boolean hasSoundedDragonRoar = false;
 
     private double teleportTargetX = 0;
     private double teleportTargetY = 0;
@@ -130,6 +139,9 @@ public class FinalBoss extends Enemy {
     private int recoveryWanderTimer = 0;
     private double rageTargetX = ARENA_CENTER_X;
     private double rageTargetY = ARENA_CENTER_Y;
+
+    private int dangerZoneFrameIndex = 0;
+    private int dangerZoneAnimTimer = 0;
 
     private CircleHitbox activeHitbox;
     private DragonStrike dragonStrike;
@@ -163,6 +175,8 @@ public class FinalBoss extends Enemy {
                 ULTIMATE_FRAMES, (int) ULTIMATE_FRAME_CACHE_SIZE, (int) ULTIMATE_FRAME_CACHE_SIZE);
         this.dragonSprite = loadOptionalImage("/assets/enemy/dragon.png");
         this.skill2Item2Sprite = loadOptionalImage("/assets/enemy/atk_2_item_2.png");
+        this.explosionSprite = loadOptionalImage("/assets/enemy/explosion.png");
+        this.dangerZoneSprite = loadOptionalImage("/assets/enemy/danger_zone.png");
     }
 
     @Override
@@ -272,14 +286,17 @@ public class FinalBoss extends Enemy {
         if (!hasFiredSkill2Volley1 && frameIndex >= SKILL2_VOLLEY_1_FRAME) {
             spawnSkill2Volley(1);
             hasFiredSkill2Volley1 = true;
+            com.hust.game.audio.SoundManager.playSwordSwing2Sound();
         }
         if (!hasFiredSkill2Volley2 && frameIndex >= SKILL2_VOLLEY_2_FRAME) {
             spawnSkill2Volley(2);
             hasFiredSkill2Volley2 = true;
+            com.hust.game.audio.SoundManager.playSwordSwing2Sound();
         }
         if (!hasFiredSkill2Volley3 && frameIndex >= SKILL2_VOLLEY_3_FRAME) {
             spawnSkill2Volley(3);
             hasFiredSkill2Volley3 = true;
+            com.hust.game.audio.SoundManager.playSwordSwing2Sound();
         }
 
         if (--stateTimer <= 0) {
@@ -293,12 +310,55 @@ public class FinalBoss extends Enemy {
         setSprite(ultiSprite != null ? ultiSprite : idleSprite,
                 ultiSprite != null ? ULTIMATE_FRAMES : idleFrames, BOSS_FRAME_DELAY);
 
+        if (frameIndex < 25) {
+            rageTargetX = playerCenterX();
+            rageTargetY = playerCenterY();
+            if (dragonStrike != null) {
+                dragonStrike.updateTarget(rageTargetX, rageTargetY);
+            }
+        }
+
+        if (dangerZoneFrameIndex < DANGER_ZONE_FRAMES - 1) {
+            dangerZoneAnimTimer++;
+            if (dangerZoneAnimTimer >= DANGER_ZONE_FRAME_DELAY) {
+                dangerZoneAnimTimer = 0;
+                dangerZoneFrameIndex++;
+            }
+        }
+
+        if (!hasSoundedWhoosh && frameIndex >= 1) {
+            com.hust.game.audio.SoundManager.playWhooshSound();
+            hasSoundedWhoosh = true;
+        }
+        
+        if (!hasSoundedUltiSwing && frameIndex >= 22) {
+            com.hust.game.audio.SoundManager.playSwordSwing2Sound();
+            hasSoundedUltiSwing = true;
+        }
+
+        if (!hasSoundedDragonRoar && frameIndex >= 31) {
+            com.hust.game.audio.SoundManager.playDragonRoarSound();
+            hasSoundedDragonRoar = true;
+        }
+
         if (dragonStrike == null && frameIndex >= RAGE_DRAGON_RELEASE_FRAME) {
-            dragonStrike = new DragonStrike(centerX(), centerY() - renderHeight * 0.45,
-                    rageTargetX, rageTargetY, playerZoneRadius() * RAGE_RADIUS_MULTIPLIER);
+            // Xác định góc xuất hiện của rồng (Cánh cổng) dựa trên việc boss có lật mặt hay không
+            double offsetScale = ULTIMATE_BOSS_RENDER_SCALE / 2.0;
+            double spawnX = isFlipped ? centerX() + renderWidth * offsetScale : centerX() - renderWidth * offsetScale;
+            double spawnY = centerY() - renderHeight * offsetScale;
+            dragonStrike = new DragonStrike(spawnX, spawnY, rageTargetX, rageTargetY);
         }
         if (dragonStrike != null && !dragonStrike.isDone()) {
             dragonStrike.update();
+        }
+
+        // Giảm âm lượng ulti_ready khi rồng bắt đầu xuất hiện
+        if (frameIndex >= RAGE_DRAGON_RELEASE_FRAME) {
+            double fade = 1.0 - (double)(frameIndex - RAGE_DRAGON_RELEASE_FRAME) / (ULTIMATE_FRAMES - RAGE_DRAGON_RELEASE_FRAME);
+            fade = Math.max(0.0, fade);
+            if (com.hust.game.audio.SoundManager.ultiReady != null) {
+                com.hust.game.audio.SoundManager.ultiReady.setVolume(fade * com.hust.game.audio.SoundManager.getSfxVolume());
+            }
         }
 
         if (--stateTimer <= 0) {
@@ -377,6 +437,7 @@ public class FinalBoss extends Enemy {
                     playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER,
                     SKILL1_HITBOX_ACTIVE_FRAMES);
             hasSpawnedSkill1Hitbox1 = true;
+            com.hust.game.audio.SoundManager.playSwordSwingSound();
         }
         if (!hasSpawnedSkill1Hitbox2 && frameIndex >= SKILL1_HIT_FRAME_2) {
             activeHitbox = createSlashHitbox(
@@ -384,6 +445,7 @@ public class FinalBoss extends Enemy {
                     playerZoneRadius() * SKILL1_RADIUS_MULTIPLIER,
                     SKILL1_HITBOX_ACTIVE_FRAMES);
             hasSpawnedSkill1Hitbox2 = true;
+            com.hust.game.audio.SoundManager.playSwordSwing1Sound();
         }
 
         if (activeHitbox != null) {
@@ -431,6 +493,11 @@ public class FinalBoss extends Enemy {
         setSprite(teleSprite != null ? teleSprite : idleSprite,
                 teleSprite != null ? TELE_FRAMES : idleFrames, BOSS_FRAME_DELAY);
 
+        if (!hasSoundedTele) {
+            com.hust.game.audio.SoundManager.playTeleSound();
+            hasSoundedTele = true;
+        }
+
         // Dịch chuyển ở giữa animation (ví dụ frame 5), lúc boss đang mờ/biến mất
         if (!hasTeleportedThisSkill && frameIndex >= 5) {
             prepareTeleportNearPlayer();
@@ -459,6 +526,7 @@ public class FinalBoss extends Enemy {
         skill1CooldownTimer = SKILL1_COOLDOWN_FRAMES;
         hasTeleportedThisSkill = false;
         hasSoundedSkill1 = false;
+        hasSoundedTele = false;
 
         changeState(BossState.SKILL1_TELEPORT, SKILL1_TELEPORT_FRAMES);
     }
@@ -509,9 +577,18 @@ public class FinalBoss extends Enemy {
         lockAimToPlayer();
         rageTargetX = playerCenterX();
         rageTargetY = playerCenterY();
+        dangerZoneFrameIndex = 0;
+        dangerZoneAnimTimer = 0;
         dragonStrike = null;
         rageQueued = false;
+        hasSoundedWhoosh = false;
+        hasSoundedUltiSwing = false;
+        hasSoundedDragonRoar = false;
         com.hust.game.audio.SoundManager.playBossUltimateSound();
+        com.hust.game.audio.SoundManager.playUltiReadySound();
+        if (com.hust.game.audio.SoundManager.ultiReady != null) {
+            com.hust.game.audio.SoundManager.ultiReady.setVolume(1.0 * com.hust.game.audio.SoundManager.getSfxVolume());
+        }
         changeState(BossState.RAGE_TELEGRAPH, RAGE_TELEGRAPH_FRAMES);
     }
 
@@ -957,7 +1034,7 @@ public class FinalBoss extends Enemy {
         DragonStrike currentDragonStrike = dragonStrike;
         if (currentDragonStrike != null && !currentDragonStrike.isDone()) {
             currentDragonStrike.renderUnder(gc);
-        } else if (bossState == BossState.RAGE_TELEGRAPH) {
+        } else if (bossState == BossState.RAGE_TELEGRAPH && frameIndex < RAGE_DRAGON_RELEASE_FRAME) {
             renderRageTelegraph(gc);
         }
 
@@ -1070,23 +1147,21 @@ public class FinalBoss extends Enemy {
     }
 
     private void renderRageTelegraph(GraphicsContext gc) {
-        // Vùng cảnh báo chiêu nộ: player có 1 giây để né khỏi vòng tròn.
-        double radius = playerZoneRadius() * RAGE_RADIUS_MULTIPLIER;
-        if (gc == null || radius <= 0) {
-            return;
-        }
-        double pulse = 0.35 + 0.25 * Math.sin(stateTimer * 0.35);
+        if (gc == null) return;
+        renderDangerZone(gc, rageTargetX, rageTargetY);
+    }
 
-        gc.save();
-        gc.setGlobalAlpha(pulse);
-        gc.setFill(Color.rgb(255, 70, 30, 0.30));
-        gc.fillOval(rageTargetX - radius, rageTargetY - radius, radius * 2.0, radius * 2.0);
-        gc.setGlobalAlpha(0.85);
-        gc.setStroke(Color.ORANGE);
-        gc.setLineWidth(3.0);
-        gc.strokeOval(rageTargetX - radius, rageTargetY - radius, radius * 2.0, radius * 2.0);
-        gc.strokeLine(rageTargetX, rageTargetY - GameConstants.TILE_SIZE * 5.0, rageTargetX, rageTargetY + 12);
-        gc.restore();
+    private void renderDangerZone(GraphicsContext gc, double targetX, double targetY) {
+        if (dangerZoneSprite != null && !dangerZoneSprite.isError() && dangerZoneSprite.getWidth() > 0) {
+            double frameW = dangerZoneSprite.getWidth() / DANGER_ZONE_FRAMES;
+            double frameH = dangerZoneSprite.getHeight();
+            double drawX = targetX - DANGER_ZONE_WIDTH / 2.0;
+            double drawY = targetY - DANGER_ZONE_HEIGHT / 2.0;
+
+            gc.drawImage(dangerZoneSprite,
+                    dangerZoneFrameIndex * frameW, 0, frameW, frameH,
+                    drawX, drawY, DANGER_ZONE_WIDTH, DANGER_ZONE_HEIGHT);
+        }
     }
 
     @Override
@@ -1265,31 +1340,46 @@ public class FinalBoss extends Enemy {
 
     private class DragonStrike {
         // Chiêu nộ: cảnh báo trước, sau đó vật thể rơi xuống và nổ một lần.
-        private enum Phase { FLYING, IMPACT_DELAY, EXPLODING, DONE }
+        private enum Phase { FLYING, EXPLODING, DONE }
 
         private Phase phase = Phase.FLYING;
-        private final double targetX;
-        private final double targetY;
-        private final double dragonTargetX;
-        private final double dragonTargetY;
-        private final double radius;
+        private double targetX;
+        private double targetY;
+        private double dragonTargetX;
+        private double dragonTargetY;
         private double dragonX;
         private double dragonY;
         private final boolean dragonFacesLeft;
         private final double dragonAngleDegrees;
         private int timer = 0;
         private boolean hasDealtDamage = false;
+        private double initialDistance;
+        private double currentScale = 1.0;
 
-        DragonStrike(double startX, double startY, double targetX, double targetY, double radius) {
+        DragonStrike(double startX, double startY, double targetX, double targetY) {
             this.targetX = targetX;
             this.targetY = targetY;
             this.dragonTargetX = targetX;
-            this.dragonTargetY = targetY + DRAGON_LANDING_Y_OFFSET;
-            this.radius = Math.max(1.0, radius);
+            this.dragonTargetY = targetY - (DANGER_ZONE_HEIGHT / 2.0); // Điểm giữa phía trên của danger_zone
             this.dragonX = startX;
             this.dragonY = startY;
             this.dragonFacesLeft = dragonTargetX < startX;
             this.dragonAngleDegrees = dragonFacesLeft ? -DRAGON_DIVE_TILT_DEGREES : DRAGON_DIVE_TILT_DEGREES;
+
+            double dx = dragonTargetX - startX;
+            double dy = dragonTargetY - startY;
+            this.initialDistance = Math.max(1.0, Math.sqrt(dx * dx + dy * dy));
+        }
+
+        void updateTarget(double newX, double newY) {
+            this.targetX = newX;
+            this.targetY = newY;
+            this.dragonTargetX = newX;
+            this.dragonTargetY = newY - (DANGER_ZONE_HEIGHT / 2.0);
+
+            double dx = this.dragonTargetX - this.dragonX;
+            double dy = this.dragonTargetY - this.dragonY;
+            this.initialDistance = Math.max(1.0, Math.sqrt(dx * dx + dy * dy));
         }
 
         void update() {
@@ -1304,27 +1394,30 @@ public class FinalBoss extends Enemy {
                 if (distance <= speed || timer >= DRAGON_MAX_FLIGHT_FRAMES) {
                     dragonX = dragonTargetX;
                     dragonY = dragonTargetY;
-                    phase = Phase.IMPACT_DELAY;
+                    phase = Phase.EXPLODING;
                     timer = 0;
+                    // Rung màn hình mạnh hơn khi rồng chạm đất phát nổ
+                    com.hust.game.main.App.triggerScreenShake(24, 1.2);
+                    com.hust.game.audio.SoundManager.playExplosionSound();
                     return;
                 }
 
                 dragonX += (dx / distance) * speed;
                 dragonY += (dy / distance) * speed;
-            } else if (phase == Phase.IMPACT_DELAY) {
-                // Giữ rồng cắm xuống đất thêm 0.5 giây để player nhìn rõ trước khi nổ.
-                if (timer >= DRAGON_IMPACT_DELAY_FRAMES) {
-                    phase = Phase.EXPLODING;
-                    timer = 0;
-                    // Rung màn hình mạnh hơn khi rồng chạm đất phát nổ
-                    com.hust.game.main.App.triggerScreenShake(24, 1.2);
-                }
             } else if (phase == Phase.EXPLODING) {
                 // Vụ nổ chỉ gây damage một lần.
                 if (!hasDealtDamage) {
                     Rectangle2D playerBounds = targetPlayer != null ? targetPlayer.getBoundary() : null;
-                    if (playerBounds != null && circleIntersectsRect(targetX, targetY, radius, playerBounds)) {
-                        targetPlayer.takeDamage(RAGE_DAMAGE, targetX, targetY);
+                    if (playerBounds != null) {
+                        Rectangle2D dangerZoneRect = new Rectangle2D(
+                                targetX - DANGER_ZONE_WIDTH / 2.0,
+                                targetY - DANGER_ZONE_HEIGHT / 2.0,
+                                DANGER_ZONE_WIDTH,
+                                DANGER_ZONE_HEIGHT
+                        );
+                        if (playerBounds.intersects(dangerZoneRect)) {
+                            targetPlayer.takeDamage(RAGE_DAMAGE, targetX, targetY);
+                        }
                     }
                     hasDealtDamage = true;
                 }
@@ -1340,20 +1433,10 @@ public class FinalBoss extends Enemy {
         }
 
         void renderUnder(GraphicsContext gc) {
-            // Vẽ vùng nổ bên dưới boss/player để player thấy nơi nguy hiểm.
-            if (gc == null || phase == Phase.DONE) {
+            if (gc == null || phase == Phase.DONE || phase == Phase.EXPLODING) {
                 return;
             }
-
-            gc.save();
-            gc.setGlobalAlpha(0.35);
-            gc.setFill(Color.rgb(255, 40, 20, 0.30));
-            gc.fillOval(targetX - radius, targetY - radius, radius * 2.0, radius * 2.0);
-            gc.setGlobalAlpha(0.9);
-            gc.setStroke(Color.RED);
-            gc.setLineWidth(3.0);
-            gc.strokeOval(targetX - radius, targetY - radius, radius * 2.0, radius * 2.0);
-            gc.restore();
+            renderDangerZone(gc, targetX, targetY);
         }
 
         void renderOver(GraphicsContext gc) {
@@ -1363,17 +1446,32 @@ public class FinalBoss extends Enemy {
             }
 
             gc.save();
-            if (phase == Phase.FLYING || phase == Phase.IMPACT_DELAY) {
+            if (phase == Phase.FLYING) {
                 renderDragon(gc);
             } else if (phase == Phase.EXPLODING) {
-                double progress = timer / 36.0;
-                double drawRadius = radius * (0.8 + progress * 0.45);
-                gc.setGlobalAlpha(Math.max(0.0, 1.0 - progress));
-                gc.setFill(Color.rgb(255, 110, 30, 0.75));
-                gc.fillOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
-                gc.setStroke(Color.YELLOW);
-                gc.setLineWidth(4.0);
-                gc.strokeOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
+                if (explosionSprite != null && !explosionSprite.isError() && explosionSprite.getWidth() > 0) {
+                    int expFrame = (timer / 3) % 12; // 36 frames game = 12 frames ảnh (mỗi frame chạy 3 nhịp)
+                    double frameW = explosionSprite.getWidth() / 12.0;
+                    double frameH = explosionSprite.getHeight();
+                    
+                    double renderW = frameW * 3.0; // Phóng to x3
+                    double renderH = frameH * 3.0; // Phóng to x3
+                    
+                    gc.drawImage(explosionSprite,
+                            expFrame * frameW, 0, frameW, frameH,
+                            dragonX - renderW / 2.0, dragonY - renderH / 2.0,
+                            renderW, renderH);
+                } else {
+                    double progress = timer / 36.0;
+                    double fallbackRadius = DANGER_ZONE_WIDTH / 2.0;
+                    double drawRadius = fallbackRadius * (0.8 + progress * 0.45);
+                    gc.setGlobalAlpha(Math.max(0.0, 1.0 - progress));
+                    gc.setFill(Color.rgb(255, 110, 30, 0.75));
+                    gc.fillOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
+                    gc.setStroke(Color.YELLOW);
+                    gc.setLineWidth(4.0);
+                    gc.strokeOval(targetX - drawRadius, targetY - drawRadius, drawRadius * 2.0, drawRadius * 2.0);
+                }
             }
             gc.restore();
         }
@@ -1385,28 +1483,49 @@ public class FinalBoss extends Enemy {
 
             gc.translate(dragonX, dragonY);
             gc.rotate(dragonAngleDegrees);
+            gc.scale(currentScale, currentScale);
+
+            // Hiệu ứng "chui ra": Tăng dần phần trăm hiển thị trong 12 frame (0.2s)
+            double revealProgress = 1.0;
+            if (phase == Phase.FLYING) {
+                revealProgress = Math.min(1.0, timer / 12.0);
+            }
 
             if (dragonSprite != null && !dragonSprite.isError() && dragonSprite.getWidth() > 0 && dragonSprite.getHeight() > 0) {
                 int dragonFrame = (timer / 6) % DRAGON_FRAMES;
                 double frameW = dragonSprite.getWidth() / DRAGON_FRAMES;
+                
+                double srcX = dragonFrame * frameW;
+                double srcY = 0;
+                double srcW = frameW * revealProgress;
+                double srcH = dragonSprite.getHeight();
+
                 if (dragonFacesLeft) {
+                    double dstX = -DRAGON_RENDER_WIDTH / 2.0;
+                    double dstY = -DRAGON_RENDER_HEIGHT / 2.0;
+                    double dstW = DRAGON_RENDER_WIDTH * revealProgress;
+                    double dstH = DRAGON_RENDER_HEIGHT;
+                    
                     gc.drawImage(dragonSprite,
-                            dragonFrame * frameW, 0, frameW, dragonSprite.getHeight(),
-                            -DRAGON_RENDER_WIDTH / 2.0, -DRAGON_RENDER_HEIGHT / 2.0,
-                            DRAGON_RENDER_WIDTH, DRAGON_RENDER_HEIGHT);
+                            srcX, srcY, srcW, srcH,
+                            dstX, dstY, dstW, dstH);
                 } else {
+                    double dstX = DRAGON_RENDER_WIDTH / 2.0;
+                    double dstY = -DRAGON_RENDER_HEIGHT / 2.0;
+                    double dstW = -DRAGON_RENDER_WIDTH * revealProgress;
+                    double dstH = DRAGON_RENDER_HEIGHT;
+                    
                     gc.drawImage(dragonSprite,
-                            dragonFrame * frameW, 0, frameW, dragonSprite.getHeight(),
-                            DRAGON_RENDER_WIDTH / 2.0, -DRAGON_RENDER_HEIGHT / 2.0,
-                            -DRAGON_RENDER_WIDTH, DRAGON_RENDER_HEIGHT);
+                            srcX, srcY, srcW, srcH,
+                            dstX, dstY, dstW, dstH);
                 }
             } else {
                 gc.setStroke(Color.rgb(255, 185, 60));
                 gc.setLineWidth(18.0);
-                gc.strokeLine(-56, 0, 56, 0);
+                gc.strokeLine(-56, 0, -56 + 112 * revealProgress, 0);
                 gc.setStroke(Color.WHITE);
                 gc.setLineWidth(5.0);
-                gc.strokeLine(-34, 0, 34, 0);
+                gc.strokeLine(-34, 0, -34 + 68 * revealProgress, 0);
             }
         }
     }
