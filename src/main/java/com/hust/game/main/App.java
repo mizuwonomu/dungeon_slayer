@@ -837,7 +837,7 @@ public class App extends Application {
         collisionChecker = new CollisionChecker(gameManager.getMap());
         combatManager.setCollisionChecker(collisionChecker);
         enemyManager.setCollisionChecker(collisionChecker);
-        hud = new HUD(player, combatManager);
+        hud = new HUD(player, combatManager, enemyManager.getEnemyList());
     }
 
     private void handleInput() {

@@ -1,7 +1,10 @@
 package com.hust.game.ui;
 
 import com.hust.game.combat.CombatManager;
+import com.hust.game.enemy.Enemy;
+import com.hust.game.enemy.FinalBoss;
 import com.hust.game.entities.player.Player;
+import java.util.List;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 
@@ -25,14 +28,19 @@ public class HUD {
 
     private static final double RENDER_WIDTH = FRAME_WIDTH * SCALE;
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
+    private static final double BOSS_BAR_WIDTH = 720.0;
+    private static final double BOSS_BAR_HEIGHT = 48.0;
+    private static final double BOSS_BAR_GAP = 12.0;
 
     private final Player player;
     private final CombatManager combatManager;
+    private final List<Enemy> enemies;
 
     // ONE constructor that takes BOTH
-    public HUD(Player player, CombatManager combatManager) {
+    public HUD(Player player, CombatManager combatManager, List<Enemy> enemies) {
         this.player = player;
         this.combatManager = combatManager;
+        this.enemies = enemies;
         loadAssets();
     }
 
@@ -130,6 +138,8 @@ public class HUD {
         double clusterMaxH = 53.0;
         double clusterY = screenHeight - 20.0 - clusterMaxH;
         double equatorY = clusterY + clusterMaxH / 2.0;
+
+        renderBossHealthBar(gc, screenWidth, clusterY);
 
         // 1. Health/Mana Box
         double hmBoxW = 148.0;
@@ -267,6 +277,56 @@ public class HUD {
         if (current >= max) return 0;
         int index = 5 - (int) Math.ceil(((double) current / max) * 5.0);
         return Math.max(0, Math.min(5, index));
+    }
+
+    private void renderBossHealthBar(GraphicsContext gc, double screenWidth, double clusterY) {
+        FinalBoss boss = getLiveBoss();
+        if (boss == null || healthImg == null) {
+            return;
+        }
+
+        int maxHp = boss.getMaxHp();
+        if (maxHp <= 0) {
+            return;
+        }
+
+        int hp = boss.getHp();
+        int hpIndex = getFrameIndex(hp, maxHp);
+        double hpSourceX = hpIndex * RENDER_WIDTH;
+        double barX = (screenWidth - BOSS_BAR_WIDTH) / 2.0;
+        double barY = clusterY - BOSS_BAR_GAP - BOSS_BAR_HEIGHT;
+
+        gc.save();
+        gc.drawImage(healthImg,
+                hpSourceX, 0, RENDER_WIDTH, RENDER_HEIGHT,
+                barX, barY, BOSS_BAR_WIDTH, BOSS_BAR_HEIGHT);
+
+        gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 18));
+        gc.setFill(javafx.scene.paint.Color.WHITE);
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(2.0);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+
+        String bossHpText = "BOSS  " + hp + " / " + maxHp;
+        double textX = barX + BOSS_BAR_WIDTH / 2.0;
+        double textY = barY + BOSS_BAR_HEIGHT / 2.0;
+        gc.strokeText(bossHpText, textX, textY);
+        gc.fillText(bossHpText, textX, textY);
+        gc.restore();
+    }
+
+    private FinalBoss getLiveBoss() {
+        if (enemies == null) {
+            return null;
+        }
+
+        for (Enemy enemy : enemies) {
+            if (enemy instanceof FinalBoss boss && boss.getHp() > 0) {
+                return boss;
+            }
+        }
+        return null;
     }
 
     private Image loadImg(String path, double requestedWidth, double requestedHeight) {
