@@ -96,6 +96,7 @@ public class MenuScreen {
         int[] hintIndex = { 0 };
         int[] hintTimer = { 0 };
         int[] selectedLevel = { 1 };
+        AnimationTimer[] menuLoopHolder = { null };
 
         // Nút Start
         StackPane startBtn = createSpriteBtn("START", buttonSheet, 3, 1.0, () -> {
@@ -107,35 +108,27 @@ public class MenuScreen {
         // Nút Chọn Level
         StackPane tutorialBtn = createSpriteBtn("TUTORIAL", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 2) {
-                phase[0] = 3;
-                selectedLevel[0] = 0;
-                hintIndex[0] = (int) (Math.random() * hints.length);
-                selectedHint[0] = hints[hintIndex[0]];
+                menuLoopHolder[0].stop();
+                onStart.accept(0);
             }
         });
 
         StackPane lvl1Btn = createSpriteBtn("LEVEL 1", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 2) {
-                phase[0] = 3;
-                selectedLevel[0] = 1;
-                hintIndex[0] = (int) (Math.random() * hints.length);
-                selectedHint[0] = hints[hintIndex[0]];
+                menuLoopHolder[0].stop();
+                onStart.accept(1);
             }
         });
         StackPane lvl2Btn = createSpriteBtn("LEVEL 2", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 2) {
-                phase[0] = 3;
-                selectedLevel[0] = 2;
-                hintIndex[0] = (int) (Math.random() * hints.length);
-                selectedHint[0] = hints[hintIndex[0]];
+                menuLoopHolder[0].stop();
+                onStart.accept(2);
             }
         });
         StackPane lvl3Btn = createSpriteBtn("BOSS", buttonSheet, 3, 1.0, () -> {
             if (phase[0] == 2) {
-                phase[0] = 3;
-                selectedLevel[0] = 3;
-                hintIndex[0] = (int) (Math.random() * hints.length);
-                selectedHint[0] = hints[hintIndex[0]];
+                menuLoopHolder[0].stop();
+                onStart.accept(3);
             }
         });
         StackPane backBtn = createSpriteBtn("BACK", buttonSheet, 3, 1.0, () -> {
@@ -184,14 +177,7 @@ public class MenuScreen {
 
         root.setStyle("-fx-background-color: black;"); // Nền đen khi background chưa load
 
-        // Thêm sự kiện click chuột để đổi hint khi đang ở màn hình loading
-        root.setOnMouseClicked(e -> {
-            if (phase[0] == 3) {
-                hintTimer[0] = 0; // Reset lại thời gian chờ
-                hintIndex[0] = (hintIndex[0] + 1) % hints.length;
-                selectedHint[0] = hints[hintIndex[0]];
-            }
-        });
+        
 
         // -------------------------------------------------------
         // LOAD SPRITE SHEET BACKGROUND
@@ -216,9 +202,7 @@ public class MenuScreen {
 
         // -------------------------------------------------------
         // ANIMATION TIMER — "game loop" của menu, chạy mỗi frame (~60fps)
-        // Dùng mảng holder để lambda bên trong có thể gọi stop()
         // -------------------------------------------------------
-        AnimationTimer[] menuLoopHolder = { null };
 
         AnimationTimer menuLoop = new AnimationTimer() {
             @Override
@@ -282,48 +266,7 @@ public class MenuScreen {
                     backBtn.setVisible(true);
                     backBtn.setMouseTransparent(false);
                     
-                } else if (phase[0] == 3) {
-                    // PHASE 3: Đã chọn Level, bắt đầu fade out và chuyển cảnh
-                    btnBox.setVisible(false); // Nút biến mất ngay lập tức
-                    levelRow.setVisible(false);
-                    levelRow.setMouseTransparent(true);
-                    backBtn.setVisible(false);
-                    backBtn.setMouseTransparent(true);
-
-                    if (skipLoadingScreens) {
-                        menuLoopHolder[0].stop();
-                        onStart.accept(selectedLevel[0]);
-                        return;
-                    }
-                    
-                    loadingTimer[0]++;
-                    hintTimer[0]++;
-
-                    // Tự động chuyển dòng hint tiếp theo sau mỗi 5s (300 frames ở 60 FPS)
-                    if (hintTimer[0] >= 300) {
-                        hintTimer[0] = 0; // Reset timer
-                        hintIndex[0] = (hintIndex[0] + 1) % hints.length;
-                        selectedHint[0] = hints[hintIndex[0]];
-                    }
-
-                    if (loadingTimer[0] < 540) {
-                        // Đang load bóng: giảm độ sáng về 0.3 giống Setting để vẫn nhìn thấy mờ mờ
-                        if (bgAlpha[0] > 0.3) {
-                            bgAlpha[0] -= FADE_SPEED;
-                            if (bgAlpha[0] < 0.3) bgAlpha[0] = 0.3;
-                        }
-                    } else {
-                        // Chờ nửa giây sau khi bóng load xong (510 + 30 = 540) -> Tối hẳn về đen
-                        bgAlpha[0] -= FADE_SPEED;
-                        if (bgAlpha[0] <= 0) {
-                            bgAlpha[0] = 0;
-                            menuLoopHolder[0].stop(); // Dừng loop menu trước
-                            onStart.accept(selectedLevel[0]); // Gọi callback chuyển scene kèm level đã chọn
-                            return;                    // Thoát handle() để không vẽ thêm
-                        }
-                    }
                 }
-
                 // --- Vẽ background frame hiện tại lên canvas ---
                 gc.save();
                 gc.setGlobalAlpha(Math.max(0.0, bgAlpha[0])); // Đảm bảo alpha không âm
@@ -349,55 +292,7 @@ public class MenuScreen {
 
                 gc.restore(); // Khôi phục globalAlpha về 1.0 để không ảnh hưởng render khác
                 
-                // --- Vẽ 4 quả bóng Loading khi vào Phase 3 ---
-                if (phase[0] == 3) {
-                    // Từ từ hiện bóng loading và text khi bắt đầu (60 frames đầu), fade out lúc chuyển sang đen tuyền
-                    double loadingAlpha = 1.0;
-                    if (loadingTimer[0] < 60) {
-                        loadingAlpha = loadingTimer[0] / 60.0;
-                    } else if (loadingTimer[0] >= 540) {
-                        loadingAlpha = Math.max(0.0, bgAlpha[0] / 0.3);
-                    }
-                    gc.setGlobalAlpha(loadingAlpha);
-
-                    double ballW = 80;
-                    double ballH = 80;
-                    double spacing = 20;
-                    double startX = GameConstants.WINDOW_WIDTH - 50 - (4 * ballW + 3 * spacing);
-                    double startY = GameConstants.WINDOW_HEIGHT - 50 - ballH;
-                    
-                    int t = loadingTimer[0];
-                    
-                    // Giả lập Game Tải:
-                    // Quả 1 & 2 chạy tuần tự trong 2s (mỗi quả 1s ~ 60 frames)
-                    int b1 = (t < 60) ? (t / 15) : 4;
-                    int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
-                    // Quả 3 xong trong 2s (60 * 2 = 120 frames)
-                    int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
-                    // Quả 4 tới frame 3 (index 2) trong 1s, nghỉ 3s, chạy hết trong 0.5s
-                    int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
-                    
-                    int[] ballFrames = {b1, b2, b3, b4};
-                    
-                    for (int i = 0; i < 4; i++) {
-                        double drawBallX = startX + i * (ballW + spacing);
-                        double frameX = Math.min(4, ballFrames[i]) * 160.0; // kích thước 1 frame = 800/5 = 160
-                        gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
-                    }
-
-                    // Vẽ Text Hướng dẫn/Mẹo
-                    gc.setFont(finalHintFont);
-                    gc.setFill(javafx.scene.paint.Color.WHITE);
-                    gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-                    gc.setTextBaseline(javafx.geometry.VPos.CENTER);
-                    double textCenterX = (20 + (startX + 20)) / 2.0;
-                    double textCenterY = startY + ballH / 2.0; // Căn dọc ngang hàng với quả bóng
-                    gc.fillText(selectedHint[0], textCenterX, textCenterY);
-                    gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
-                    gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
-
-                gc.setGlobalAlpha(1.0); // Reset alpha
-                }
+                
             }
         };
 

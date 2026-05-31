@@ -562,6 +562,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         double dashSpeedMultiplier = 9.5;
         dashVectorX = dx * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
         dashVectorY = dy * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
+        
+        com.hust.game.audio.SoundManager.playDashSound();
     }
 
     public boolean isDashing() { return isDashing; }
