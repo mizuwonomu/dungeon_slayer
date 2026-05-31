@@ -58,13 +58,6 @@ public class Minimap {
         double worldHeight =
                 GameConstants.MAX_WORLD_ROW * GameConstants.TILE_SIZE;
 
-        // ===== DISPLAYED MINIMAP SIZE =====
-        double minimapWidth = mapView.getFitWidth();
-
-        double minimapHeight =
-                minimapImage.getHeight()
-                        * (mapView.getFitWidth() / minimapImage.getWidth());
-
         // ===== LEVEL SETTINGS =====
         double offsetX = 0;
         double offsetY = 0;
@@ -84,12 +77,19 @@ public class Minimap {
 
             // ===== LEVEL 2 =====
             case 2:
-                offsetX = 170;
-                offsetY = 110;
+                double scaleX = (double) width / minimapImage.getWidth();
+                double scaleY = (double) height / minimapImage.getHeight();
 
-                miniXMultiplier = 1.0;
+                double scale = Math.min(scaleX, scaleY);
+
+                mapView.setFitWidth(minimapImage.getWidth() * scale);
+                mapView.setFitHeight(minimapImage.getHeight() * scale);
                 break;
         }
+
+        // ===== DISPLAYED MINIMAP SIZE =====
+        double minimapWidth = mapView.getFitWidth();
+        double minimapHeight = mapView.getFitHeight();
 
         // ===== PLAYER POSITION =====
         double miniX =
