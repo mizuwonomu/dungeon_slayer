@@ -28,11 +28,16 @@ public class PlayerMinion extends BaseEntity {
     private final Image idleUp;
     private final Image idleLeft;
     private final Image idleRight;
+    private final Image runDown;
+    private final Image runUp;
+    private final Image runLeft;
+    private final Image runRight;
     private final Image combatDown;
     private final Image combatUp;
     private final Image combatLeft;
     private final Image combatRight;
     private final Image swordHit;
+    private final Image transformImg;
 
     private FinalBoss target;
     private Direction direction = Direction.DOWN;
@@ -41,37 +46,55 @@ public class PlayerMinion extends BaseEntity {
     private int animationTimer = 0;
     private int lifetimeTimer = LIFETIME_FRAMES;
     private int attackCooldown = 0;
+    private boolean isDisappearing = false;
+    private int transformAnimTimer = 0;
+    private int transformFrameIndex = 0;
 
     public PlayerMinion(double x, double y,
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
+            Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
-            Image swordHit, FinalBoss target) {
+            Image swordHit, Image transformImg, FinalBoss target) {
         super(x, y, idleDown, PLAYER_FRAMES, RENDER_SIZE, RENDER_SIZE);
         this.idleDown = idleDown;
         this.idleUp = idleUp;
         this.idleLeft = idleLeft;
         this.idleRight = idleRight;
+        this.runDown = runDown;
+        this.runUp = runUp;
+        this.runLeft = runLeft;
+        this.runRight = runRight;
         this.combatDown = combatDown;
         this.combatUp = combatUp;
         this.combatLeft = combatLeft;
         this.combatRight = combatRight;
         this.swordHit = swordHit;
+        this.transformImg = transformImg;
         this.target = target;
+        
+        updateDirectionToTarget();
+        setIdleSprite();
     }
 
     @Override
     public void update() {
-        lifetimeTimer--;
+        if (isDisappearing) {
+            transformAnimTimer++;
+            if (transformAnimTimer >= 4) { // Tốc độ animation: 4 frame game / 1 frame ảnh
+                transformAnimTimer = 0;
+                transformFrameIndex++;
+            }
+            return;
+        }
+
         if (attackCooldown > 0) {
             attackCooldown--;
         }
 
-        if (!isAlive()) {
-            return;
-        }
-
-        if (target == null || target.getHp() <= 0) {
-            lifetimeTimer = 0;
+        lifetimeTimer--;
+        if (lifetimeTimer <= 0 || target == null || target.getHp() <= 0) {
+            isDisappearing = true;
+            com.hust.game.audio.SoundManager.playTransformSound();
             return;
         }
 
@@ -87,7 +110,10 @@ public class PlayerMinion extends BaseEntity {
     }
 
     public boolean isAlive() {
-        return lifetimeTimer > 0;
+        if (isDisappearing) {
+            return transformFrameIndex < 20; // Minion chính thức biến mất khi frame index đạt 20
+        }
+        return true; // Nếu chưa hết thời gian thì chắc chắn còn sống, AllyManager không được xóa
     }
 
     private void updateDirectionToTarget() {
@@ -111,7 +137,7 @@ public class PlayerMinion extends BaseEntity {
 
         x += (dx / dist) * SPEED;
         y += (dy / dist) * SPEED;
-        setIdleSprite();
+        setRunSprite();
     }
 
     private void updateIdleAnimation() {
@@ -144,8 +170,13 @@ public class PlayerMinion extends BaseEntity {
         animationTimer = 0;
         frameIndex++;
 
-        if (!damageApplied && frameIndex >= DAMAGE_FRAME && isTargetInRange()) {
-            target.takeDamage(ATTACK_DAMAGE);
+        if (!damageApplied && frameIndex == DAMAGE_FRAME) {
+            if (isTargetInRange()) {
+                target.takeDamage(ATTACK_DAMAGE);
+                com.hust.game.audio.SoundManager.playNsHitKnightSound(); // Âm thanh chém trúng quái
+            } else {
+                com.hust.game.audio.SoundManager.playNsMissSound(); // Âm thanh chém hụt (chém gió)
+            }
             damageApplied = true;
         }
 
@@ -187,7 +218,20 @@ public class PlayerMinion extends BaseEntity {
             case LEFT -> idleLeft;
             case RIGHT -> idleRight;
         };
-        isFlipped = direction == Direction.LEFT;
+        isFlipped = false;
+        numFrames = PLAYER_FRAMES;
+        frameWidth = spriteSheet.getWidth() / numFrames;
+        frameHeight = spriteSheet.getHeight();
+    }
+
+    private void setRunSprite() {
+        spriteSheet = switch (direction) {
+            case UP -> runUp;
+            case DOWN -> runDown;
+            case LEFT -> runLeft;
+            case RIGHT -> runRight;
+        };
+        isFlipped = false;
         numFrames = PLAYER_FRAMES;
         frameWidth = spriteSheet.getWidth() / numFrames;
         frameHeight = spriteSheet.getHeight();
@@ -200,7 +244,7 @@ public class PlayerMinion extends BaseEntity {
             case LEFT -> combatLeft;
             case RIGHT -> combatRight;
         };
-        isFlipped = direction == Direction.LEFT;
+        isFlipped = false;
         numFrames = ATTACK_FRAMES;
         frameWidth = spriteSheet.getWidth() / numFrames;
         frameHeight = spriteSheet.getHeight();
@@ -208,8 +252,18 @@ public class PlayerMinion extends BaseEntity {
 
     @Override
     public void render(GraphicsContext gc) {
-        super.render(gc);
-        if (attacking) {
+        if (!isDisappearing || transformFrameIndex < 12) {
+            super.render(gc);
+        }
+        
+        if (isDisappearing && transformImg != null) {
+            double frameW = transformImg.getHeight(); // Ảnh cuộn ngang nên frame luôn vuông theo chiều cao
+            double effectSize = 288.0 * 0.5; // Kích thước bằng 50% ảnh gốc (288.0 là size chuẩn bên Player)
+            double drawX = getCenterX() - effectSize / 2.0;
+            double drawY = getCenterY() - effectSize / 2.0;
+            
+            gc.drawImage(transformImg, transformFrameIndex * frameW, 0, frameW, frameW, drawX, drawY, effectSize, effectSize);
+        } else if (attacking) {
             renderSwordHit(gc);
         }
     }
@@ -236,11 +290,9 @@ public class PlayerMinion extends BaseEntity {
             }
             case LEFT -> {
                 swordX = x - SWORD_RENDER_SIZE + SWORD_ANCHOR_OFFSET;
-                isFlipped = true;
             }
             case RIGHT -> {
                 swordX = x + renderWidth - SWORD_ANCHOR_OFFSET;
-                isFlipped = false;
             }
         }
 
@@ -259,7 +311,6 @@ public class PlayerMinion extends BaseEntity {
                     SWORD_RENDER_SIZE, SWORD_RENDER_SIZE);
         }
         gc.restore();
-        isFlipped = direction == Direction.LEFT;
     }
 
     private double getCenterX() {

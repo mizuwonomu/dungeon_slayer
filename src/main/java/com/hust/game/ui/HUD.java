@@ -21,7 +21,21 @@ public class HUD {
     private Image skillNhaphonBoxImg;
     private Image cooldownBoxImg;
 
+    // Boss UI
+    private Image bossHpImg;
+    private Image bossHpWhiteImg;
+    private Image bossHpOutlineImg;
+    private int bossHpAnimTimer = 0;
+    private boolean hasStartedBossHpAnim = false;
+
+    // Boss White HP Logic
+    private int lastBossHp = -1;
+    private double whiteBossHp = -1;
+    private int whiteHpDelayTimer = 0;
+    private double whiteHpDropRate = 0;
+
     private javafx.scene.text.Font pixelFont;
+    private javafx.scene.text.Font bossFont;
 
     private static final double FRAME_WIDTH = 720.0;
     private static final double FRAME_HEIGHT = 120.0;
@@ -29,9 +43,7 @@ public class HUD {
 
     private static final double RENDER_WIDTH = FRAME_WIDTH * SCALE;
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
-    private static final double BOSS_BAR_WIDTH = 720.0;
-    private static final double BOSS_BAR_HEIGHT = 48.0;
-    private static final double BOSS_BAR_GAP = 12.0;
+    
 
     private final Player player;
     private final CombatManager combatManager;
@@ -64,9 +76,22 @@ public class HUD {
             System.err.println("Could not load cooldown_box.png: " + e.getMessage());
         }
 
+        try {
+            bossHpImg = loadImg("/assets/boss_hp.png", 600.0, 20.0); // To x2
+            bossHpWhiteImg = loadImg("/assets/boss_hp_white.png", 600.0, 20.0); // To x2
+            bossHpOutlineImg = loadImg("/assets/boss_hp_outline.png", 600.0, 20.0); // To x2
+        } catch (Exception e) {
+            System.err.println("Could not load boss hp images: " + e.getMessage());
+        }
+
         pixelFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 14);
         if (pixelFont == null) {
             pixelFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 14);
+        }
+        
+        bossFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 20);
+        if (bossFont == null) {
+            bossFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 20);
         }
     }
 
@@ -141,8 +166,6 @@ public class HUD {
         double clusterMaxH = 53.0;
         double clusterY = screenHeight - 20.0 - clusterMaxH;
         double equatorY = clusterY + clusterMaxH / 2.0;
-
-        renderBossHealthBar(gc, screenWidth, clusterY);
 
         // 1. Health/Mana Box
         double hmBoxW = 148.0;
@@ -221,54 +244,76 @@ public class HUD {
         gc.setGlobalAlpha(1.0);
         gc.drawImage(skillNhaphonBoxImg, nhaphonBoxX, nhaphonBoxY);
 
-        if (renderSummonSkillBox(gc, nhaphonBoxX, nhaphonBoxY)) {
-            return;
+        if (!renderSummonSkillBox(gc, nhaphonBoxX, nhaphonBoxY)) {
+            boolean mergeActive = player.isMergeActive();
+            boolean mergeReady = player.hasStoredMergeForm();
+            boolean mergeCooldown = player.getMergeCooldownRemaining() > 0;
+
+            if (mergeCooldown) {
+                double ratio = player.getMergeCooldownRemaining() / 360.0;
+                double yOffset = (1.0 - ratio) * 53.0;
+
+                if (cooldownBoxImg != null) {
+                    gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset, nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
+                } else {
+                    gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
+                    gc.fillRect(nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
+                }
+
+                gc.setFill(javafx.scene.paint.Color.WHITE);
+                gc.setStroke(javafx.scene.paint.Color.BLACK);
+                gc.setLineWidth(1.5);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                int seconds = (int) Math.ceil(player.getMergeCooldownRemaining() / 60.0);
+                gc.strokeText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+                gc.fillText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+            } else if (mergeActive) {
+                gc.setFill(javafx.scene.paint.Color.WHITE);
+                gc.setStroke(javafx.scene.paint.Color.BLACK);
+                gc.setLineWidth(1.5);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                int seconds = (int) Math.ceil(player.getMergeDurationRemaining() / 60.0);
+                gc.strokeText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+                gc.fillText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+            } else if (mergeReady) {
+                gc.setFill(javafx.scene.paint.Color.WHITE);
+                gc.setStroke(javafx.scene.paint.Color.BLACK);
+                gc.setLineWidth(1.5);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                gc.strokeText("K", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+                gc.fillText("K", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
+            } else {
+                if (cooldownBoxImg != null) {
+                    gc.drawImage(cooldownBoxImg, 0, 0, 50.0, 53.0, nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
+                } else {
+                    gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.5));
+                    gc.fillRect(nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
+                }
+            }
         }
 
-        boolean mergeActive = player.isMergeActive();
-        boolean mergeReady = player.hasStoredMergeForm();
-        boolean mergeCooldown = player.getMergeCooldownRemaining() > 0;
-
-        if (mergeCooldown) {
-            double ratio = player.getMergeCooldownRemaining() / 360.0;
-            double yOffset = (1.0 - ratio) * 53.0;
-
-            if (cooldownBoxImg != null) {
-                gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset, nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
-            } else {
-                gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
-                gc.fillRect(nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
+        // ============================================
+        // BOSS HEALTH BAR
+        // ============================================
+        FinalBoss boss = getLiveBoss();
+        if (boss != null && boss.hasStartedCombat() && boss.getHp() > 0) {
+            if (!hasStartedBossHpAnim) {
+                hasStartedBossHpAnim = true;
+                bossHpAnimTimer = 0;
+                lastBossHp = boss.getHp();
+                whiteBossHp = boss.getHp();
+                whiteHpDelayTimer = 0;
+                whiteHpDropRate = 0;
             }
-
-            gc.setFill(javafx.scene.paint.Color.WHITE);
-            gc.setStroke(javafx.scene.paint.Color.BLACK);
-            gc.setLineWidth(1.5);
-            gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-            int seconds = (int) Math.ceil(player.getMergeCooldownRemaining() / 60.0);
-            gc.strokeText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-            gc.fillText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-        } else if (mergeActive) {
-            gc.setFill(javafx.scene.paint.Color.WHITE);
-            gc.setStroke(javafx.scene.paint.Color.BLACK);
-            gc.setLineWidth(1.5);
-            gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-            int seconds = (int) Math.ceil(player.getMergeDurationRemaining() / 60.0);
-            gc.strokeText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-            gc.fillText(seconds + "s", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-        } else if (mergeReady) {
-            gc.setFill(javafx.scene.paint.Color.WHITE);
-            gc.setStroke(javafx.scene.paint.Color.BLACK);
-            gc.setLineWidth(1.5);
-            gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-            gc.strokeText("K", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-            gc.fillText("K", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
-        } else {
-            if (cooldownBoxImg != null) {
-                gc.drawImage(cooldownBoxImg, 0, 0, 50.0, 53.0, nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
-            } else {
-                gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.5));
-                gc.fillRect(nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
-            }
+            if (bossHpAnimTimer < 60) bossHpAnimTimer++;
+            renderBossUI(gc, screenWidth, screenHeight, boss);
+        } else if (boss == null || (boss != null && boss.getHp() <= 0)) {
+            hasStartedBossHpAnim = false;
+            bossHpAnimTimer = 0;
+            lastBossHp = -1;
+            whiteBossHp = -1;
+            whiteHpDelayTimer = 0;
+            whiteHpDropRate = 0;
         }
     }
 
@@ -333,40 +378,104 @@ public class HUD {
         gc.fillText(text, boxX + 25.0, boxY + 26.5);
     }
 
-    private void renderBossHealthBar(GraphicsContext gc, double screenWidth, double clusterY) {
-        FinalBoss boss = getLiveBoss();
-        if (boss == null || healthImg == null) {
-            return;
+    private void renderBossUI(GraphicsContext gc, double screenWidth, double screenHeight, FinalBoss boss) {
+        if (bossHpImg == null || bossHpOutlineImg == null) return;
+
+        // --- Cập nhật logic thanh máu trắng (White HP) ---
+        if (lastBossHp != -1 && boss.getHp() < lastBossHp) {
+            lastBossHp = boss.getHp();
+            whiteHpDelayTimer = 18; // Delay 0.3s (18 frames ở 60 FPS)
+            whiteHpDropRate = (whiteBossHp - boss.getHp()) / 18.0; // Tốc độ giảm để hoàn thành trong 0.3s
+        } else if (lastBossHp != -1 && boss.getHp() > lastBossHp) {
+            lastBossHp = boss.getHp();
+            whiteBossHp = boss.getHp(); // Nếu Boss hồi máu thì cập nhật ngay
         }
 
-        int maxHp = boss.getMaxHp();
-        if (maxHp <= 0) {
-            return;
+        if (whiteHpDelayTimer > 0) {
+            whiteHpDelayTimer--;
+        } else {
+            if (whiteBossHp > boss.getHp()) {
+                whiteBossHp -= whiteHpDropRate;
+                if (whiteBossHp < boss.getHp()) {
+                    whiteBossHp = boss.getHp();
+                }
+            } else {
+                whiteBossHp = boss.getHp();
+            }
         }
+        // -------------------------------------------------
 
-        int hp = boss.getHp();
-        int hpIndex = getFrameIndex(hp, maxHp);
-        double hpSourceX = hpIndex * RENDER_WIDTH;
-        double barX = (screenWidth - BOSS_BAR_WIDTH) / 2.0;
-        double barY = clusterY - BOSS_BAR_GAP - BOSS_BAR_HEIGHT;
-
+        double t = bossHpAnimTimer / 60.0;
+        // Ease out cubic: Nhanh ban đầu, chậm dần về cuối trong 1s
+        double progress = 1.0 - Math.pow(1.0 - t, 3);
+        
+        double fullWidth = 600.0;
+        double barHeight = 20.0;
+        double currentWidth = fullWidth * progress;
+        
+        double centerX = screenWidth / 2.0;
+        
+        // Đưa xuống dưới màn hình, nằm ngay phía trên cụm Skill Box (cách 30px)
+        double clusterY = screenHeight - 20.0 - 53.0; // Tọa độ Y của hộp kỹ năng
+        double topY = clusterY - 30.0 - barHeight; 
+        
         gc.save();
-        gc.drawImage(healthImg,
-                hpSourceX, 0, RENDER_WIDTH, RENDER_HEIGHT,
-                barX, barY, BOSS_BAR_WIDTH, BOSS_BAR_HEIGHT);
-
-        gc.setFont(javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 18));
+        
+        // 1. Vẽ Tên Boss
+        gc.setFont(bossFont);
         gc.setFill(javafx.scene.paint.Color.WHITE);
-        gc.setStroke(javafx.scene.paint.Color.BLACK);
-        gc.setLineWidth(2.0);
         gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
-        gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+        gc.setTextBaseline(javafx.geometry.VPos.BOTTOM);
+        gc.setGlobalAlpha(progress); // Mờ dần đồng bộ với thanh máu
+        
+        // Vẽ viền đen cho tên Boss
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(3.0);
+        gc.strokeText("Kẻ lang bạt mất đi linh hồn", centerX, topY - 5);
+        gc.fillText("Kẻ lang bạt mất đi linh hồn", centerX, topY - 5); // Tách tên cách thanh máu 5px
+        
+        gc.setGlobalAlpha(1.0);
+        
+        // 2. Vẽ Nền thanh máu (Kéo dài từ giữa ra 2 bên)
+        double sx = (fullWidth / 2.0) - (currentWidth / 2.0); // Tọa độ X để cắt ảnh gốc
+        double dx = centerX - (currentWidth / 2.0); // Tọa độ X để vẽ lên màn hình
+        if (currentWidth > 0 && barHeight > 0) {
+            gc.drawImage(bossHpOutlineImg, sx, 0, currentWidth, barHeight, dx, topY, currentWidth, barHeight);
+        }
 
-        String bossHpText = "BOSS  " + hp + " / " + maxHp;
-        double textX = barX + BOSS_BAR_WIDTH / 2.0;
-        double textY = barY + BOSS_BAR_HEIGHT / 2.0;
-        gc.strokeText(bossHpText, textX, textY);
-        gc.fillText(bossHpText, textX, textY);
+        // 3. Vẽ Máu Boss Trắng (Nằm dưới máu đỏ, trên nền outline)
+        if (bossHpWhiteImg != null) {
+            double whiteHpPercent = whiteBossHp / boss.getMaxHp();
+            double whiteFillWidth = fullWidth * whiteHpPercent;
+
+            double drawWhiteLeft = Math.max(sx, 0);
+            double drawWhiteRight = Math.min(sx + currentWidth, whiteFillWidth);
+
+            if (drawWhiteLeft < drawWhiteRight) {
+                double sw = drawWhiteRight - drawWhiteLeft;
+                if (sw > 0 && barHeight > 0) {
+                    double destX = centerX - (fullWidth / 2.0) + drawWhiteLeft;
+                    gc.drawImage(bossHpWhiteImg, drawWhiteLeft, 0, sw, barHeight, destX, topY, sw, barHeight);
+                }
+            }
+        }
+        
+        // 4. Vẽ Máu Boss thực tế
+        double hpPercent = (double) boss.getHp() / boss.getMaxHp();
+        double fillWidth = fullWidth * hpPercent; // Máu cắt từ phải sang trái (Chỉ lấy phần từ 0 đến fillWidth)
+        
+        // Chỉ vẽ phần máu NẰM TRONG vùng animation đang được mở ra
+        double drawLeft = Math.max(sx, 0); // Giới hạn bên trái
+        double drawRight = Math.min(sx + currentWidth, fillWidth); // Giới hạn bên phải
+        
+        if (drawLeft < drawRight) {
+            double sw = drawRight - drawLeft;
+            if (sw > 0 && barHeight > 0) {
+                double destX = centerX - (fullWidth / 2.0) + drawLeft;
+                gc.drawImage(bossHpImg, drawLeft, 0, sw, barHeight, destX, topY, sw, barHeight);
+            }
+        }
+        
         gc.restore();
     }
 

@@ -237,7 +237,7 @@ public class FinalBoss extends Enemy {
         
         // Đợi player bước vào vùng kích hoạt (Bán kính 7 ô)
         if (distanceToPlayerCenter() <= GameConstants.TILE_SIZE * 7.0) {
-            changeState(BossState.INTRO, 300); // 5 giây (300 frame ở 60 FPS)
+            changeState(BossState.INTRO, 370);
             com.hust.game.main.App.setCutsceneActive(true);
             com.hust.game.main.App.showDialog("Hừ, có cố gắng,\nnhưng đây là thứ thuộc về ta!", 300);
             com.hust.game.audio.SoundManager.playBossStartSound();
@@ -655,6 +655,11 @@ public class FinalBoss extends Enemy {
                 || bossState == BossState.RECOVERY
                 || bossState == BossState.WAITING
                 || bossState == BossState.INTRO;
+    }
+
+    // Cho phép App.java kiểm tra xem Boss đã qua đoạn hội thoại mở đầu chưa
+    public boolean hasStartedCombat() {
+        return bossState != BossState.WAITING && bossState != BossState.INTRO;
     }
 
     private void lockAimToPlayer() {
@@ -1208,7 +1213,11 @@ public class FinalBoss extends Enemy {
         // Vùng nhận damage nhỏ hơn sprite để không bị trúng đòn ở vùng trong suốt.
         double paddingX = this.renderWidth * 0.12;
         double paddingY = this.renderHeight * 0.08;
-        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+        
+        double originalHeight = renderHeight - 2 * paddingY;
+        double newHeight = originalHeight / 2.0; // Chiều cao = 1/2 hiện tại
+        
+        return new Rectangle2D(x + paddingX, y + paddingY + newHeight, renderWidth - 2 * paddingX, newHeight);
     }
 
     @Override

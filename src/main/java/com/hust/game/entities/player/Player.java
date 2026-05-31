@@ -512,7 +512,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             return mergeController.getTreeAttackBox(x, y, renderWidth, renderHeight);
         }
 
-        double attackRange = isThrusting ? 33.75 : 22.5; // Scale lại tầm đánh theo tỷ lệ 48/64 (x0.75)
+        double attackRange = (isThrusting ? 33.75 : 22.5) * 1.5; // Dài thêm 1/2 hiện tại
         double px = this.x;
         double py = this.y;
         double pw = this.renderWidth;

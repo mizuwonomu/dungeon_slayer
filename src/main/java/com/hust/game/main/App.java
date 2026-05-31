@@ -500,6 +500,49 @@ public class App extends Application {
                 // Vẽ lần lượt theo thứ tự đã sắp xếp
                 for (BaseEntity entity : renderList) {
                     entity.render(gc);
+                    
+                    // HIỆN HITBOX KHI BẬT DEV MODE
+                    if (DevSettings.isDevMode()) {
+                        if (entity instanceof Player || entity instanceof Enemy) {
+                            gc.save();
+                            gc.setLineWidth(1.5);
+                            
+                            // 1. Vẽ Boundary (Hurtbox - Vùng nhận sát thương) màu ĐỎ
+                            javafx.geometry.Rectangle2D bound = entity.getBoundary();
+                            if (bound != null) {
+                                gc.setStroke(javafx.scene.paint.Color.RED);
+                                gc.strokeRect(bound.getMinX(), bound.getMinY(), bound.getWidth(), bound.getHeight());
+                            }
+                            
+                            // 2. Vẽ Collision Boundary (Hitbox vật lý cản bước) màu XANH DƯƠNG
+                            javafx.geometry.Rectangle2D colBound = null;
+                            if (entity instanceof Player) {
+                                colBound = ((Player) entity).getCollisionBoundary();
+                            } else if (entity instanceof Enemy) {
+                                colBound = ((Enemy) entity).getCollisionBoundary();
+                            }
+                            if (colBound != null) {
+                                gc.setStroke(javafx.scene.paint.Color.BLUE);
+                                gc.strokeRect(colBound.getMinX(), colBound.getMinY(), colBound.getWidth(), colBound.getHeight());
+                            }
+                            
+                            // 3. Vẽ Tầm đánh (Attack Box) của Player màu VÀNG nếu đang tung chiêu
+                            if (entity instanceof Player p) {
+                                if (p.isAttacking() || p.isThrusting() || p.isTreeMergeAttacking()) {
+                                    javafx.geometry.Rectangle2D atkBound = p.getAttackBox();
+                                    if (atkBound != null) {
+                                        gc.setStroke(javafx.scene.paint.Color.YELLOW);
+                                        gc.strokeRect(atkBound.getMinX(), atkBound.getMinY(), atkBound.getWidth(), atkBound.getHeight());
+                                    }
+                                }
+                            }
+                            gc.restore();
+                        }
+                    }
+                }
+                
+                if (allyManager != null) {
+                    allyManager.renderSummonAnim(gc);
                 }
                 
                 combatManager.getParticleManager().render(gc);
@@ -805,6 +848,17 @@ public class App extends Application {
             manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
             Image bossImg = loadImg("/assets/enemy/boss_idle.png");
+            
+            Image minionSpamImg = null;
+            try {
+                minionSpamImg = loadImg("/assets/player/minion_spam.png");
+            } catch (Exception e) {
+                try {
+                    minionSpamImg = loadImg("/assets/ally/minion_spam.png");
+                } catch (Exception ex) {
+                    System.err.println("Không tìm thấy ảnh minion_spam.png");
+                }
+            }
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
@@ -841,8 +895,9 @@ public class App extends Application {
             allyManager = new AllyManager(
                     enemyManager.getEnemyList(),
                     iDown, iUp, iLeft, iRight,
+                    rDown, rUp, rLeft, rRight,
                     cDown, cUp, cLeft, cRight,
-                    swordHit);
+                    swordHit, minionSpamImg, transformImg);
 
         } catch (Exception e) {
             System.err.println("LỖI: Không tìm thấy file ảnh!");
@@ -1480,36 +1535,21 @@ public class App extends Application {
                         App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
                         App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
                     }
-
                     stage.setScene(nextScene);
                     onLoaded.run();
                 }
             }
         };
-
         loadingLoop.start();
         stage.setScene(loadingScene);
     }
 
     private Image loadImg(String path) {
-        return loadImg(path, 0, 0);
-    }
-
-    private Image loadImg(String path, double w, double h) {
-        java.io.InputStream is = getClass().getResourceAsStream(path);
-        if (is == null) {
-            System.err.println("❌ LỖI KHÔNG TÌM THẤY ẢNH: " + path);
-            throw new IllegalArgumentException("Missing image file: " + path);
+        java.io.InputStream stream = getClass().getResourceAsStream(path);
+        if (stream == null) {
+            throw new RuntimeException("Missing asset: " + path);
         }
-        return new Image(is, w, h, true, false);
-    }
-
-    public static int getGameWidth() {
-        return WIDTH;
-    }
-
-    public static int getGameHeight() {
-        return HEIGHT;
+        return new Image(stream, 0, 0, true, false);
     }
 
     public static void main(String[] args) {
