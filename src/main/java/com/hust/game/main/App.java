@@ -3,6 +3,7 @@ package com.hust.game.main;
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.dev.DevSettings;
+import com.hust.game.entities.ally.AllyManager;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
@@ -60,6 +61,7 @@ public class App extends Application {
     private GraphicsContext gc;
     private Player player;
     private CombatManager combatManager;
+    private AllyManager allyManager;
 
     private EnemyManager enemyManager; // Gọi quản lý quái vật
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
@@ -401,6 +403,9 @@ public class App extends Application {
                             }
 
                             combatManager.update();
+                            if (allyManager != null) {
+                                allyManager.update();
+                            }
                             gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
 
                             // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
@@ -451,6 +456,9 @@ public class App extends Application {
                 // Gom tất cả Entity lại để sắp xếp thứ tự vẽ (Y-Sorting)
                 List<BaseEntity> renderList = new ArrayList<>();
                 renderList.add(player);
+                if (allyManager != null && allyManager.getActiveMinion() != null) {
+                    renderList.add(allyManager.getActiveMinion());
+                }
                 
                 // Thêm Quái vật
                 for (Enemy e : enemyManager.getEnemyList()) {
@@ -539,6 +547,7 @@ public class App extends Application {
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
+                                    if (allyManager != null) allyManager.reset();
                                     input.clear(); // Chống kẹt nút
                                     fadeInTimer = 120;
                                 updateCameraZoom(1);
@@ -572,6 +581,7 @@ public class App extends Application {
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
+                                    if (allyManager != null) allyManager.reset();
                                     input.clear(); // Xóa các phím đang đè để tránh kẹt nút
                                     fadeInTimer = 120; // Kích hoạt lại hiệu ứng mờ dần sáng lên khi vào màn mới
                                 updateCameraZoom(gameManager.getCurrentLevelIndex());
@@ -828,6 +838,11 @@ public class App extends Application {
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
             combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
+            allyManager = new AllyManager(
+                    enemyManager.getEnemyList(),
+                    iDown, iUp, iLeft, iRight,
+                    cDown, cUp, cLeft, cRight,
+                    swordHit);
 
         } catch (Exception e) {
             System.err.println("LỖI: Không tìm thấy file ảnh!");
@@ -837,7 +852,7 @@ public class App extends Application {
         collisionChecker = new CollisionChecker(gameManager.getMap());
         combatManager.setCollisionChecker(collisionChecker);
         enemyManager.setCollisionChecker(collisionChecker);
-        hud = new HUD(player, combatManager, enemyManager.getEnemyList());
+        hud = new HUD(player, combatManager, enemyManager.getEnemyList(), allyManager);
     }
 
     private void handleInput() {
@@ -908,7 +923,11 @@ public class App extends Application {
 
         if (input.contains(KeyCode.K)) {
             if (!isKHeld) {
-                if (player.activateStoredMergeForm()) {
+                if (gameManager != null && gameManager.getCurrentLevelIndex() == 3 && allyManager != null) {
+                    if (allyManager.trySummon(player)) {
+                        com.hust.game.audio.SoundManager.playTransformSound();
+                    }
+                } else if (player.activateStoredMergeForm()) {
                     com.hust.game.audio.SoundManager.playTransformSound();
                 }
                 isKHeld = true;

@@ -3,6 +3,7 @@ package com.hust.game.ui;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.Enemy;
 import com.hust.game.enemy.FinalBoss;
+import com.hust.game.entities.ally.AllyManager;
 import com.hust.game.entities.player.Player;
 import java.util.List;
 import javafx.scene.canvas.GraphicsContext;
@@ -35,12 +36,14 @@ public class HUD {
     private final Player player;
     private final CombatManager combatManager;
     private final List<Enemy> enemies;
+    private final AllyManager allyManager;
 
     // ONE constructor that takes BOTH
-    public HUD(Player player, CombatManager combatManager, List<Enemy> enemies) {
+    public HUD(Player player, CombatManager combatManager, List<Enemy> enemies, AllyManager allyManager) {
         this.player = player;
         this.combatManager = combatManager;
         this.enemies = enemies;
+        this.allyManager = allyManager;
         loadAssets();
     }
 
@@ -218,6 +221,10 @@ public class HUD {
         gc.setGlobalAlpha(1.0);
         gc.drawImage(skillNhaphonBoxImg, nhaphonBoxX, nhaphonBoxY);
 
+        if (renderSummonSkillBox(gc, nhaphonBoxX, nhaphonBoxY)) {
+            return;
+        }
+
         boolean mergeActive = player.isMergeActive();
         boolean mergeReady = player.hasStoredMergeForm();
         boolean mergeCooldown = player.getMergeCooldownRemaining() > 0;
@@ -277,6 +284,53 @@ public class HUD {
         if (current >= max) return 0;
         int index = 5 - (int) Math.ceil(((double) current / max) * 5.0);
         return Math.max(0, Math.min(5, index));
+    }
+
+    private boolean renderSummonSkillBox(GraphicsContext gc, double boxX, double boxY) {
+        if (allyManager == null
+                || (!allyManager.hasLiveBoss()
+                && !allyManager.hasActiveMinion()
+                && allyManager.getSummonCooldownRemaining() <= 0)) {
+            return false;
+        }
+
+        int cooldown = allyManager.getSummonCooldownRemaining();
+        if (cooldown > 0) {
+            double ratio = cooldown / 1800.0;
+            double yOffset = (1.0 - ratio) * 53.0;
+
+            if (cooldownBoxImg != null) {
+                gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset,
+                        boxX, boxY + yOffset, 50.0, 53.0 - yOffset);
+            } else {
+                gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
+                gc.fillRect(boxX, boxY + yOffset, 50.0, 53.0 - yOffset);
+            }
+
+            drawSkillBoxText(gc, (int) Math.ceil(cooldown / 60.0) + "s", boxX, boxY);
+        } else if (allyManager.canSummon()) {
+            drawSkillBoxText(gc, "K", boxX, boxY);
+        } else if (allyManager.hasActiveMinion()) {
+            drawSkillBoxText(gc, "ON", boxX, boxY);
+        } else {
+            if (cooldownBoxImg != null) {
+                gc.drawImage(cooldownBoxImg, 0, 0, 50.0, 53.0, boxX, boxY, 50.0, 53.0);
+            } else {
+                gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.5));
+                gc.fillRect(boxX, boxY, 50.0, 53.0);
+            }
+        }
+
+        return true;
+    }
+
+    private void drawSkillBoxText(GraphicsContext gc, String text, double boxX, double boxY) {
+        gc.setFill(javafx.scene.paint.Color.WHITE);
+        gc.setStroke(javafx.scene.paint.Color.BLACK);
+        gc.setLineWidth(1.5);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+        gc.strokeText(text, boxX + 25.0, boxY + 26.5);
+        gc.fillText(text, boxX + 25.0, boxY + 26.5);
     }
 
     private void renderBossHealthBar(GraphicsContext gc, double screenWidth, double clusterY) {
