@@ -12,6 +12,7 @@ public class HUD {
     private Image manaImg;
     private Image healthPotionSheet;
     private Image manaPotionSheet;
+    private Image potionBoxImg;
     private Image berserkIcon;
     private Image coinSheet;
     private javafx.scene.text.Font pixelFont;
@@ -24,10 +25,12 @@ public class HUD {
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
 
     private static final int POTION_FRAMES = 8;
-    private static final double POTION_ICON_SIZE = 32.0;
-    private static final double POTION_TEXT_GAP = 6.0;
-    private static final double POTION_GROUP_GAP = 20.0;
-    private static final double POTION_OFFSET_X = -48.0;
+    private static final double POTION_PANEL_X = 6.0;
+    private static final double POTION_PANEL_Y_OFFSET = 78.0;
+    private static final double POTION_PANEL_WIDTH = 58.0;
+    private static final double POTION_PANEL_HEIGHT = 116.0;
+    private static final double POTION_SLOT_HEIGHT = POTION_PANEL_HEIGHT / 2.0;
+    private static final double POTION_ICON_SIZE = 30.0;
 
     private final Player player;
     private final CombatManager combatManager;
@@ -47,6 +50,7 @@ public class HUD {
         manaImg = loadImg("/assets/player_mana.png", RENDER_WIDTH * 6, RENDER_HEIGHT);
         healthPotionSheet = loadRawImg("/assets/items/health_potion.png");
         manaPotionSheet = loadRawImg("/assets/items/mana_potion.png");
+        potionBoxImg = loadRawImg("/assets/cmt_box.png");
         coinSheet = loadRawImg("/assets/items/coin.png");
 
         // Skill icon
@@ -96,7 +100,6 @@ public class HUD {
         gc.strokeText(hpText, textX, textY);
         gc.fillText(hpText, textX, textY);
 
-        renderPotionCounts(gc, drawX, drawY);
         renderCoins(gc, drawX, drawY);
 
         gc.restore();
@@ -108,7 +111,7 @@ public class HUD {
         if (combatManager != null) {
 
             // Vị trí icon skill: dưới avatar, cách lề trái 5px
-            double iconX = drawX + 5;
+            double iconX = drawX + POTION_PANEL_WIDTH + 16;
             double iconY = drawY + RENDER_HEIGHT; // Ngay dưới avatar
             double iconSize = 32.0; // Kích thước icon 32x32
 
@@ -141,6 +144,7 @@ public class HUD {
             }
         }
 
+        renderPotionPanel(gc, drawX, drawY);
         renderMergeStatus(gc, drawX, drawY);
     }
 
@@ -149,7 +153,7 @@ public class HUD {
             return;
         }
 
-        double textX = drawX + 5;
+        double textX = drawX + POTION_PANEL_WIDTH + 16;
         double textY = drawY + RENDER_HEIGHT + 54;
         String text = player.isMergeActive()
                 ? "TREE " + Math.max(1, (int) Math.ceil(player.getMergeDurationRemaining() / 60.0)) + "s"
@@ -179,44 +183,59 @@ public class HUD {
         return Math.max(0, Math.min(5, index));
     }
 
-    private void renderPotionCounts(GraphicsContext gc, double drawX, double drawY) {
+    private void renderPotionPanel(GraphicsContext gc, double drawX, double drawY) {
         if (healthPotionSheet == null || manaPotionSheet == null) {
             return;
         }
 
-        double manaBarRightX = drawX + RENDER_WIDTH + POTION_OFFSET_X;
-        double iconY = drawY + (RENDER_HEIGHT / 2.0) + 6.0;
+        double panelX = drawX + POTION_PANEL_X;
+        double panelY = drawY + POTION_PANEL_Y_OFFSET;
 
-        double frameW = healthPotionSheet.getWidth() / POTION_FRAMES;
-        double frameH = healthPotionSheet.getHeight();
+        gc.save();
+        if (potionBoxImg != null) {
+            gc.drawImage(potionBoxImg, panelX, panelY, POTION_PANEL_WIDTH, POTION_PANEL_HEIGHT);
+        } else {
+            gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
+            gc.fillRoundRect(panelX, panelY, POTION_PANEL_WIDTH, POTION_PANEL_HEIGHT, 10, 10);
+            gc.setStroke(javafx.scene.paint.Color.WHITE);
+            gc.setLineWidth(2.0);
+            gc.strokeRoundRect(panelX, panelY, POTION_PANEL_WIDTH, POTION_PANEL_HEIGHT, 10, 10);
+        }
 
-        double healthIconX = manaBarRightX;
-        gc.drawImage(healthPotionSheet, 0, 0, frameW, frameH,
-                healthIconX, iconY, POTION_ICON_SIZE, POTION_ICON_SIZE);
+        double separatorY = panelY + POTION_SLOT_HEIGHT;
+        gc.setStroke(javafx.scene.paint.Color.rgb(235, 220, 170, 0.75));
+        gc.setLineWidth(1.5);
+        gc.strokeLine(panelX + 7.0, separatorY, panelX + POTION_PANEL_WIDTH - 7.0, separatorY);
+
+        renderPotionSlot(gc, healthPotionSheet, player.getHealthPotionCount(), panelX, panelY);
+        renderPotionSlot(gc, manaPotionSheet, player.getManaPotionCount(), panelX, panelY + POTION_SLOT_HEIGHT);
+        gc.restore();
+    }
+
+    private void renderPotionSlot(GraphicsContext gc, Image sheet, int count, double slotX, double slotY) {
+        double frameW = sheet.getWidth() / POTION_FRAMES;
+        double frameH = sheet.getHeight();
+        double iconX = slotX + (POTION_PANEL_WIDTH - POTION_ICON_SIZE) / 2.0;
+        double iconY = slotY + 9.0;
+
+        if (count <= 0) {
+            gc.setGlobalAlpha(0.45);
+        }
+        gc.drawImage(sheet, 0, 0, frameW, frameH, iconX, iconY, POTION_ICON_SIZE, POTION_ICON_SIZE);
+        gc.setGlobalAlpha(1.0);
 
         gc.setFont(pixelFont);
         gc.setFill(javafx.scene.paint.Color.WHITE);
         gc.setStroke(javafx.scene.paint.Color.BLACK);
         gc.setLineWidth(1.0);
-        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
         gc.setTextBaseline(javafx.geometry.VPos.CENTER);
 
-        String healthCount = "x" + player.getHealthPotionCount();
-        double healthTextX = healthIconX + POTION_ICON_SIZE + POTION_TEXT_GAP;
-        double textY = iconY + POTION_ICON_SIZE / 2.0;
-        gc.strokeText(healthCount, healthTextX, textY);
-        gc.fillText(healthCount, healthTextX, textY);
-
-        double manaIconX = healthTextX + 24.0 + POTION_GROUP_GAP;
-        double manaFrameW = manaPotionSheet.getWidth() / POTION_FRAMES;
-        double manaFrameH = manaPotionSheet.getHeight();
-        gc.drawImage(manaPotionSheet, 0, 0, manaFrameW, manaFrameH,
-                manaIconX, iconY, POTION_ICON_SIZE, POTION_ICON_SIZE);
-
-        String manaCount = "x" + player.getManaPotionCount();
-        double manaTextX = manaIconX + POTION_ICON_SIZE + POTION_TEXT_GAP;
-        gc.strokeText(manaCount, manaTextX, textY);
-        gc.fillText(manaCount, manaTextX, textY);
+        String countText = "x" + count;
+        double textX = slotX + POTION_PANEL_WIDTH / 2.0;
+        double textY = slotY + POTION_SLOT_HEIGHT - 12.0;
+        gc.strokeText(countText, textX, textY);
+        gc.fillText(countText, textX, textY);
     }
 
     private void renderCoins(GraphicsContext gc, double drawX, double drawY) {

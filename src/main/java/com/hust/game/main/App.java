@@ -25,6 +25,8 @@ import com.hust.game.ui.LevelClearScreen;
 import com.hust.game.ui.TutorialCompleteScreen;
 import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
+import com.hust.game.ui.DisplaySettings;
+import com.hust.game.ui.ScaledSceneFactory;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -35,6 +37,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
@@ -111,6 +114,9 @@ public class App extends Application {
     public void start(Stage stage) {
         instance = this;
         stage.setTitle("GHOULITE");
+        stage.setResizable(true);
+        stage.setFullScreenExitHint("");
+        stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
 
         // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
         SoundManager.loadSounds();
@@ -122,7 +128,7 @@ public class App extends Application {
                 level -> {
                     stopMenuMusic();
                     Scene gameScene = createGameScene(stage, level);
-                    stage.setScene(gameScene);
+                    setAppScene(stage, gameScene);
                     gameLoop.start();
                 },
 
@@ -130,7 +136,7 @@ public class App extends Application {
                 v -> showSettings(stage, () -> showMenu(stage))
         );
 
-        stage.setScene(menu.createScene());
+        setAppScene(stage, menu.createScene());
         stage.show();
     }
     private void showMenu(Stage stage) {
@@ -141,23 +147,42 @@ public class App extends Application {
                 level -> {
                     stopMenuMusic();
                     Scene gameScene = createGameScene(stage, level);
-                    stage.setScene(gameScene);
+                    setAppScene(stage, gameScene);
                     gameLoop.start();
                 },
 
                 v -> showSettings(stage, () -> showMenu(stage))
         );
 
-        stage.setScene(menu.createScene());
+        setAppScene(stage, menu.createScene());
     }
 
     private void showSettings(Stage stage, Runnable onBack) {
         SettingsScreen settings = new SettingsScreen(
-                v -> onBack.run()
+                v -> onBack.run(),
+                mode -> applyDisplayMode(stage)
         );
 
-        stage.setScene(settings.createScene());
+        setAppScene(stage, settings.createScene());
     }
+
+    private void setAppScene(Stage stage, Scene scene) {
+        stage.setScene(scene);
+        applyDisplayMode(stage);
+    }
+
+    private void applyDisplayMode(Stage stage) {
+        boolean fullscreen = DisplaySettings.isFullscreen();
+        if (stage.isFullScreen() != fullscreen) {
+            stage.setFullScreen(fullscreen);
+        }
+
+        if (!fullscreen) {
+            stage.sizeToScene();
+            stage.centerOnScreen();
+        }
+    }
+
     private Scene createMenuScene(Stage stage) {
         Image startImg = loadImg("/assets/start.png");
         Image exitImg = loadImg("/assets/exit.png");
@@ -202,7 +227,7 @@ public class App extends Application {
         startBtn.setOnAction(e -> {
             stopMenuMusic();
             Scene gameScene = createGameScene(stage, 1);
-            stage.setScene(gameScene);
+            setAppScene(stage, gameScene);
             gameLoop.start();
         });
 
@@ -217,7 +242,7 @@ public class App extends Application {
 
         layout.setStyle("-fx-alignment: center; -fx-background-color: black;");
 
-        return new Scene(layout, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        return ScaledSceneFactory.createScene(layout);
     }
 
     private AnimationTimer gameLoop;
@@ -254,7 +279,7 @@ public class App extends Application {
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
         root.setStyle("-fx-background-color: black;"); // Đảm bảo toàn bộ khung viền cũng hiển thị đen 
-        Scene scene = new Scene(root);
+        Scene scene = ScaledSceneFactory.createScene(root);
 
         pauseScreen = new PauseScreen(
             () -> setPaused(false),
@@ -262,7 +287,7 @@ public class App extends Application {
             () -> {
                 if (gameLoop != null) gameLoop.stop();
                 showSettings(stage, () -> {
-                    stage.setScene(scene); // Khôi phục lại GameScene đang dở
+                    setAppScene(stage, scene); // Khôi phục lại GameScene đang dở
                     if (gameLoop != null) gameLoop.start();
                 });
             },
@@ -541,7 +566,7 @@ public class App extends Application {
                             () -> {
                                 isLevelClearUIShown = false;
                                 Scene newGame = createGameScene(stage, gameManager.getCurrentLevelIndex());
-                                stage.setScene(newGame);
+                                setAppScene(stage, newGame);
                                 gameLoop.start();
                             },
                             // Menu
@@ -605,7 +630,7 @@ public class App extends Application {
                                     isEndUIShown = false;
                                     int retryLevel = isVictory ? 1 : gameManager.getCurrentLevelIndex();
                                     Scene newGame = createGameScene(stage, retryLevel);
-                                    stage.setScene(newGame);
+                                    setAppScene(stage, newGame);
                                     gameLoop.start();
                                 },
 
@@ -1257,7 +1282,7 @@ public class App extends Application {
                 App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
                 App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
             }
-            stage.setScene(nextScene);
+            setAppScene(stage, nextScene);
             onLoaded.run();
             return;
         }
@@ -1267,7 +1292,7 @@ public class App extends Application {
         Canvas canvas = new Canvas(WIDTH, HEIGHT);
         GraphicsContext gc = canvas.getGraphicsContext2D();
         root.getChildren().add(canvas);
-        Scene loadingScene = new Scene(root, WIDTH, HEIGHT);
+        Scene loadingScene = ScaledSceneFactory.createScene(root);
 
         Image bgSheet = loadImg("/assets/menu_background.png");
         Image loadingBallSheet = loadImg("/assets/loading_ball.png");
@@ -1390,14 +1415,14 @@ public class App extends Application {
                         App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
                     }
 
-                    stage.setScene(nextScene);
+                    setAppScene(stage, nextScene);
                     onLoaded.run();
                 }
             }
         };
 
         loadingLoop.start();
-        stage.setScene(loadingScene);
+        setAppScene(stage, loadingScene);
     }
 
     private Image loadImg(String path) {
