@@ -65,7 +65,7 @@ public class Npc extends StaticEntity {
 
     public Npc(double x, double y, Image idle1, Image idle2, Image idle3,
             Image dialogue, Image approval, Image manaPotion, Image healthPotion) {
-        super(x, y, idle1, 6, GameConstants.TILE_SIZE * 2, GameConstants.TILE_SIZE * 2); // idle1 có 6 frames, x2 kích thước
+        super(x, y, idle1, 6, 64, 64); // idle1 có 6 frames, kích thước 64x64
         this.idle1 = idle1;
         this.idle2 = idle2;
         this.idle3 = idle3;
@@ -163,6 +163,7 @@ public class Npc extends StaticEntity {
         if (!canStartInteraction()) {
             return;
         }
+        com.hust.game.audio.SoundManager.playInteractSound();
         state = State.MENU;
         panelState = PanelState.APPEARING;
         panelAnimTimer = 0;
@@ -175,6 +176,7 @@ public class Npc extends StaticEntity {
             dialogueVisibleChars = 0;
             dialogueTimer = 0;
             setSheet(idle1);
+            com.hust.game.audio.SoundManager.playLine1Sound();
         } else if (state == State.SHOP) {
             buyPotion(player, true);
         }
@@ -196,6 +198,7 @@ public class Npc extends StaticEntity {
         }
 
         if (!player.spendCoins(POTION_PRICE_COINS)) {
+            com.hust.game.audio.SoundManager.playCantBuySound();
             showFeedback("Không đủ xu");
             return;
         }
@@ -207,6 +210,8 @@ public class Npc extends StaticEntity {
             return;
         }
 
+        com.hust.game.audio.SoundManager.playCoinSound();
+        com.hust.game.audio.SoundManager.playBuySuccessRandomSound();
         showFeedback(mana ? "Đã mua Mana Potion" : "Đã mua Health Potion");
     }
 

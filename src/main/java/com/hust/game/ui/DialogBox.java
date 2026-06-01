@@ -26,6 +26,11 @@ public class DialogBox {
     private int visibleTimer = 0;
     private int maxVisibleTime = -1; // -1 nghĩa là hiển thị vô hạn tới khi gọi hide()
 
+    // Hiệu ứng chữ chạy (Typewriter)
+    private int visibleChars = 0;
+    private int textTimer = 0;
+    private static final int TEXT_DELAY = 2; // Số frame để hiện 1 chữ
+
     public DialogBox() {
         try {
             boxImage = new Image(getClass().getResourceAsStream("/assets/cmt_box.png"));
@@ -34,9 +39,10 @@ public class DialogBox {
         }
         
         try {
-            font = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 36);
+            // Đổi font chữ xuống cỡ 28 cho giống màn tutorial
+            font = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
         } catch (Exception e) {}
-        if (font == null) font = Font.font("Arial", FontWeight.BOLD, 36);
+        if (font == null) font = Font.font("Arial", FontWeight.BOLD, 28);
         
         // Kích thước gốc 1280x320 hơi to, ta scale xuống để vừa vặn cửa sổ 1440
         renderWidth = 1000;
@@ -50,6 +56,8 @@ public class DialogBox {
         this.currentText = text;
         this.maxVisibleTime = durationFrames;
         this.visibleTimer = 0;
+        this.visibleChars = 0;
+        this.textTimer = 0;
         this.state = State.APPEARING;
         this.animTimer = 0;
     }
@@ -79,6 +87,15 @@ public class DialogBox {
                 state = State.HIDDEN;
             }
         } else if (state == State.VISIBLE) {
+            // Typewriter effect
+            if (visibleChars < currentText.length()) {
+                textTimer++;
+                if (textTimer >= TEXT_DELAY) {
+                    textTimer = 0;
+                    visibleChars++;
+                }
+            }
+
             if (maxVisibleTime > 0) {
                 visibleTimer++;
                 if (visibleTimer >= maxVisibleTime) {
@@ -110,25 +127,35 @@ public class DialogBox {
         gc.drawImage(boxImage, drawX, drawY, renderWidth, renderHeight);
         
         // Vẽ chữ căn giữa (truyền toạ độ và chiều rộng hộp thoại)
-        renderRichText(gc, currentText, drawX, drawY + 70, renderWidth);
+        renderRichText(gc, currentText, drawX, drawY + 80, renderWidth);
     }
     
-    private void renderRichText(GraphicsContext gc, String text, double boxX, double boxY, double boxWidth) {
+    private void renderRichText(GraphicsContext gc, String fullText, double boxX, double boxY, double boxWidth) {
         gc.setFont(font);
-        gc.setLineWidth(3.0); // Làm viền đen dày hơn
+        gc.setLineWidth(2.5);
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT); // CHỐT CĂN TRÁI ĐỂ KHÔNG BỊ LỆCH KHI TÍNH TOẠ ĐỘ X
         gc.setTextBaseline(javafx.geometry.VPos.TOP); // Đỉnh chữ trùng với tọa độ Y
         
         double currentY = boxY;
-        String[] lines = text.split("\n"); // Tự động ngắt dòng nếu có \n
         
-        for (String line : lines) {
-            // Loại bỏ ngoặc vuông để tính toán chính xác bề rộng của dòng chữ
-            String rawLine = line.replace("[", "").replace("]", "");
-            javafx.scene.text.Text tempNode = new javafx.scene.text.Text(rawLine);
+        // Cắt string theo số lượng ký tự đã hiển thị (Typewriter effect)
+        int charsToDraw = Math.min(visibleChars, fullText.length());
+        String visibleText = fullText.substring(0, charsToDraw);
+        
+        String[] lines = visibleText.split("\n", -1); // Tự động ngắt dòng nếu có \n
+        String[] fullLines = fullText.split("\n", -1); // Dùng fullLines để lấy độ dài tĩnh, tránh text bị nở ra từ giữa
+        
+        for (int lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+            String line = lines[lineIndex];
+            String fullLine = fullLines[lineIndex];
+            
+            // Loại bỏ ngoặc vuông để tính toán chính xác bề rộng của dòng chữ CHUẨN (full length)
+            String rawFullLine = fullLine.replace("[", "").replace("]", "");
+            javafx.scene.text.Text tempNode = new javafx.scene.text.Text(rawFullLine);
             tempNode.setFont(font);
             double lineWidth = tempNode.getLayoutBounds().getWidth();
             
-            // Căn giữa trục X
+            // Căn giữa trục X dựa trên độ dài TỔNG của dòng, giúp chữ không bị chạy từ giữa ra 2 bên
             double currentX = boxX + (boxWidth - lineWidth) / 2.0;
             
             boolean isHighlight = false;
@@ -156,9 +183,10 @@ public class DialogBox {
             if (currentPart.length() > 0) {
                 drawTextPart(gc, currentPart.toString(), currentX, currentY, isHighlight ? Color.ORANGE : Color.WHITE);
             }
-            currentY += 55; // Line height
+            currentY += 40; // Giãn dòng 40px cho font size 28
         }
-        gc.setTextBaseline(javafx.geometry.VPos.BASELINE); // Khôi phục cài đặt mặc định
+        // Khôi phục cài đặt mặc định
+        gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
     }
     
     private double drawTextPart(GraphicsContext gc, String part, double x, double y, Color fill) {

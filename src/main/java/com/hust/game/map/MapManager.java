@@ -33,14 +33,11 @@ public class MapManager {
         mapTileNumLayer2 = new int[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
         loadTiles();
         
-        // Tái sử dụng map Level 2 cho màn Final Boss (Level 3)
-        String mapPath = (level == 3) ? "/assets/maps/level2.txt" : "/assets/maps/level" + level + ".txt";
+        String mapPath = "/assets/maps/level" + level + ".txt";
         loadMap(mapPath);
         
-        String layer2Path = (level == 3) ? null : "/assets/maps/level" + level + "_layer2.txt";
-        if (layer2Path != null) {
-            loadMapLayer2(layer2Path);
-        }
+        String layer2Path = "/assets/maps/level" + level + "_layer2.txt";
+        loadMapLayer2(layer2Path);
     }
 
     public void loadTiles() {

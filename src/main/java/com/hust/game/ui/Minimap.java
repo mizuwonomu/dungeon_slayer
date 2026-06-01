@@ -44,7 +44,7 @@ public class Minimap {
 
         // ===== PLAYER ICON =====
         ImageView playerDot = new ImageView(
-                imageLoader.apply("/assets/berserk.png")
+                imageLoader.apply("/assets/avatar.png")
         );
 
         playerDot.setFitWidth(20);
