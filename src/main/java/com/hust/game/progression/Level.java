@@ -20,6 +20,14 @@ public class Level {
     private static final int HEIGHT = 624; // 13 * 48
     private static final int TILE_SIZE = GameConstants.TILE_SIZE;
     private static final int LEVEL1_TEST_ENEMY_LIMIT = 2;
+    private static final int[][] LEVEL1_TREE_TEST_SPAWNS = {
+            {15, 16},
+            {18, 16},
+            {21, 16},
+            {15, 18},
+            {18, 18},
+            {21, 18}
+    };
     private static final long LEVEL1_NPC_SEED = 1001L;
 
     private int lvlID;
@@ -197,6 +205,8 @@ public class Level {
                 e.setHarmless(true);
             }
         } else if(lvlID == 1){
+            spawnLevel1TestTrees();
+
             // --- THUẬT TOÁN SINH QUÁI THÔNG MINH CHO LEVEL 1 ---
             
             // 1. Flood Fill (BFS) để tìm tất cả các ô có thể đi tới được từ vị trí spawn của Player
@@ -285,6 +295,14 @@ public class Level {
         else if (lvlID == 3) {
             // Spawn boss ở ô (31, 20)
             enemyManager.spawnEnemy("FinalBoss", 30 * TILE_SIZE, 19 * TILE_SIZE, bossImg, 5, TILE_SIZE * 3, TILE_SIZE * 3, player);
+        }
+    }
+
+    private void spawnLevel1TestTrees() {
+        for (int[] pos : LEVEL1_TREE_TEST_SPAWNS) {
+            double spawnX = pos[0] * TILE_SIZE;
+            double spawnY = (pos[1] - 1) * TILE_SIZE;
+            enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, 96, 96, player, treeSkillImg);
         }
     }
 

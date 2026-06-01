@@ -300,7 +300,7 @@ public class MenuScreen {
         menuLoop.start();
 
         // Dừng loop khi scene bị thay thế (tránh memory leak)
-        Scene scene = new Scene(root, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        Scene scene = ScaledSceneFactory.createScene(root);
         scene.windowProperty().addListener((obs, oldWin, newWin) -> {
             if (newWin == null) menuLoop.stop();
         });

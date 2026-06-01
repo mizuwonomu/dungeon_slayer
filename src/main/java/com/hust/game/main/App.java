@@ -26,7 +26,8 @@ import com.hust.game.ui.LevelClearScreen;
 import com.hust.game.ui.TutorialCompleteScreen;
 import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
-import com.hust.game.ui.Minimap;
+import com.hust.game.ui.DisplaySettings;
+import com.hust.game.ui.ScaledSceneFactory;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -37,6 +38,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCombination;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
@@ -173,6 +175,9 @@ public class App extends Application {
     public void start(Stage stage) {
         instance = this;
         stage.setTitle("GHOULITE");
+        stage.setResizable(true);
+        stage.setFullScreenExitHint("");
+        stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
 
         // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
         SoundManager.loadSounds();
@@ -183,7 +188,7 @@ public class App extends Application {
                 // START
                 level -> {
                     Scene gameScene = createGameScene(stage, level);
-                    stage.setScene(gameScene);
+                    setAppScene(stage, gameScene);
                     gameLoop.start();
                 },
 
@@ -191,7 +196,7 @@ public class App extends Application {
                 v -> showSettings(stage, () -> showMenu(stage))
         );
 
-        stage.setScene(menu.createScene());
+        setAppScene(stage, menu.createScene());
         stage.show();
     }
     private void showMenu(Stage stage) {
@@ -201,23 +206,42 @@ public class App extends Application {
 
                 level -> {
                     Scene gameScene = createGameScene(stage, level);
-                    stage.setScene(gameScene);
+                    setAppScene(stage, gameScene);
                     gameLoop.start();
                 },
 
                 v -> showSettings(stage, () -> showMenu(stage))
         );
 
-        stage.setScene(menu.createScene());
+        setAppScene(stage, menu.createScene());
     }
 
     private void showSettings(Stage stage, Runnable onBack) {
         SettingsScreen settings = new SettingsScreen(
-                v -> onBack.run()
+                v -> onBack.run(),
+                mode -> applyDisplayMode(stage)
         );
 
-        stage.setScene(settings.createScene());
+        setAppScene(stage, settings.createScene());
     }
+
+    private void setAppScene(Stage stage, Scene scene) {
+        stage.setScene(scene);
+        applyDisplayMode(stage);
+    }
+
+    private void applyDisplayMode(Stage stage) {
+        boolean fullscreen = DisplaySettings.isFullscreen();
+        if (stage.isFullScreen() != fullscreen) {
+            stage.setFullScreen(fullscreen);
+        }
+
+        if (!fullscreen) {
+            stage.sizeToScene();
+            stage.centerOnScreen();
+        }
+    }
+
     private Scene createMenuScene(Stage stage) {
         Image startImg = loadImg("/assets/start.png");
         Image exitImg = loadImg("/assets/exit.png");
@@ -261,7 +285,7 @@ public class App extends Application {
 
         startBtn.setOnAction(e -> {
             Scene gameScene = createGameScene(stage, 1);
-            stage.setScene(gameScene);
+            setAppScene(stage, gameScene);
             gameLoop.start();
         });
 
@@ -276,7 +300,7 @@ public class App extends Application {
 
         layout.setStyle("-fx-alignment: center; -fx-background-color: black;");
 
-        return new Scene(layout, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        return ScaledSceneFactory.createScene(layout);
     }
 
     private AnimationTimer gameLoop;
@@ -306,11 +330,27 @@ public class App extends Application {
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
         root.setStyle("-fx-background-color: black;"); // Đảm bảo toàn bộ khung viền cũng hiển thị đen 
-        Scene scene = new Scene(root);
+        Scene scene = ScaledSceneFactory.createScene(root);
 
-        // Nút pause dummy tạm thời trong lúc load, sẽ gán lại khi load xong
-        pauseScreen = new PauseScreen(()->{}, ()->{}, ()->{}); 
-
+        pauseScreen = new PauseScreen(
+            () -> setPaused(false),
+            // Nút SETTINGS: Tạm tắt logic GameLoop đi để tránh hao CPU, khi quay lại (onBack) thì bật lại GameLoop
+            () -> {
+                if (gameLoop != null) gameLoop.stop();
+                showSettings(stage, () -> {
+                    setAppScene(stage, scene); // Khôi phục lại GameScene đang dở
+                    if (gameLoop != null) gameLoop.start();
+                });
+            },
+            () -> {
+                setPaused(false);
+                    if (gameLoop != null) {
+                        gameLoop.stop();
+                    }
+                showMenu(stage);
+            }
+        );
+        
         Image pauseBtnSheet = loadImg("/assets/pause.png");
         StackPane pauseBtn = createSpriteBtn(pauseBtnSheet, 3, 0.5, () -> togglePause(stage)); // Thu nhỏ nút xuống 50% (còn 64x64)
         StackPane.setAlignment(pauseBtn, javafx.geometry.Pos.TOP_RIGHT); // Căn sát góc trên bên phải
@@ -863,7 +903,7 @@ public class App extends Application {
                             () -> {
                                 isLevelClearUIShown = false;
                                 Scene newGame = createGameScene(stage, gameManager.getCurrentLevelIndex());
-                                stage.setScene(newGame);
+                                setAppScene(stage, newGame);
                                 gameLoop.start();
                             },
                             // Menu
@@ -923,7 +963,7 @@ public class App extends Application {
                                     isEndUIShown = false;
                                     int retryLevel = isVictory ? 1 : gameManager.getCurrentLevelIndex();
                                     Scene newGame = createGameScene(stage, retryLevel);
-                                    stage.setScene(newGame);
+                                    setAppScene(stage, newGame);
                                     gameLoop.start();
                                 },
 
@@ -1623,12 +1663,175 @@ public class App extends Application {
         }
     }
 
-        private Image loadImg(String path) {
-        java.io.InputStream stream = getClass().getResourceAsStream(path);
-        if (stream == null) {
-            throw new RuntimeException("Missing asset: " + path);
+    private void showLoadingScreen(Stage stage, Scene nextScene, Runnable onLoaded) {
+        if (DevSettings.shouldSkipLoadingScreens()) {
+            if (App.this.gc != null) {
+                App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
+                App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
+                App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
+            }
+            setAppScene(stage, nextScene);
+            onLoaded.run();
+            return;
         }
-        return new Image(stream, 0, 0, true, false);
+
+        StackPane root = new StackPane();
+        root.setStyle("-fx-background-color: black;");
+        Canvas canvas = new Canvas(WIDTH, HEIGHT);
+        GraphicsContext gc = canvas.getGraphicsContext2D();
+        root.getChildren().add(canvas);
+        Scene loadingScene = ScaledSceneFactory.createScene(root);
+
+        Image bgSheet = loadImg("/assets/menu_background.png");
+        Image loadingBallSheet = loadImg("/assets/loading_ball.png");
+
+        javafx.scene.text.Font hintFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
+        if (hintFont == null) {
+            hintFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 28);
+        }
+        final javafx.scene.text.Font finalHintFont = hintFont;
+
+        String[] hints = {
+            "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
+            "Sử dụng cuồng nộ có thể x2 sát thương đó!",
+            "Phát triển bởi nhóm 27 Ộ Ô Pi!",
+            "Slime là sinh vật chạm vào thôi là mất máu!",
+            "Cái cây có tầm đánh y như player! Cẩn thận!",
+            "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
+        };
+        int[] hintIndex = { (int) (Math.random() * hints.length) };
+        String[] selectedHint = { hints[hintIndex[0]] };
+
+        int[] loadingTimer = { 0 };
+        int[] hintTimer = { 0 };
+        double[] bgAlpha = { 0.0 };
+
+        root.setOnMouseClicked(e -> {
+            hintTimer[0] = 0;
+            hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+            selectedHint[0] = hints[hintIndex[0]];
+        });
+
+        AnimationTimer loadingLoop = new AnimationTimer() {
+            @Override
+            public void handle(long now) {
+                loadingTimer[0]++;
+                hintTimer[0]++;
+
+                // Random chữ sau mỗi 5 giây giống ngoài menu
+                if (hintTimer[0] >= 300) {
+                    hintTimer[0] = 0;
+                    hintIndex[0] = (hintIndex[0] + 1) % hints.length;
+                    selectedHint[0] = hints[hintIndex[0]];
+                }
+
+                // Hiệu ứng mờ dần (Fade In - Fade Out)
+                if (loadingTimer[0] < 30) {
+                    bgAlpha[0] += 0.01;
+                    if (bgAlpha[0] > 0.3) bgAlpha[0] = 0.3; // Nền mờ 0.3 để không bị chói
+                } else if (loadingTimer[0] > 540) {
+                    bgAlpha[0] -= 0.02;
+                    if (bgAlpha[0] < 0) bgAlpha[0] = 0;
+                }
+
+                gc.clearRect(0, 0, WIDTH, HEIGHT);
+                gc.setFill(javafx.scene.paint.Color.BLACK);
+                gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+                gc.save();
+                gc.setGlobalAlpha(bgAlpha[0]);
+
+                int bgFrameIndex = (loadingTimer[0] / 64) % 4;
+                double sx = bgFrameIndex * 1838.0;
+
+                double scale = Math.max((double) WIDTH / 1838.0, (double) HEIGHT / 1079.0);
+                double drawW = 1838.0 * scale;
+                double drawH = 1079.0 * scale;
+                double drawX = (WIDTH - drawW) / 2.0;
+                double drawY = (HEIGHT - drawH) / 2.0;
+
+                gc.drawImage(bgSheet, sx, 0, 1838.0, 1079.0, drawX, drawY, drawW, drawH);
+                gc.restore();
+
+                // Xử lý vẽ quả bóng Loading Ball và Hints
+                double loadingAlpha = 1.0;
+                if (loadingTimer[0] < 60) {
+                    loadingAlpha = loadingTimer[0] / 60.0;
+                } else if (loadingTimer[0] >= 540) {
+                    loadingAlpha = Math.max(0.0, bgAlpha[0] / 0.3);
+                }
+                gc.setGlobalAlpha(loadingAlpha);
+
+                double ballW = 80, ballH = 80, spacing = 20;
+                double startX = WIDTH - 50 - (4 * ballW + 3 * spacing);
+                double startY = HEIGHT - 50 - ballH;
+
+                int t = loadingTimer[0];
+                int b1 = (t < 60) ? (t / 15) : 4;
+                int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
+                int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
+                int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
+
+                int[] ballFrames = {b1, b2, b3, b4};
+
+                for (int i = 0; i < 4; i++) {
+                    double drawBallX = startX + i * (ballW + spacing);
+                    double frameX = Math.min(4, ballFrames[i]) * 160.0;
+                    gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
+                }
+
+                gc.setFont(finalHintFont);
+                gc.setFill(javafx.scene.paint.Color.WHITE);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+                double textCenterX = (20 + (startX + 20)) / 2.0;
+                double textCenterY = startY + ballH / 2.0;
+                gc.fillText(selectedHint[0], textCenterX, textCenterY);
+                gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+                
+                gc.setGlobalAlpha(1.0);
+
+                // Khi chạy xong 540 + x frame (đã tối đen) -> Hoàn tất Scene
+                if (loadingTimer[0] > 540 && bgAlpha[0] <= 0) {
+                    this.stop();
+                    
+                    // Xoá nền Map cũ của Scene trước khi đẩy lại vào Stage để tránh chớp nháy khung hình
+                    if (App.this.gc != null) {
+                        App.this.gc.clearRect(0, 0, WIDTH, HEIGHT);
+                        App.this.gc.setFill(javafx.scene.paint.Color.BLACK);
+                        App.this.gc.fillRect(0, 0, WIDTH, HEIGHT);
+                    }
+
+                    setAppScene(stage, nextScene);
+                    onLoaded.run();
+                }
+            }
+        };
+
+        loadingLoop.start();
+        setAppScene(stage, loadingScene);
+    }
+
+    private Image loadImg(String path) {
+        return loadImg(path, 0, 0);
+    }
+
+    private Image loadImg(String path, double w, double h) {
+        java.io.InputStream is = getClass().getResourceAsStream(path);
+        if (is == null) {
+            System.err.println("❌ LỖI KHÔNG TÌM THẤY ẢNH: " + path);
+            throw new IllegalArgumentException("Missing image file: " + path);
+        }
+        return new Image(is, w, h, true, false);
+    }
+
+    public static int getGameWidth() {
+        return WIDTH;
+    }
+
+    public static int getGameHeight() {
+        return HEIGHT;
     }
 
     public static void main(String[] args) {

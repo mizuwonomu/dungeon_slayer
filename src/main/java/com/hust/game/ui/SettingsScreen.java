@@ -27,6 +27,7 @@ import java.util.function.Consumer;
 public class SettingsScreen {
 
     private final Consumer<Void> onBack;
+    private final Consumer<DisplaySettings.WindowMode> onWindowModeChange;
 
     // -------------------------------------------------------
     // BACKGROUND — dùng lại sprite sheet của menu
@@ -45,8 +46,9 @@ public class SettingsScreen {
     private int bgmLevel;
     private int sfxLevel;
 
-    public SettingsScreen(Consumer<Void> onBack) {
+    public SettingsScreen(Consumer<Void> onBack, Consumer<DisplaySettings.WindowMode> onWindowModeChange) {
         this.onBack = onBack;
+        this.onWindowModeChange = onWindowModeChange;
         // Đồng bộ mức âm lượng hiện tại khi mở cài đặt
         this.bgmLevel = (int) Math.round(SoundManager.getBgmVolume() * 100);
         this.sfxLevel = (int) Math.round(SoundManager.getSfxVolume() * 100);
@@ -78,9 +80,9 @@ public class SettingsScreen {
         title.setStroke(Color.BLACK);
         title.setStrokeWidth(2.0);
 
-        Font labelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 36);
+        Font labelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 30);
         if (labelFont == null) {
-            labelFont = Font.font("Arial", FontWeight.BOLD, 36);
+            labelFont = Font.font("Arial", FontWeight.BOLD, 30);
         }
 
         // -------------------------------------------------------
@@ -92,9 +94,9 @@ public class SettingsScreen {
         bgmLabel.setStroke(Color.BLACK);
         bgmLabel.setStrokeWidth(1.5);
 
-        StackPane bgmBtn = createSpriteBtn(String.valueOf(bgmLevel), buttonSheet, 3, 0.8, () -> {});
+        StackPane bgmBtn = createSpriteBtn(String.valueOf(bgmLevel), buttonSheet, 3, 0.55, () -> {});
 
-        StackPane bgmMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
+        StackPane bgmMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.35, () -> {
             if (bgmLevel > 0) {
                 bgmLevel -= 10;
                 ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
@@ -103,7 +105,7 @@ public class SettingsScreen {
             }
         });
 
-        StackPane bgmPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
+        StackPane bgmPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.35, () -> {
             if (bgmLevel < 100) {
                 bgmLevel += 10;
                 ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
@@ -126,9 +128,9 @@ public class SettingsScreen {
         sfxLabel.setStroke(Color.BLACK);
         sfxLabel.setStrokeWidth(1.5);
 
-        StackPane sfxBtn = createSpriteBtn(String.valueOf(sfxLevel), buttonSheet, 3, 0.8, () -> {});
+        StackPane sfxBtn = createSpriteBtn(String.valueOf(sfxLevel), buttonSheet, 3, 0.55, () -> {});
 
-        StackPane sfxMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
+        StackPane sfxMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.35, () -> {
             if (sfxLevel > 0) {
                 sfxLevel -= 10;
                 ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
@@ -136,7 +138,7 @@ public class SettingsScreen {
             }
         });
 
-        StackPane sfxPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
+        StackPane sfxPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.35, () -> {
             if (sfxLevel < 100) {
                 sfxLevel += 10;
                 ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
@@ -150,14 +152,39 @@ public class SettingsScreen {
         sfxBox.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------
+        // DISPLAY MODE ROW
+        // -------------------------------------------------------
+        javafx.scene.text.Text displayLabel = new javafx.scene.text.Text("Chế độ màn hình");
+        displayLabel.setFont(labelFont);
+        displayLabel.setFill(Color.WHITE);
+        displayLabel.setStroke(Color.BLACK);
+        displayLabel.setStrokeWidth(1.5);
+
+        StackPane displayModeBtn = createSpriteBtn(DisplaySettings.getWindowModeLabel(), buttonSheet, 3, 0.85, () -> {});
+        Text displayModeText = (Text) displayModeBtn.getChildren().get(1);
+        displayModeBtn.setOnMouseClicked(e -> {
+            DisplaySettings.WindowMode nextMode = DisplaySettings.isFullscreen()
+                    ? DisplaySettings.WindowMode.WINDOWED
+                    : DisplaySettings.WindowMode.FULLSCREEN;
+            DisplaySettings.setWindowMode(nextMode);
+            displayModeText.setText(DisplaySettings.getWindowModeLabel());
+            onWindowModeChange.accept(nextMode);
+        });
+
+        HBox displayRow = new HBox(10, displayModeBtn);
+        displayRow.setAlignment(Pos.CENTER);
+        VBox displayBox = new VBox(5, displayLabel, displayRow);
+        displayBox.setAlignment(Pos.CENTER);
+
+        // -------------------------------------------------------
         // NÚT BACK VỀ MENU
         // -------------------------------------------------------
-        StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.8, () -> onBack.accept(null));
+        StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.7, () -> onBack.accept(null));
 
         // -------------------------------------------------------
         // LAYOUT TỔNG — Title → Sound Row → Back, canh giữa màn hình
         // -------------------------------------------------------
-        VBox uiBox = new VBox(20, title, bgmBox, sfxBox, menuBtn);
+        VBox uiBox = new VBox(12, title, bgmBox, sfxBox, displayBox, menuBtn);
         uiBox.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------
@@ -220,7 +247,7 @@ public class SettingsScreen {
         bgLoop.start();
 
         // Dừng loop khi scene bị thay thế (tránh memory leak)
-        Scene scene = new Scene(root, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        Scene scene = ScaledSceneFactory.createScene(root);
         scene.windowProperty().addListener((obs, oldWin, newWin) -> {
             if (newWin == null) bgLoop.stop();
         });
@@ -250,14 +277,15 @@ public class SettingsScreen {
         
         if (textNode != null) {
             if ("+".equals(btnText) || "-".equals(btnText)) {
-                textNode.setFont(Font.font("Consolas", FontWeight.BOLD, 60));
+                textNode.setFont(Font.font("Consolas", FontWeight.BOLD, 46));
                 textNode.setFill(Color.BLACK);
                 textNode.setStroke(Color.WHITE);
                 textNode.setStrokeWidth(2.0);
             } else {
-                Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 46);
+                double fontSize = btnText.length() > 8 ? 30 : 36;
+                Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), fontSize);
                 if (pixelFont == null) {
-                    pixelFont = Font.font("Arial", FontWeight.BOLD, 46);
+                    pixelFont = Font.font("Arial", FontWeight.BOLD, fontSize);
                 }
                 textNode.setFont(pixelFont);
                 textNode.setFill(Color.RED);

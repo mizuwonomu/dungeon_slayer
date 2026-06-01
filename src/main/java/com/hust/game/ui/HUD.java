@@ -43,7 +43,14 @@ public class HUD {
 
     private static final double RENDER_WIDTH = FRAME_WIDTH * SCALE;
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
-    
+
+    private static final int POTION_FRAMES = 8;
+    private static final double POTION_PANEL_X = 6.0;
+    private static final double POTION_PANEL_Y_OFFSET = 78.0;
+    private static final double POTION_PANEL_WIDTH = 58.0;
+    private static final double POTION_PANEL_HEIGHT = 116.0;
+    private static final double POTION_SLOT_HEIGHT = POTION_PANEL_HEIGHT / 2.0;
+    private static final double POTION_ICON_SIZE = 30.0;
 
     private final Player player;
     private final CombatManager combatManager;
