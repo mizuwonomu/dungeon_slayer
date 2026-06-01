@@ -3,6 +3,7 @@ package com.hust.game.main;
 import com.hust.game.audio.SoundManager;
 import com.hust.game.constants.GameConstants;
 import com.hust.game.dev.DevSettings;
+import com.hust.game.entities.ally.AllyManager;
 import com.hust.game.entities.base.BaseEntity;
 import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
@@ -56,12 +57,13 @@ public class App extends Application {
     private static final int TILE_SIZE = 48;
     private AnimationTimer timer;
 
-    // Độ zoom camera (1.0 = gốc)
-    private static final double ZOOM = 1.0;
+    // Độ zoom camera (Sẽ thay đổi theo màn chơi)
+    private static double ZOOM = 1.0;
 
     private GraphicsContext gc;
     private Player player;
     private CombatManager combatManager;
+    private AllyManager allyManager;
 
     private EnemyManager enemyManager; // Gọi quản lý quái vật
     private List<BaseEntity> obstacles = new ArrayList<>(); // danh sách vật cản
@@ -88,11 +90,58 @@ public class App extends Application {
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
+    private boolean isMinimapOpen = false;
+    private Minimap minimapUI;
+    private boolean isCutsceneActive = false;
+    private com.hust.game.ui.DialogBox globalDialog;
 
     // Camera position
     private double cameraX = 0;
     private double cameraY = 0;
-    private int fadeInTimer = 0; // Bộ đếm thời gian fade-in khi vào màn (120 frame = 2s)
+
+    private volatile boolean isDataLoaded = false;
+    private int realLoadingTimer = 0;
+    private int realLoadingHintTimer = 0;
+    private int realLoadingHintIndex = 0;
+    private boolean isLoadingPhase = false;
+    private String[] realLoadingHints = {
+        "Sử dụng WASD để di chuyển, J để tấn công, L để bật cuồng nộ!",
+        "Sử dụng cuồng nộ có thể x2 sát thương đó!",
+        "Phát triển bởi nhóm 27 Ộ Ô Pi!",
+        "Slime là sinh vật chạm vào thôi là mất máu!",
+        "Cái cây có tầm đánh y như player! Cẩn thận!",
+        "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
+    };
+    private Image loadingBgSheet;
+    private Image loadingBallSheet;
+    private javafx.scene.text.Font loadingHintFont;
+    private int nextLevelToLoadMusic = -1;
+    private Image backScreenImg;
+    private int loadedFrames = 0;
+    
+    private void startLoadingPhase(int level) {
+        if (DevSettings.shouldSkipLoadingScreens()) {
+            playInGameMusic(level);
+            isLoadingPhase = false;
+            return;
+        }
+        isLoadingPhase = true;
+        realLoadingTimer = 0;
+        loadedFrames = 0;
+        realLoadingHintTimer = 0;
+        realLoadingHintIndex = (int) (Math.random() * realLoadingHints.length);
+        nextLevelToLoadMusic = level;
+        
+        if (loadingBgSheet == null) {
+            loadingBgSheet = loadImg("/assets/menu_background.png");
+            loadingBallSheet = loadImg("/assets/loading_ball.png");
+            loadingHintFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 28);
+            if (loadingHintFont == null) {
+                loadingHintFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 28);
+            }
+        }
+    }
+
 
     // ... (everything above stays EXACTLY the same)
 
@@ -107,6 +156,18 @@ public class App extends Application {
         if (instance != null) {
             instance.screenShakeTimer = timer;
             instance.screenShakeAmplitude = amplitude;
+        }
+    }
+
+    public static void setCutsceneActive(boolean active) {
+        if (instance != null) {
+            instance.isCutsceneActive = active;
+        }
+    }
+
+    public static void showDialog(String text, int durationFrames) {
+        if (instance != null && instance.globalDialog != null) {
+            instance.globalDialog.show(text, durationFrames);
         }
     }
 
@@ -126,7 +187,6 @@ public class App extends Application {
 
                 // START
                 level -> {
-                    stopMenuMusic();
                     Scene gameScene = createGameScene(stage, level);
                     setAppScene(stage, gameScene);
                     gameLoop.start();
@@ -145,7 +205,6 @@ public class App extends Application {
         MenuScreen menu = new MenuScreen(
 
                 level -> {
-                    stopMenuMusic();
                     Scene gameScene = createGameScene(stage, level);
                     setAppScene(stage, gameScene);
                     gameLoop.start();
@@ -225,7 +284,6 @@ public class App extends Application {
         exitBtn.setStyle("-fx-background-color: transparent; -fx-padding: 0;");
 
         startBtn.setOnAction(e -> {
-            stopMenuMusic();
             Scene gameScene = createGameScene(stage, 1);
             setAppScene(stage, gameScene);
             gameLoop.start();
@@ -259,22 +317,15 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
-        
-        Image tempBackScreen = null;
-        try {
-            tempBackScreen = loadImg("/assets/back_screen.png");
-        } catch (Exception e) {
-            System.out.println("Không tìm thấy ảnh back_screen.png");
-        }
-        final Image backScreenImg = tempBackScreen;
 
-        // Đổ hình nền hoặc đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
-        if (backScreenImg != null) {
-            gc.drawImage(backScreenImg, 0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
-        } else {
-            gc.setFill(javafx.scene.paint.Color.BLACK);
-            gc.fillRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
-        }
+        isDataLoaded = false;
+        startLoadingPhase(startLevel);
+        globalDialog = new com.hust.game.ui.DialogBox();
+        backScreenImg = null;
+
+        // Đổ đen ngay từ đầu trên Canvas để tránh nháy khung hình đầu tiên
+        gc.setFill(javafx.scene.paint.Color.BLACK);
+        gc.fillRect(0, 0, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
 
         Group gameLayer = new Group(canvas);
         StackPane root = new StackPane(gameLayer);
@@ -306,50 +357,163 @@ public class App extends Application {
         root.getChildren().add(pauseBtn);
 
         root.getChildren().add(pauseScreen.getRoot());
+        pauseScreen.setVisible(false);
+
+        // Chạy load dưới nền
+        javafx.concurrent.Task<Void> loadTask = new javafx.concurrent.Task<>() {
+            @Override
+            protected Void call() throws Exception {
+                initializeEntities(startLevel);
+                return null;
+            }
+        };
+        loadTask.setOnSucceeded(e -> {
+            updateCameraZoom(startLevel);
+            try {
+                backScreenImg = loadImg(gameManager.getBackgroundPath());
+            } catch (Exception ex) {
+                System.out.println("Không tìm thấy ảnh background");
+            }
+            
+            // Cập nhật lại pauseScreen thật sau khi load xong (vì cần có HUD/gameManager)
+            root.getChildren().remove(pauseScreen.getRoot());
+            pauseScreen = new PauseScreen(
+                () -> setPaused(false),
+                () -> {
+                    if (gameLoop != null) gameLoop.stop();
+                    showSettings(stage, () -> {
+                        stage.setScene(scene);
+                        if (gameLoop != null) gameLoop.start();
+                    });
+                },
+                () -> {
+                    setPaused(false);
+                    if (gameLoop != null) gameLoop.stop();
+                    showMenu(stage);
+                }
+            );
+            root.getChildren().add(pauseScreen.getRoot());
+            isDataLoaded = true;
+        });
+        new Thread(loadTask).start();
 
         scene.setOnKeyPressed(e -> {
-            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
+            if (isLoadingPhase) return; // Khoá input khi đang chuyển cảnh
             if (e.getCode() == KeyCode.ESCAPE) {
+                if (isMinimapOpen) {
+                    toggleMinimap(root);
+                    return;
+                }
                 togglePause(stage);
                 return;
             }
-            if (!isPaused) {
+            if (e.getCode() == KeyCode.M) {
+                // Don't open minimap while paused
+                if (!isPaused) {
+                    toggleMinimap(root);
+                }
+                return;
+            }
+            if (!isPaused && !isMinimapOpen) {
                 input.add(e.getCode());
             }
         });
         scene.setOnKeyReleased(e -> {
-            if (fadeInTimer > 0) return; // Khoá input khi đang chuyển cảnh
+            if (isLoadingPhase) return; // Khoá input khi đang chuyển cảnh
             if (!isPaused) {
                 input.remove(e.getCode());
             }
         });
         
         scene.setOnMousePressed(e -> {
-            if (fadeInTimer > 0) return;
+            if (isLoadingPhase) {
+                realLoadingHintTimer = 0;
+                realLoadingHintIndex = (realLoadingHintIndex + 1) % realLoadingHints.length;
+                return;
+            }
             if (!isPaused) isMousePressed = true;
         });
         scene.setOnMouseReleased(e -> {
-            if (fadeInTimer > 0) return;
+            if (isLoadingPhase) return;
             if (!isPaused) isMousePressed = false;
         });
-
-        initializeEntities(startLevel);
-        playInGameMusic(startLevel);
-        
-        fadeInTimer = 120; // 2 giây fade-in (120 frames ở 60FPS)
 
         gameLoop = new AnimationTimer() {
             @Override
             public void handle(long now) {
+                if (!isDataLoaded) {
+                    realLoadingTimer++;
+                    realLoadingHintTimer++;
+                    if (realLoadingHintTimer >= 300) {
+                        realLoadingHintTimer = 0;
+                        realLoadingHintIndex = (realLoadingHintIndex + 1) % realLoadingHints.length;
+                    }
+
+                    gc.setFill(javafx.scene.paint.Color.BLACK);
+                    gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+                    if (loadingBgSheet != null) {
+                        gc.save();
+                        gc.setGlobalAlpha(0.3);
+                        int bgFrameIndex = (realLoadingTimer / 64) % 4;
+                        double sx = bgFrameIndex * 1838.0;
+                        double scale = Math.max((double) GameConstants.WINDOW_WIDTH / 1838.0, (double) GameConstants.WINDOW_HEIGHT / 1079.0);
+                        double drawW = 1838.0 * scale;
+                        double drawH = 1079.0 * scale;
+                        double drawX = (GameConstants.WINDOW_WIDTH - drawW) / 2.0;
+                        double drawY = (GameConstants.WINDOW_HEIGHT - drawH) / 2.0;
+                        gc.drawImage(loadingBgSheet, sx, 0, 1838.0, 1079.0, drawX, drawY, drawW, drawH);
+                        gc.restore();
+                    }
+
+                    if (loadingBallSheet != null) {
+                        double currentLoadingAlpha = (realLoadingTimer < 60) ? (realLoadingTimer / 60.0) : 1.0;
+                        gc.setGlobalAlpha(currentLoadingAlpha);
+                        double ballW = 80, ballH = 80, spacing = 20;
+                        double startX = GameConstants.WINDOW_WIDTH - 50 - (4 * ballW + 3 * spacing);
+                        double startY = GameConstants.WINDOW_HEIGHT - 50 - ballH;
+
+                        int t = realLoadingTimer;
+                        int b1 = (t < 60) ? (t / 15) : 4;
+                        int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
+                        int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
+                        int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
+
+                        int[] ballFrames = {b1, b2, b3, b4};
+
+                        for (int i = 0; i < 4; i++) {
+                            double drawBallX = startX + i * (ballW + spacing);
+                            double frameX = Math.min(4, ballFrames[i]) * 160.0;
+                            gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
+                        }
+
+                        if (loadingHintFont != null) {
+                            gc.setFont(loadingHintFont);
+                            gc.setFill(javafx.scene.paint.Color.WHITE);
+                            gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                            gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+                            double textCenterX = (20 + (startX + 20)) / 2.0;
+                            double textCenterY = startY + ballH / 2.0;
+                            gc.fillText(realLoadingHints[realLoadingHintIndex], textCenterX, textCenterY);
+                            gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                            gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+                        }
+                        gc.setGlobalAlpha(1.0);
+                    }
+                    return;
+                }
+
+                if (isLoadingPhase) {
+                    loadedFrames++;
+                }
 
                 boolean isVictory = gameManager.isVictory();
                 boolean isGameOver = player.isDead();
 
-                if (fadeInTimer > 0) {
-                    fadeInTimer--;
+                if (isLoadingPhase) {
                     updateCamera(); // Chỉ tính toán camera theo người chơi, bỏ qua logic game
                     pauseBtn.setMouseTransparent(true); // Khóa tương tác nút Pause
-                } else if (!isVictory && !isGameOver && !isPaused) {
+                } else if (!isVictory && !isGameOver && !isPaused && !isMinimapOpen) {
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     
                     // Cơ chế Hit Stop: Đóng băng toàn bộ hoạt động (trừ việc vẽ ra hình)
@@ -363,7 +527,7 @@ public class App extends Application {
                         }
                         boolean isNpcInteractionOpen = npc != null && npc.isInteractionOpen();
 
-                        if (isNpcInteractionOpen) {
+                        if (isNpcInteractionOpen || isCutsceneActive) {
                             player.savePosition();
                             player.setState(EntityState.IDLE);
                         } else {
@@ -389,7 +553,14 @@ public class App extends Application {
                                 tutorialManager.update(player, input, isMousePressed);
                             }
 
+                            if (globalDialog != null) {
+                                globalDialog.update();
+                            }
+
                             combatManager.update();
+                            if (allyManager != null) {
+                                allyManager.update();
+                            }
                             gameManager.update(); // Cập nhật logic của map (ví dụ Gate)
 
                             // Logic Culling: Tắt hoạt động của quái vật nằm ngoài màn hình
@@ -440,6 +611,9 @@ public class App extends Application {
                 // Gom tất cả Entity lại để sắp xếp thứ tự vẽ (Y-Sorting)
                 List<BaseEntity> renderList = new ArrayList<>();
                 renderList.add(player);
+                if (allyManager != null && allyManager.getActiveMinion() != null) {
+                    renderList.add(allyManager.getActiveMinion());
+                }
                 
                 // Thêm Quái vật
                 for (Enemy e : enemyManager.getEnemyList()) {
@@ -481,6 +655,49 @@ public class App extends Application {
                 // Vẽ lần lượt theo thứ tự đã sắp xếp
                 for (BaseEntity entity : renderList) {
                     entity.render(gc);
+                    
+                    // HIỆN HITBOX KHI BẬT DEV MODE
+                    if (DevSettings.isDevMode()) {
+                        if (entity instanceof Player || entity instanceof Enemy) {
+                            gc.save();
+                            gc.setLineWidth(1.5);
+                            
+                            // 1. Vẽ Boundary (Hurtbox - Vùng nhận sát thương) màu ĐỎ
+                            javafx.geometry.Rectangle2D bound = entity.getBoundary();
+                            if (bound != null) {
+                                gc.setStroke(javafx.scene.paint.Color.RED);
+                                gc.strokeRect(bound.getMinX(), bound.getMinY(), bound.getWidth(), bound.getHeight());
+                            }
+                            
+                            // 2. Vẽ Collision Boundary (Hitbox vật lý cản bước) màu XANH DƯƠNG
+                            javafx.geometry.Rectangle2D colBound = null;
+                            if (entity instanceof Player) {
+                                colBound = ((Player) entity).getCollisionBoundary();
+                            } else if (entity instanceof Enemy) {
+                                colBound = ((Enemy) entity).getCollisionBoundary();
+                            }
+                            if (colBound != null) {
+                                gc.setStroke(javafx.scene.paint.Color.BLUE);
+                                gc.strokeRect(colBound.getMinX(), colBound.getMinY(), colBound.getWidth(), colBound.getHeight());
+                            }
+                            
+                            // 3. Vẽ Tầm đánh (Attack Box) của Player màu VÀNG nếu đang tung chiêu
+                            if (entity instanceof Player p) {
+                                if (p.isAttacking() || p.isThrusting() || p.isTreeMergeAttacking()) {
+                                    javafx.geometry.Rectangle2D atkBound = p.getAttackBox();
+                                    if (atkBound != null) {
+                                        gc.setStroke(javafx.scene.paint.Color.YELLOW);
+                                        gc.strokeRect(atkBound.getMinX(), atkBound.getMinY(), atkBound.getWidth(), atkBound.getHeight());
+                                    }
+                                }
+                            }
+                            gc.restore();
+                        }
+                    }
+                }
+                
+                if (allyManager != null) {
+                    allyManager.renderSummonAnim(gc);
                 }
                 
                 combatManager.getParticleManager().render(gc);
@@ -501,12 +718,102 @@ public class App extends Application {
                     tutorialManager.render(gc);
                 }
 
+                if (globalDialog != null) {
+                    globalDialog.render(gc);
+                }
+
                 // --- VẼ HIỆU ỨNG FADE-IN TỪ ĐEN SANG GAME ---
-                if (fadeInTimer > 0) {
+                if (isLoadingPhase) {
+                    realLoadingTimer++;
+                    realLoadingHintTimer++;
+                    if (realLoadingHintTimer >= 300) {
+                        realLoadingHintTimer = 0;
+                        realLoadingHintIndex = (realLoadingHintIndex + 1) % realLoadingHints.length;
+                    }
+
+                    double currentBlackAlpha = 1.0;
+                    double currentBgAlpha = 0.3;
+                    double currentLoadingAlpha = 1.0;
+
+                    if (realLoadingTimer < 60) {
+                        currentLoadingAlpha = realLoadingTimer / 60.0;
+                    }
+
+                    if (realLoadingTimer > 540) {
+                        int elapsedSinceFade = realLoadingTimer - 540;
+                        if (elapsedSinceFade <= 60) {
+                            double fade = 1.0 - (elapsedSinceFade / 60.0);
+                            currentBgAlpha = 0.3 * fade;
+                            currentLoadingAlpha = fade;
+                            currentBlackAlpha = 1.0;
+                        } else {
+                            currentBgAlpha = 0.0;
+                            currentLoadingAlpha = 0.0;
+                            currentBlackAlpha = Math.max(0, 1.0 - ((elapsedSinceFade - 60) * 0.02));
+                        }
+                    }
+
+                    // Fill black to cover game
                     gc.setFill(javafx.scene.paint.Color.BLACK);
-                    gc.setGlobalAlpha((double) fadeInTimer / 120.0);
+                    gc.setGlobalAlpha(currentBlackAlpha);
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
+
+                    // Draw background faint
+                    if (currentBgAlpha > 0 && loadingBgSheet != null) {
+                        gc.save();
+                        gc.setGlobalAlpha(currentBgAlpha);
+                        int bgFrameIndex = (realLoadingTimer / 64) % 4;
+                        double sx = bgFrameIndex * 1838.0;
+                        double scale = Math.max((double) GameConstants.WINDOW_WIDTH / 1838.0, (double) GameConstants.WINDOW_HEIGHT / 1079.0);
+                        double drawW = 1838.0 * scale;
+                        double drawH = 1079.0 * scale;
+                        double drawX = (GameConstants.WINDOW_WIDTH - drawW) / 2.0;
+                        double drawY = (GameConstants.WINDOW_HEIGHT - drawH) / 2.0;
+                        gc.drawImage(loadingBgSheet, sx, 0, 1838.0, 1079.0, drawX, drawY, drawW, drawH);
+                        gc.restore();
+                    }
+
+                    // Draw loading balls & hint
+                    if (currentLoadingAlpha > 0 && loadingBallSheet != null) {
+                        gc.setGlobalAlpha(currentLoadingAlpha);
+                        double ballW = 80, ballH = 80, spacing = 20;
+                        double startX = GameConstants.WINDOW_WIDTH - 50 - (4 * ballW + 3 * spacing);
+                        double startY = GameConstants.WINDOW_HEIGHT - 50 - ballH;
+
+                        int t = realLoadingTimer;
+                        int b1 = (t < 60) ? (t / 15) : 4;
+                        int b2 = (t < 60) ? 0 : (t < 120) ? ((t - 60) / 15) : 4;
+                        int b3 = (t < 120) ? 0 : (t < 240) ? ((t - 120) / 30) : 4;
+                        int b4 = (t < 240) ? 0 : (t < 300) ? ((t - 240) / 30) : (t < 480) ? 2 : Math.min(4, 3 + (t - 480) / 15);
+
+                        int[] ballFrames = {b1, b2, b3, b4};
+
+                        for (int i = 0; i < 4; i++) {
+                            double drawBallX = startX + i * (ballW + spacing);
+                            double frameX = Math.min(4, ballFrames[i]) * 160.0;
+                            gc.drawImage(loadingBallSheet, frameX, 0, 160, 160, drawBallX, startY, ballW, ballH);
+                        }
+
+                        if (loadingHintFont != null) {
+                            gc.setFont(loadingHintFont);
+                            gc.setFill(javafx.scene.paint.Color.WHITE);
+                            gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                            gc.setTextBaseline(javafx.geometry.VPos.CENTER);
+                            double textCenterX = (20 + (startX + 20)) / 2.0;
+                            double textCenterY = startY + ballH / 2.0;
+                            gc.fillText(realLoadingHints[realLoadingHintIndex], textCenterX, textCenterY);
+                            gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                            gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
+                        }
+                    }
+
                     gc.setGlobalAlpha(1.0);
+
+                    // Stop loading phase
+                    if (realLoadingTimer > 540 && currentBlackAlpha <= 0) {
+                        isLoadingPhase = false;
+                        playInGameMusic(nextLevelToLoadMusic);
+                    }
                 }
 
                 // Tutorial clear
@@ -517,18 +824,33 @@ public class App extends Application {
                             () -> {
                                 isTutorialClearUIShown = false;
                                 root.getChildren().remove(tutorialClearScreen.getRoot());
-                                showLoadingScreen(stage, scene, () -> {
-                                    gameManager.loadLevel(1);
+                                
+                                isDataLoaded = false;
+                                startLoadingPhase(1);
+                                gameLoop.start();
+                                
+                                javafx.concurrent.Task<Void> task = new javafx.concurrent.Task<>() {
+                                    @Override
+                                    protected Void call() throws Exception {
+                                        gameManager.loadLevel(1);
+                                        return null;
+                                    }
+                                };
+                                task.setOnSucceeded(ev -> {
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
                                     combatManager.setCollisionChecker(collisionChecker);
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
+                                    if (allyManager != null) allyManager.reset();
                                     input.clear(); // Chống kẹt nút
-                                    fadeInTimer = 120;
-                                    playInGameMusic(1);
-                                    gameLoop.start();
+                                    updateCameraZoom(1);
+                                    try {
+                                        backScreenImg = loadImg(gameManager.getBackgroundPath());
+                                    } catch (Exception ex) {}
+                                    isDataLoaded = true;
                                 });
+                                new Thread(task).start();
                             },
                             // Về Menu
                             () -> {
@@ -549,18 +871,33 @@ public class App extends Application {
                             () -> {
                                 isLevelClearUIShown = false;
                                 root.getChildren().remove(levelClearScreen.getRoot());
-                                showLoadingScreen(stage, scene, () -> {
-                                    gameManager.loadNextLevel();
+                                
+                                isDataLoaded = false;
+                                startLoadingPhase(gameManager.getCurrentLevelIndex() + 1);
+                                gameLoop.start();
+                                
+                                javafx.concurrent.Task<Void> task = new javafx.concurrent.Task<>() {
+                                    @Override
+                                    protected Void call() throws Exception {
+                                        gameManager.loadNextLevel();
+                                        return null;
+                                    }
+                                };
+                                task.setOnSucceeded(ev -> {
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
                                     combatManager.setCollisionChecker(collisionChecker);
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
+                                    if (allyManager != null) allyManager.reset();
                                     input.clear(); // Xóa các phím đang đè để tránh kẹt nút
-                                    fadeInTimer = 120; // Kích hoạt lại hiệu ứng mờ dần sáng lên khi vào màn mới
-                                    playInGameMusic(gameManager.getCurrentLevelIndex());
-                                    gameLoop.start();
+                                    updateCameraZoom(gameManager.getCurrentLevelIndex());
+                                    try {
+                                        backScreenImg = loadImg(gameManager.getBackgroundPath());
+                                    } catch (Exception ex) {}
+                                    isDataLoaded = true;
                                 });
+                                new Thread(task).start();
                             },
                             // Retry
                             () -> {
@@ -593,32 +930,28 @@ public class App extends Application {
                     gc.setFont(finishFont);
                     gc.setStroke(javafx.scene.paint.Color.WHITE);
                     gc.setLineWidth(4);
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
+                    gc.setTextBaseline(javafx.geometry.VPos.CENTER);
 
                     if (isVictory) {
                         String text = "VICTORY!";
-                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
-                        tempText.setFont(gc.getFont());
-                        double textWidth = tempText.getLayoutBounds().getWidth();
-                        double textHeight = tempText.getLayoutBounds().getHeight();
-                        double x = (WIDTH - textWidth) / 2;
-                        double y = (HEIGHT + textHeight) / 2 - 50;
+                        double x = WIDTH / 2.0;
+                        double y = HEIGHT / 2.0 - 50;
 
                         gc.setFill(javafx.scene.paint.Color.GOLD);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
                         gc.fillText(text, x, y);   // Vẽ chữ màu vàng gold
                     } else { // isGameOver
                         String text = "DEFEAT";
-                        javafx.scene.text.Text tempText = new javafx.scene.text.Text(text);
-                        tempText.setFont(gc.getFont());
-                        double textWidth = tempText.getLayoutBounds().getWidth();
-                        double textHeight = tempText.getLayoutBounds().getHeight();
-                        double x = (WIDTH - textWidth) / 2;
-                        double y = (HEIGHT + textHeight) / 2 - 50;
+                        double x = WIDTH / 2.0;
+                        double y = HEIGHT / 2.0 - 50;
 
                         gc.setFill(javafx.scene.paint.Color.GRAY);
                         gc.strokeText(text, x, y); // Vẽ viền trắng
                         gc.fillText(text, x, y);   // Vẽ chữ màu xám
                     }
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                    gc.setTextBaseline(javafx.geometry.VPos.BASELINE);
 
                     if (!isEndUIShown) {
                         gameLoop.stop();
@@ -648,6 +981,10 @@ public class App extends Application {
             }
         };
         return scene;
+    }
+
+    private void updateCameraZoom(int level) {
+        ZOOM = (level == 3) ? 0.8 : 1.0; // Thu nhỏ góc nhìn ở phòng Boss để bao quát được toàn bộ sàn đấu
     }
 
     private void updateCamera() {
@@ -710,6 +1047,33 @@ public class App extends Application {
         }
     }
 
+    private void toggleMinimap(StackPane root) {
+        isMinimapOpen = !isMinimapOpen;
+        if (isMinimapOpen) {
+            minimapUI = new Minimap(
+                    WIDTH,
+                    HEIGHT,
+                    () -> toggleMinimap(root),
+                    this::loadImg,
+                    player,
+                    gameManager.getMap()
+            );
+
+            root.getChildren().add(minimapUI.getRoot());
+
+            if (gameLoop != null) {
+                gameLoop.stop();
+            }
+        } else {
+            if (minimapUI != null) {
+                root.getChildren().remove(minimapUI.getRoot());
+            }
+            if (gameLoop != null) {
+                gameLoop.start();
+            }
+        }
+    }
+
     private void initializeEntities(int level) {
         try {
             Image iDown = loadImg("/assets/player/idle_down.png");
@@ -737,6 +1101,7 @@ public class App extends Application {
 
             Image treeImg = loadImg("/assets/enemy/tree.png");
             Image treeSkillImg = loadImg("/assets/enemy/Tree_skill.png");
+            Image transformImg = loadImg("/assets/player/transform.png");
             Image slimeImg = loadImg("/assets/enemy/slime.png");
             Image knightImg = loadImg("/assets/enemy/knight_idle.png");
             Image knightSkillImg = loadImg("/assets/enemy/knight_attack.png");
@@ -750,6 +1115,17 @@ public class App extends Application {
             manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
             Image bossImg = loadImg("/assets/enemy/boss_idle.png");
+            
+            Image minionSpamImg = null;
+            try {
+                minionSpamImg = loadImg("/assets/player/minion_spam.png");
+            } catch (Exception e) {
+                try {
+                    minionSpamImg = loadImg("/assets/ally/minion_spam.png");
+                } catch (Exception ex) {
+                    System.err.println("Không tìm thấy ảnh minion_spam.png");
+                }
+            }
 
             // Khai báo Player trước khi đưa cho Quái
             player = new Player(WIDTH / 2, HEIGHT / 2,
@@ -757,7 +1133,7 @@ public class App extends Application {
                     cDown, cUp, cLeft, cRight, 
                     dDown, dUp, dLeft, dRight, 
                     swordHit, rageHit, powerUpImg, thunderImg);
-            player.configureTreeMerge(treeImg, treeSkillImg);
+            player.configureTreeMerge(treeImg, treeSkillImg, transformImg);
 
             // Sinh quái vật để test di chuyển
             enemyManager = new EnemyManager();
@@ -783,6 +1159,12 @@ public class App extends Application {
             // tạo combat manager
             combatManager = new CombatManager(player, enemyManager.getEnemyList());
             combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
+            allyManager = new AllyManager(
+                    enemyManager.getEnemyList(),
+                    iDown, iUp, iLeft, iRight,
+                    rDown, rUp, rLeft, rRight,
+                    cDown, cUp, cLeft, cRight,
+                    swordHit, minionSpamImg, transformImg);
 
         } catch (Exception e) {
             System.err.println("LỖI: Không tìm thấy file ảnh!");
@@ -792,7 +1174,7 @@ public class App extends Application {
         collisionChecker = new CollisionChecker(gameManager.getMap());
         combatManager.setCollisionChecker(collisionChecker);
         enemyManager.setCollisionChecker(collisionChecker);
-        hud = new HUD(player, combatManager);
+        hud = new HUD(player, combatManager, enemyManager.getEnemyList(), allyManager);
     }
 
     private void handleInput() {
@@ -810,7 +1192,6 @@ public class App extends Application {
                 if (input.contains(KeyCode.D) || input.contains(KeyCode.RIGHT)) dashDx += 1;
                 
                 player.startDash(dashDx, dashDy);
-                com.hust.game.audio.SoundManager.playSlimeMoveSound(); // Tạm dùng âm thanh này làm tiếng gió lướt
             }
         }
 
@@ -863,7 +1244,13 @@ public class App extends Application {
 
         if (input.contains(KeyCode.K)) {
             if (!isKHeld) {
-                player.activateStoredMergeForm();
+                if (gameManager != null && gameManager.getCurrentLevelIndex() == 3 && allyManager != null) {
+                    if (allyManager.trySummon(player)) {
+                        com.hust.game.audio.SoundManager.playTransformSound();
+                    }
+                } else if (player.activateStoredMergeForm()) {
+                    com.hust.game.audio.SoundManager.playTransformSound();
+                }
                 isKHeld = true;
             }
         } else {
@@ -1224,6 +1611,7 @@ public class App extends Application {
     }
 
     private void playInGameMusic(int level) {
+        stopMenuMusic();
         stopInGameMusic();
         String musicPath = "";
         double volMultiplier = 1.0;
@@ -1231,7 +1619,7 @@ public class App extends Application {
         if (level == 0) {
             musicPath = "/sounds/tutorial.mp3";
             volMultiplier = 0.5;
-        } else if (level == 1) {
+        } else if (level == 1 || level == 2) {
             musicPath = "/sounds/Music_lvl_1.mp3";
             volMultiplier = 0.7;
         } else if (level == 3) {

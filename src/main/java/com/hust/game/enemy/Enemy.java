@@ -292,6 +292,10 @@ public abstract class Enemy extends MovingEntity {
         return this.hp;
     }
 
+    public int getMaxHp() {
+        return this.maxHp;
+    }
+
     // Hàm nhận sát thương từ Player
     public void takeDamage(int amount) {
         if (this.hp <= 0)
