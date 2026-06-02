@@ -248,8 +248,12 @@ public class SettingsScreen {
 
         // Dừng loop khi scene bị thay thế (tránh memory leak)
         Scene scene = ScaledSceneFactory.createScene(root);
-        scene.windowProperty().addListener((obs, oldWin, newWin) -> {
-            if (newWin == null) bgLoop.stop();
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                javafx.application.Platform.runLater(() -> {
+                    if (root.getScene() == null) bgLoop.stop();
+                });
+            }
         });
 
         return scene;

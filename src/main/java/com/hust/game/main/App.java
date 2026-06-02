@@ -28,6 +28,7 @@ import com.hust.game.ui.PauseScreen;
 import com.hust.game.ui.SettingsScreen;
 import com.hust.game.ui.DisplaySettings;
 import com.hust.game.ui.ScaledSceneFactory;
+import com.hust.game.ui.Minimap;
 import javafx.animation.AnimationTimer;
 import javafx.application.Application;
 import javafx.scene.Group;
@@ -110,7 +111,8 @@ public class App extends Application {
         "Phát triển bởi nhóm 27 Ộ Ô Pi!",
         "Slime là sinh vật chạm vào thôi là mất máu!",
         "Cái cây có tầm đánh y như player! Cẩn thận!",
-        "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!"
+        "Quyền năng hắc ám của phù thủy có thể triệu hồi ra hiệp sĩ!",
+        "Thân xác của ta..."
     };
     private Image loadingBgSheet;
     private Image loadingBallSheet;
@@ -141,9 +143,6 @@ public class App extends Application {
             }
         }
     }
-
-
-    // ... (everything above stays EXACTLY the same)
 
     private javafx.scene.media.MediaPlayer menuMusicPlayer;
     private javafx.scene.media.MediaPlayer inGameMusicPlayer;
@@ -179,7 +178,6 @@ public class App extends Application {
         stage.setFullScreenExitHint("");
         stage.setFullScreenExitKeyCombination(KeyCombination.NO_MATCH);
 
-        // Gọi tải toàn bộ âm thanh ngay từ đầu để MenuScreen và Settings có thể dùng được tiếng click/hover
         SoundManager.loadSounds();
         playMenuMusic();
 
@@ -225,8 +223,26 @@ public class App extends Application {
         setAppScene(stage, settings.createScene());
     }
 
+    private Scene mainScene;
+
     private void setAppScene(Stage stage, Scene scene) {
-        stage.setScene(scene);
+        if (mainScene == null) {
+            mainScene = scene;
+            stage.setScene(mainScene);
+        } else {
+            // Tái sử dụng mainScene và chỉ thay đổi root để tránh lỗi mất Fullscreen của JavaFX khi đổi Scene
+            mainScene.setOnKeyPressed(scene.getOnKeyPressed());
+            mainScene.setOnKeyReleased(scene.getOnKeyReleased());
+            mainScene.setOnMousePressed(scene.getOnMousePressed());
+            mainScene.setOnMouseReleased(scene.getOnMouseReleased());
+            mainScene.setOnMouseClicked(scene.getOnMouseClicked());
+            
+            // Lấy root từ scene mới và gỡ nó ra khỏi scene mới trước khi gán vào mainScene
+            // để tránh lỗi "is already set as root of another scene"
+            javafx.scene.Parent root = scene.getRoot();
+            scene.setRoot(new javafx.scene.layout.Region());
+            mainScene.setRoot(root);
+        }
         applyDisplayMode(stage);
     }
 
@@ -337,8 +353,17 @@ public class App extends Application {
             // Nút SETTINGS: Tạm tắt logic GameLoop đi để tránh hao CPU, khi quay lại (onBack) thì bật lại GameLoop
             () -> {
                 if (gameLoop != null) gameLoop.stop();
+                javafx.scene.Parent savedRoot = mainScene != null ? mainScene.getRoot() : scene.getRoot();
                 showSettings(stage, () -> {
-                    setAppScene(stage, scene); // Khôi phục lại GameScene đang dở
+                    if (mainScene != null) {
+                        mainScene.setRoot(savedRoot);
+                        mainScene.setOnKeyPressed(scene.getOnKeyPressed());
+                        mainScene.setOnKeyReleased(scene.getOnKeyReleased());
+                        mainScene.setOnMousePressed(scene.getOnMousePressed());
+                        mainScene.setOnMouseReleased(scene.getOnMouseReleased());
+                        mainScene.setOnMouseClicked(scene.getOnMouseClicked());
+                        applyDisplayMode(stage);
+                    }
                     if (gameLoop != null) gameLoop.start();
                 });
             },
@@ -381,8 +406,17 @@ public class App extends Application {
                 () -> setPaused(false),
                 () -> {
                     if (gameLoop != null) gameLoop.stop();
+                    javafx.scene.Parent savedRoot = mainScene != null ? mainScene.getRoot() : scene.getRoot();
                     showSettings(stage, () -> {
-                        stage.setScene(scene);
+                        if (mainScene != null) {
+                            mainScene.setRoot(savedRoot);
+                            mainScene.setOnKeyPressed(scene.getOnKeyPressed());
+                            mainScene.setOnKeyReleased(scene.getOnKeyReleased());
+                            mainScene.setOnMousePressed(scene.getOnMousePressed());
+                            mainScene.setOnMouseReleased(scene.getOnMouseReleased());
+                            mainScene.setOnMouseClicked(scene.getOnMouseClicked());
+                            applyDisplayMode(stage);
+                        }
                         if (gameLoop != null) gameLoop.start();
                     });
                 },

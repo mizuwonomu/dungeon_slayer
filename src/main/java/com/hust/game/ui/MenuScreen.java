@@ -301,8 +301,12 @@ public class MenuScreen {
 
         // Dừng loop khi scene bị thay thế (tránh memory leak)
         Scene scene = ScaledSceneFactory.createScene(root);
-        scene.windowProperty().addListener((obs, oldWin, newWin) -> {
-            if (newWin == null) menuLoop.stop();
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                javafx.application.Platform.runLater(() -> {
+                    if (root.getScene() == null) menuLoop.stop();
+                });
+            }
         });
 
         return scene;
