@@ -393,6 +393,8 @@ public class App extends Application {
         Image pauseBtnSheet = loadImg("/assets/pause.png");
         StackPane pauseBtn = createSpriteBtn(pauseBtnSheet, 3, 0.5, () -> togglePause(stage)); // Thu nhỏ nút xuống 50% (còn 64x64)
         StackPane.setAlignment(pauseBtn, javafx.geometry.Pos.TOP_RIGHT); // Căn sát góc trên bên phải
+        pauseBtn.setVisible(false);
+        pauseBtn.setMouseTransparent(true);
         root.getChildren().add(pauseBtn);
 
         root.getChildren().add(pauseScreen.getRoot());
@@ -506,6 +508,8 @@ public class App extends Application {
             @Override
             public void handle(long now) {
                 if (!isDataLoaded) {
+                    pauseBtn.setVisible(false);
+                    pauseBtn.setMouseTransparent(true);
                     realLoadingTimer++;
                     realLoadingHintTimer++;
                     if (realLoadingHintTimer >= 300) {
@@ -576,8 +580,10 @@ public class App extends Application {
 
                 if (isLoadingPhase) {
                     updateCamera(); // Chỉ tính toán camera theo người chơi, bỏ qua logic game
+                    pauseBtn.setVisible(false);
                     pauseBtn.setMouseTransparent(true); // Khóa tương tác nút Pause
                 } else if (!isVictory && !isGameOver && !isPaused && !isMinimapOpen) {
+                    pauseBtn.setVisible(true);
                     pauseBtn.setMouseTransparent(false); // Mở khóa nút Pause
                     
                     // Cơ chế Hit Stop: Đóng băng toàn bộ hoạt động (trừ việc vẽ ra hình)
