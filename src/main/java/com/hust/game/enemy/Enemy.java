@@ -35,6 +35,7 @@ public abstract class Enemy extends MovingEntity {
     protected boolean isActive = true; // Trạng thái hoạt động (trong màn hình)
     protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
     protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
+    private int playerDamageCooldownTimer = 0;
 
     protected com.hust.game.collision.CollisionChecker collisionChecker;
 
@@ -111,6 +112,8 @@ public abstract class Enemy extends MovingEntity {
     @Override
     public void update() {
         if (!isActive) return; // Nếu ngoài camera thì bỏ qua update (Bất động)
+
+        updatePlayerDamageCooldown();
 
         if (flashTimer > 0)
             flashTimer--; // Giảm dần thời gian nháy đỏ
@@ -286,6 +289,42 @@ public abstract class Enemy extends MovingEntity {
 
     public int getDamage() {
         return this.damage;
+    }
+
+    protected void updatePlayerDamageCooldown() {
+        if (playerDamageCooldownTimer > 0) {
+            playerDamageCooldownTimer--;
+        }
+    }
+
+    protected boolean canDamagePlayer(Player player) {
+        return player != null && this.hp > 0 && !this.isHarmless && playerDamageCooldownTimer <= 0;
+    }
+
+    protected boolean tryDamagePlayer(Player player, int damageAmount, int cooldownFrames) {
+        return tryDamagePlayer(player, damageAmount, this, cooldownFrames);
+    }
+
+    protected boolean tryDamagePlayer(Player player, int damageAmount, BaseEntity source, int cooldownFrames) {
+        if (!canDamagePlayer(player)) {
+            return false;
+        }
+        player.takeDamage(damageAmount, source);
+        startPlayerDamageCooldown(cooldownFrames);
+        return true;
+    }
+
+    protected boolean tryDamagePlayer(Player player, int damageAmount, double sourceX, double sourceY, int cooldownFrames) {
+        if (!canDamagePlayer(player)) {
+            return false;
+        }
+        player.takeDamage(damageAmount, sourceX, sourceY);
+        startPlayerDamageCooldown(cooldownFrames);
+        return true;
+    }
+
+    private void startPlayerDamageCooldown(int cooldownFrames) {
+        playerDamageCooldownTimer = Math.max(playerDamageCooldownTimer, Math.max(0, cooldownFrames));
     }
 
     public int getHp() {

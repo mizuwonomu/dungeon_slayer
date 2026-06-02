@@ -1516,7 +1516,7 @@ public class App extends Application {
                     player.onCollision(enemy);
 
                     if (enemy instanceof Knight && ((Knight) enemy).isDealingDamage()) {
-                        player.takeDamage(enemy.getDamage(), enemy);
+                        // Knight tự xử lý damage trong update() để tránh cùng một nhát dash gây damage hai lần.
                     } else {
                         enemy.onCollision(player);
                     }

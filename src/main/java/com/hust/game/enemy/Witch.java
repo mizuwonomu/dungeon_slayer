@@ -9,6 +9,12 @@ import javafx.geometry.Rectangle2D;
 
 public class Witch extends Enemy {
 
+    private static final int CIRCLE_DAMAGE_COOLDOWN_FRAMES = 30;
+    private static final double SUMMON_KNIGHT_RENDER_WIDTH = 96.0;
+    private static final double SUMMON_KNIGHT_RENDER_HEIGHT = 96.0;
+    private static final double SUMMON_KNIGHT_COLLISION_WIDTH_RATIO = 0.4;
+    private static final double SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO = 0.2;
+    private static final int SUMMON_SEARCH_RADIUS_TILES = 18;
     private int skillCooldownTimer = 0;
     private int circleCountSinceLastSummon = 3;
     private EnemyManager enemyManager;
@@ -120,20 +126,216 @@ public class Witch extends Enemy {
             if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0) knightCount++;
         }
 
-        // Giới hạn y cho Knight không bị dính vào viền tường Level 2 (Phòng cao 480)
-        double safeY = Math.max(96, Math.min(this.y, 480 - 144));
+        // Tim vi tri summon gan Witch nhung khong de Knight vao tuong hoac ngoai map.
+        double[] spawn;
 
         if (knightCount == 0) {
-            double safeX = Math.max(96, this.x - 80);
-            enemyManager.spawnEnemy("Knight", safeX, safeY, knightIdle, 8, 96, 96, targetPlayer, knightAtk);
+            spawn = findSafeKnightSpawn(this.x - SUMMON_KNIGHT_RENDER_WIDTH, this.y);
+            enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
+                    SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
         } else if (knightCount == 1) {
-            double safeX = Math.min(816 - 144, this.x + 80); // Phòng rộng 816
-            enemyManager.spawnEnemy("Knight", safeX, safeY, knightIdle, 8, 96, 96, targetPlayer, knightAtk);
+            spawn = findSafeKnightSpawn(this.x + this.renderWidth, this.y);
+            enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
+                    SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
         }
+    }
+
+    private double[] findSafeKnightSpawn(double preferredX, double preferredY) {
+        if (isSafeKnightSpawn(preferredX, preferredY)) {
+            return new double[]{preferredX, preferredY};
+        }
+
+        int startCol = (int) Math.round(knightCollisionCenterX(preferredX) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        int startRow = (int) Math.round(knightCollisionCenterY(preferredY) / com.hust.game.constants.GameConstants.TILE_SIZE);
+
+        for (int radius = 0; radius <= SUMMON_SEARCH_RADIUS_TILES; radius++) {
+            double[] best = null;
+            double bestDistance = Double.MAX_VALUE;
+
+            for (int row = startRow - radius; row <= startRow + radius; row++) {
+                for (int col = startCol - radius; col <= startCol + radius; col++) {
+                    if (Math.abs(row - startRow) != radius && Math.abs(col - startCol) != radius) {
+                        continue;
+                    }
+
+                    double centerX = col * com.hust.game.constants.GameConstants.TILE_SIZE
+                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    double centerY = row * com.hust.game.constants.GameConstants.TILE_SIZE
+                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    double candidateX = centerX - SUMMON_KNIGHT_RENDER_WIDTH / 2.0;
+                    double candidateY = centerY - SUMMON_KNIGHT_RENDER_HEIGHT
+                            + (SUMMON_KNIGHT_RENDER_HEIGHT * SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO) / 2.0;
+
+                    if (!isSafeKnightSpawn(candidateX, candidateY)) {
+                        continue;
+                    }
+
+                    double dx = candidateX - preferredX;
+                    double dy = candidateY - preferredY;
+                    double distance = dx * dx + dy * dy;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new double[]{candidateX, candidateY};
+                    }
+                }
+            }
+
+            if (best != null) {
+                return best;
+            }
+        }
+
+        System.err.println("Witch khong tim thay vi tri summon Knight an toan.");
+        return new double[]{preferredX, preferredY};
+    }
+
+    private boolean isSafeKnightSpawn(double x, double y) {
+        Rectangle2D collisionBox = knightSpawnCollisionBox(x, y);
+        int left = (int) Math.floor(collisionBox.getMinX());
+        int right = (int) Math.floor(collisionBox.getMaxX() - 1);
+        int top = (int) Math.floor(collisionBox.getMinY());
+        int bottom = (int) Math.floor(collisionBox.getMaxY() - 1);
+        int centerX = (int) Math.floor(collisionBox.getMinX() + collisionBox.getWidth() / 2.0);
+        int centerY = (int) Math.floor(collisionBox.getMinY() + collisionBox.getHeight() / 2.0);
+
+        if (isBlockedByCollisionChecker(left, top) || isBlockedByCollisionChecker(right, top)
+                || isBlockedByCollisionChecker(left, bottom) || isBlockedByCollisionChecker(right, bottom)
+                || isBlockedByCollisionChecker(centerX, centerY)) {
+            return false;
+        }
+
+        if (targetPlayer != null && targetPlayer.getCollisionBoundary().intersects(collisionBox)) {
+            return false;
+        }
+
+        for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
+            if (e == this || e.getHp() <= 0) {
+                continue;
+            }
+            if (e.getCollisionBoundary().intersects(collisionBox)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isBlockedByCollisionChecker(int pixelX, int pixelY) {
+        return collisionChecker != null && collisionChecker.checkTile(pixelX, pixelY);
+    }
+
+    private boolean canOccupy(double x, double y) {
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        Rectangle2D collisionBox = new Rectangle2D(
+                x + renderWidth * 0.3,
+                y + renderHeight * 0.8,
+                renderWidth * 0.4,
+                renderHeight * 0.2
+        );
+        int left = (int) Math.floor(collisionBox.getMinX());
+        int right = (int) Math.floor(collisionBox.getMaxX() - 1);
+        int top = (int) Math.floor(collisionBox.getMinY());
+        int bottom = (int) Math.floor(collisionBox.getMaxY() - 1);
+        return !isBlockedByCollisionChecker(left, top)
+                && !isBlockedByCollisionChecker(right, top)
+                && !isBlockedByCollisionChecker(left, bottom)
+                && !isBlockedByCollisionChecker(right, bottom);
+    }
+
+    private Rectangle2D knightSpawnCollisionBox(double x, double y) {
+        double w = SUMMON_KNIGHT_RENDER_WIDTH * SUMMON_KNIGHT_COLLISION_WIDTH_RATIO;
+        double h = SUMMON_KNIGHT_RENDER_HEIGHT * SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO;
+        double bx = x + (SUMMON_KNIGHT_RENDER_WIDTH - w) / 2.0;
+        double by = y + SUMMON_KNIGHT_RENDER_HEIGHT - h;
+        return new Rectangle2D(bx, by, w, h);
+    }
+
+    private double knightCollisionCenterX(double x) {
+        return x + SUMMON_KNIGHT_RENDER_WIDTH / 2.0;
+    }
+
+    private double knightCollisionCenterY(double y) {
+        return y + SUMMON_KNIGHT_RENDER_HEIGHT
+                - (SUMMON_KNIGHT_RENDER_HEIGHT * SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO) / 2.0;
+    }
+
+    private double[] findSafeWitchPosition(double preferredX, double preferredY) {
+        if (isSafeWitchPosition(preferredX, preferredY)) {
+            return new double[]{preferredX, preferredY};
+        }
+
+        int startCol = (int) Math.round((preferredX + renderWidth / 2.0) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        int startRow = (int) Math.round((preferredY + renderHeight - (renderHeight * 0.2) / 2.0)
+                / com.hust.game.constants.GameConstants.TILE_SIZE);
+
+        for (int radius = 0; radius <= SUMMON_SEARCH_RADIUS_TILES; radius++) {
+            double[] best = null;
+            double bestDistance = Double.MAX_VALUE;
+
+            for (int row = startRow - radius; row <= startRow + radius; row++) {
+                for (int col = startCol - radius; col <= startCol + radius; col++) {
+                    if (Math.abs(row - startRow) != radius && Math.abs(col - startCol) != radius) {
+                        continue;
+                    }
+
+                    double centerX = col * com.hust.game.constants.GameConstants.TILE_SIZE
+                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    double centerY = row * com.hust.game.constants.GameConstants.TILE_SIZE
+                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    double candidateX = centerX - renderWidth / 2.0;
+                    double candidateY = centerY - renderHeight + (renderHeight * 0.2) / 2.0;
+
+                    if (!isSafeWitchPosition(candidateX, candidateY)) {
+                        continue;
+                    }
+
+                    double dx = candidateX - preferredX;
+                    double dy = candidateY - preferredY;
+                    double distance = dx * dx + dy * dy;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new double[]{candidateX, candidateY};
+                    }
+                }
+            }
+
+            if (best != null) {
+                return best;
+            }
+        }
+
+        System.err.println("Witch khong tim thay vi tri dich chuyen an toan.");
+        return new double[]{this.x, this.y};
+    }
+
+    private boolean isSafeWitchPosition(double x, double y) {
+        Rectangle2D collisionBox = new Rectangle2D(
+                x + renderWidth * 0.3,
+                y + renderHeight * 0.8,
+                renderWidth * 0.4,
+                renderHeight * 0.2
+        );
+        int left = (int) Math.floor(collisionBox.getMinX());
+        int right = (int) Math.floor(collisionBox.getMaxX() - 1);
+        int top = (int) Math.floor(collisionBox.getMinY());
+        int bottom = (int) Math.floor(collisionBox.getMaxY() - 1);
+        int centerX = (int) Math.floor(collisionBox.getMinX() + collisionBox.getWidth() / 2.0);
+        int centerY = (int) Math.floor(collisionBox.getMinY() + collisionBox.getHeight() / 2.0);
+
+        return !isBlockedByCollisionChecker(left, top)
+                && !isBlockedByCollisionChecker(right, top)
+                && !isBlockedByCollisionChecker(left, bottom)
+                && !isBlockedByCollisionChecker(right, bottom)
+                && !isBlockedByCollisionChecker(centerX, centerY)
+                && (targetPlayer == null || !targetPlayer.getCollisionBoundary().intersects(collisionBox));
     }
 
     @Override
     public void update() {
+        updatePlayerDamageCooldown();
+
         this.lastX = this.x;
         this.lastY = this.y;
 
@@ -202,12 +404,11 @@ public class Witch extends Enemy {
             // Kích thước phòng Level 2 là 816x480. Dịch chuyển trong vùng an toàn (x: 100->650, y: 200)
             // Dịch chuyển Witch đến vị trí an toàn hơn, tránh bị kẹt vào tường ở rìa màn hình.
             // Các giá trị đã được điều chỉnh để đảm bảo có khoảng trống xung quanh.
-            if (targetPlayer.getX() < 400) {
-                this.x = 600;
-            } else {
-                this.x = 200;
-            }
-            this.y = 250;
+            double preferredX = targetPlayer.getX() < 400 ? 600 : 200;
+            double preferredY = 250;
+            double[] safePos = findSafeWitchPosition(preferredX, preferredY);
+            this.x = safePos[0];
+            this.y = safePos[1];
             
             // Cập nhật lastX, lastY để cơ chế chống kẹt tường không đẩy ngược Witch về chỗ cũ
             this.lastX = this.x;
@@ -240,8 +441,15 @@ public class Witch extends Enemy {
             if (dist > 250) {
                 this.moveX = (diffX / dist) * this.speed;
                 this.moveY = (diffY / dist) * this.speed;
-                this.x += this.moveX;
-                this.y += this.moveY;
+                double nextX = this.x + this.moveX;
+                double nextY = this.y + this.moveY;
+                if (canOccupy(nextX, nextY)) {
+                    this.x = nextX;
+                    this.y = nextY;
+                } else {
+                    this.moveX = 0;
+                    this.moveY = 0;
+                }
             } else {
                 this.moveX = 0;
                 this.moveY = 0;
@@ -297,7 +505,7 @@ public class Witch extends Enemy {
                 double cDiffX = (targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0) - (circleX + 32);
                 double cDiffY = (targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0) - (circleY + 32);
                 if (Math.sqrt(cDiffX * cDiffX + cDiffY * cDiffY) <= 40) {
-                    targetPlayer.takeDamage(this.damage, circleX + 32, circleY + 32); // Đẩy lùi tính từ tâm vòng lửa
+                    tryDamagePlayer(targetPlayer, this.damage, circleX + 32, circleY + 32, CIRCLE_DAMAGE_COOLDOWN_FRAMES); // Đẩy lùi tính từ tâm vòng lửa
                 }
             } else if (circleTimer > 230) {
                 resetToIdle();
