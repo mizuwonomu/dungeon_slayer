@@ -36,10 +36,13 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.layout.StackPane;
+import javafx.scene.Cursor;
+import javafx.scene.ImageCursor;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyCombination;
+import javafx.scene.Node;
 import javafx.stage.Stage;
 
 import java.util.ArrayList;
@@ -228,6 +231,7 @@ public class App extends Application {
     }
 
     private Scene mainScene;
+    private Cursor appCursor;
 
     private void setAppScene(Stage stage, Scene scene) {
         if (mainScene == null) {
@@ -247,6 +251,7 @@ public class App extends Application {
             scene.setRoot(new javafx.scene.layout.Region());
             mainScene.setRoot(root);
         }
+        applyCursorToScene(mainScene);
         applyDisplayMode(stage);
     }
 
@@ -337,6 +342,8 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
+        Cursor gameCursor = getAppCursor();
+        canvas.setCursor(gameCursor);
         isMouseInsideCanvas = false;
         mouseCanvasX = 0;
         mouseCanvasY = 0;
@@ -434,6 +441,7 @@ public class App extends Application {
                 }
             );
             root.getChildren().add(pauseScreen.getRoot());
+            applyCursorToNode(pauseScreen.getRoot());
             isDataLoaded = true;
         });
         new Thread(loadTask).start();
@@ -488,7 +496,11 @@ public class App extends Application {
             mouseCanvasY = e.getY();
             isMouseInsideCanvas = true;
         });
-        canvas.setOnMouseExited(e -> isMouseInsideCanvas = false);
+        canvas.setOnMouseEntered(e -> canvas.setCursor(gameCursor));
+        canvas.setOnMouseExited(e -> {
+            isMouseInsideCanvas = false;
+            canvas.setCursor(gameCursor);
+        });
 
         gameLoop = new AnimationTimer() {
             @Override
@@ -1876,6 +1888,54 @@ public class App extends Application {
 
     private Image loadImg(String path) {
         return loadImg(path, 0, 0);
+    }
+
+    private Cursor getAppCursor() {
+        if (appCursor == null) {
+            appCursor = createGameCursor();
+        }
+        return appCursor;
+    }
+
+    private void applyCursorToScene(Scene scene) {
+        Cursor cursor = getAppCursor();
+        scene.setCursor(cursor);
+        applyCursorToNode(scene.getRoot());
+    }
+
+    private void applyCursorToNode(Node node) {
+        if (node == null) {
+            return;
+        }
+
+        node.setCursor(getAppCursor());
+        if (node instanceof javafx.scene.Parent parent) {
+            for (Node child : parent.getChildrenUnmodifiable()) {
+                applyCursorToNode(child);
+            }
+        }
+    }
+
+    private Cursor createGameCursor() {
+        String[] paths = {
+                "/assets/cursors/game_cursor.png",
+                "/assets/ui/cursors/game_cursor.png"
+        };
+
+        for (String path : paths) {
+            try (java.io.InputStream stream = getClass().getResourceAsStream(path)) {
+                if (stream == null) {
+                    continue;
+                }
+                Image cursorImage = new Image(stream);
+                return new ImageCursor(cursorImage, 0, 0);
+            } catch (Exception e) {
+                System.err.println("Lỗi load cursor: " + path);
+            }
+        }
+
+        System.err.println("Không tìm thấy cursor game_cursor.png");
+        return Cursor.DEFAULT;
     }
 
     private Image loadImg(String path, double w, double h) {
