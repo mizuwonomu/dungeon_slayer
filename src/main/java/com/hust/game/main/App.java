@@ -53,6 +53,7 @@ public class App extends Application {
     // Cập nhật lại kích thước khớp chuẩn tỷ lệ 1.7 (17 cột x 10 hàng, TILE_SIZE = 48)
     private static final int WIDTH = GameConstants.WINDOW_WIDTH; 
     private static final int HEIGHT = GameConstants.WINDOW_HEIGHT; 
+    private static final int MERGE_MANA_COST = 20;
 
     // kích thước 1 ô trong game 8-bit sau khi upscale (ví dụ 16x16 -> 48x48)
     private static final int TILE_SIZE = 48;
@@ -1282,7 +1283,7 @@ public class App extends Application {
                     if (allyManager.trySummon(player)) {
                         com.hust.game.audio.SoundManager.playTransformSound();
                     }
-                } else if (player.activateStoredMergeForm()) {
+                } else if (player.activateStoredMergeForm(MERGE_MANA_COST)) {
                     com.hust.game.audio.SoundManager.playTransformSound();
                 }
                 isKHeld = true;

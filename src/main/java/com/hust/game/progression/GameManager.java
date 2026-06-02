@@ -63,13 +63,13 @@ public class GameManager {
 
         // Đặt lại chỉ số và toạ độ người chơi theo level
         if (lvlID == 0) {
-            player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 5 * com.hust.game.constants.GameConstants.TILE_SIZE);
+            player.moveToLevelStart(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 5 * com.hust.game.constants.GameConstants.TILE_SIZE);
         } else if (lvlID == 1) {
-            player.reset(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 16 * com.hust.game.constants.GameConstants.TILE_SIZE);
+            player.moveToLevelStart(4 * com.hust.game.constants.GameConstants.TILE_SIZE, 16 * com.hust.game.constants.GameConstants.TILE_SIZE);
         } else if (lvlID == 2) {
-            player.reset(7 * com.hust.game.constants.GameConstants.TILE_SIZE, 22 * com.hust.game.constants.GameConstants.TILE_SIZE); // Tọa độ mặc định của Level 2
+            player.moveToLevelStart(7 * com.hust.game.constants.GameConstants.TILE_SIZE, 22 * com.hust.game.constants.GameConstants.TILE_SIZE); // Tọa độ mặc định của Level 2
         } else if (lvlID == 3) {
-            player.reset(1 * com.hust.game.constants.GameConstants.TILE_SIZE, 19 * com.hust.game.constants.GameConstants.TILE_SIZE); // Player xuất hiện ở ô (2, 20)
+            player.moveToLevelStart(1 * com.hust.game.constants.GameConstants.TILE_SIZE, 19 * com.hust.game.constants.GameConstants.TILE_SIZE); // Player xuất hiện ở ô (2, 20)
         }
 
         currentLevel.init();

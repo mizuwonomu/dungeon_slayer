@@ -822,7 +822,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.currentMana = maxMana;
         this.healthPotionCount = 0;
         this.manaPotionCount = 0;
-        this.coins = 0;
+        mergeController.clearAll();
+        resetAttackCooldown();
+    }
+
+    public void moveToLevelStart(double startX, double startY) {
+        this.x = startX;
+        this.y = startY;
         mergeController.clearAll();
         resetAttackCooldown();
     }
