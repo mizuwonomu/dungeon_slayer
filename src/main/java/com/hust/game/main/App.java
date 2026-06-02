@@ -89,6 +89,9 @@ public class App extends Application {
     private double screenShakeAmplitude = 0.0; // Độ rung (0.0, 0.5, 1.0)
     private int hitStopTimer = 0;
     private boolean isMousePressed = false;
+    private boolean isMouseInsideCanvas = false;
+    private double mouseCanvasX = 0;
+    private double mouseCanvasY = 0;
 
     private boolean isPaused = false;
     private PauseScreen pauseScreen;
@@ -334,6 +337,9 @@ public class App extends Application {
     private Scene createGameScene(Stage stage, int startLevel) {
         Canvas canvas = new Canvas(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
         gc = canvas.getGraphicsContext2D();
+        isMouseInsideCanvas = false;
+        mouseCanvasX = 0;
+        mouseCanvasY = 0;
 
         isDataLoaded = false;
         startLoadingPhase(startLevel);
@@ -472,6 +478,17 @@ public class App extends Application {
             if (isLoadingPhase) return;
             if (!isPaused) isMousePressed = false;
         });
+        canvas.setOnMouseMoved(e -> {
+            mouseCanvasX = e.getX();
+            mouseCanvasY = e.getY();
+            isMouseInsideCanvas = true;
+        });
+        canvas.setOnMouseDragged(e -> {
+            mouseCanvasX = e.getX();
+            mouseCanvasY = e.getY();
+            isMouseInsideCanvas = true;
+        });
+        canvas.setOnMouseExited(e -> isMouseInsideCanvas = false);
 
         gameLoop = new AnimationTimer() {
             @Override
@@ -743,7 +760,11 @@ public class App extends Application {
 
                 gc.restore(); // Khôi phục toạ độ nguyên gốc tại đây, để HUD vẽ không bị trượt đi
 
-                hud.render(gc);
+                if (hud != null) {
+                    boolean showHudTooltip = isMouseInsideCanvas && !isLoadingPhase && !isPaused && !isMinimapOpen;
+                    hud.setMousePosition(mouseCanvasX, mouseCanvasY, showHudTooltip);
+                    hud.render(gc);
+                }
 
                 if (npc != null) {
                     npc.renderOverlay(gc);
