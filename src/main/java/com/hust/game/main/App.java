@@ -374,6 +374,42 @@ public class App extends Application {
                 }
                 return;
             }
+            if (isMinimapOpen) {
+
+                switch (e.getCode()) {
+
+                    case PLUS:
+                    case EQUALS:
+                        minimapUI.zoomIn();
+                        break;
+
+                    case MINUS:
+                        minimapUI.zoomOut();
+                        break;
+
+                    case W:
+                        minimapUI.moveUp();
+                        break;
+
+                    case S:
+                        minimapUI.moveDown();
+                        break;
+
+                    case A:
+                        minimapUI.moveLeft();
+                        break;
+
+                    case D:
+                        minimapUI.moveRight();
+                        break;
+
+                    case M:
+                        toggleMinimap(root);
+                        break;
+                }
+
+                return;
+            }
             if (!isPaused && !isMinimapOpen) {
                 input.add(e.getCode());
             }
