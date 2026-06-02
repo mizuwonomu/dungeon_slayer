@@ -113,7 +113,9 @@ public class MapManager {
                 }
             }
 
-            spawnPotions();
+            if (level != 3) {
+                spawnPotions();
+            }
         } catch (Exception e) { e.printStackTrace(); }
     }
 

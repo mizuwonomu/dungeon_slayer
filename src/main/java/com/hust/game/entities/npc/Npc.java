@@ -29,6 +29,10 @@ public class Npc extends StaticEntity {
     private static final int POTION_PRICE_COINS = 2;
     private static final int COIN_FRAMES = 6;
     private static final double INTERACTION_RANGE = GameConstants.TILE_SIZE;
+    private static final double PANEL_X = 220;
+    private static final double PANEL_WIDTH = GameConstants.WINDOW_WIDTH - 440;
+    private static final double PANEL_HEIGHT = 230;
+    private static final double DIALOGUE_PANEL_HEIGHT = 260;
 
     private final Image idle1;
     private final Image idle2;
@@ -60,11 +64,17 @@ public class Npc extends StaticEntity {
     private static final int PANEL_ANIM_DURATION = 30;
 
     private static final String PROMPT_TEXT = "Bấm H để tương tác";
-    private static final String TIP_TEXT = "Cách đánh quái đơn giản lắm! Bạn chỉ cần canh thời gian đánh trúng!\n"
+    private static final String DEFAULT_TIP_TEXT = "Cách đánh quái đơn giản lắm! Bạn chỉ cần canh thời gian đánh trúng!\n"
             + "Nếu thấy quái chuẩn bị đánh, hãy né hoặc chém đúng nhịp để phản đòn.";
+    private final String tipText;
 
     public Npc(double x, double y, Image idle1, Image idle2, Image idle3,
             Image dialogue, Image approval, Image manaPotion, Image healthPotion) {
+        this(x, y, idle1, idle2, idle3, dialogue, approval, manaPotion, healthPotion, DEFAULT_TIP_TEXT);
+    }
+
+    public Npc(double x, double y, Image idle1, Image idle2, Image idle3,
+            Image dialogue, Image approval, Image manaPotion, Image healthPotion, String tipText) {
         super(x, y, idle1, 6, 64, 64); // idle1 có 6 frames, kích thước 64x64
         this.idle1 = idle1;
         this.idle2 = idle2;
@@ -74,6 +84,7 @@ public class Npc extends StaticEntity {
         this.manaPotion = manaPotion;
         this.healthPotion = healthPotion;
         this.coin = loadOptionalImage("/assets/items/coin.png");
+        this.tipText = tipText != null ? tipText : DEFAULT_TIP_TEXT;
 
         java.io.InputStream fontStream = getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf");
         Font loadedFont = fontStream != null ? Font.loadFont(fontStream, 24) : null;
@@ -117,7 +128,7 @@ public class Npc extends StaticEntity {
             dialogueTimer++;
             if (dialogueTimer >= DIALOGUE_DELAY) {
                 dialogueTimer = 0;
-                if (dialogueVisibleChars < TIP_TEXT.length()) {
+                if (dialogueVisibleChars < tipText.length()) {
                     dialogueVisibleChars++;
                 }
             }
@@ -217,7 +228,7 @@ public class Npc extends StaticEntity {
 
     public void skipDialogue() {
         if (state == State.DIALOGUE) {
-            dialogueVisibleChars = TIP_TEXT.length();
+            dialogueVisibleChars = tipText.length();
         }
     }
 
@@ -240,8 +251,8 @@ public class Npc extends StaticEntity {
             renderPrompt(gc);
         } else if (panelState != PanelState.HIDDEN) {
             // Calculate animated Y position for the panel
-            double targetY = GameConstants.WINDOW_HEIGHT - 275;
-            double height = 230;
+            double height = state == State.DIALOGUE ? DIALOGUE_PANEL_HEIGHT : PANEL_HEIGHT;
+            double targetY = GameConstants.WINDOW_HEIGHT - height - 45;
             double offsetY = 0;
             double t = (double) panelAnimTimer / PANEL_ANIM_DURATION;
 
@@ -258,8 +269,8 @@ public class Npc extends StaticEntity {
             if (state == State.MENU) {
                 renderPanel(gc, "NPC", "[1] Tips and tricks\n[2] Buy items\n[O] Thoát", animatedY);
             } else if (state == State.DIALOGUE) {
-                int chars = Math.min(dialogueVisibleChars, TIP_TEXT.length());
-                renderPanel(gc, "Tips and tricks", TIP_TEXT.substring(0, chars) + "\n\n[O] Thoát", animatedY);
+                int chars = Math.min(dialogueVisibleChars, tipText.length());
+                renderDialoguePanel(gc, tipText.substring(0, chars), animatedY);
             } else if (state == State.SHOP) {
                 renderShop(gc, animatedY);
             }
@@ -303,11 +314,19 @@ public class Npc extends StaticEntity {
     }
 
     private void renderPanel(GraphicsContext gc, String title, String body, double yPos) {
+        renderPanel(gc, title, body, yPos, PANEL_HEIGHT, 24, 34);
+    }
+
+    private void renderDialoguePanel(GraphicsContext gc, String body, double yPos) {
+        renderPanel(gc, "Tips and tricks", body + "\n\n[O] Thoát", yPos, DIALOGUE_PANEL_HEIGHT, 21, 29);
+    }
+
+    private void renderPanel(GraphicsContext gc, String title, String body, double yPos,
+            double height, double bodyFontSize, double lineSpacing) {
         gc.save();
-        double x = 220;
+        double x = PANEL_X;
         double y = yPos;
-        double width = GameConstants.WINDOW_WIDTH - 440;
-        double height = 230;
+        double width = PANEL_WIDTH;
 
         // Vẽ hình ảnh comment box nếu có, ngược lại fallback về vẽ bằng code như cũ
         if (cmtBox != null) {
@@ -324,12 +343,12 @@ public class Npc extends StaticEntity {
         gc.setTextAlign(TextAlignment.CENTER);
         drawOutlinedText(gc, title, x + width / 2.0, y + 44, Color.ORANGE);
 
-        gc.setFont(font);
+        gc.setFont(Font.font(font.getFamily(), FontWeight.BOLD, bodyFontSize));
         gc.setTextAlign(TextAlignment.LEFT);
         double textY = y + 88;
         for (String line : body.split("\n")) {
             drawOutlinedText(gc, line, x + 46, textY, Color.WHITE);
-            textY += 34;
+            textY += lineSpacing;
         }
         gc.restore();
     }
@@ -347,8 +366,7 @@ public class Npc extends StaticEntity {
         if (!feedbackText.isEmpty()) {
             gc.setFont(font);
             gc.setTextAlign(TextAlignment.CENTER);
-            double height = 230;
-            drawOutlinedText(gc, feedbackText, GameConstants.WINDOW_WIDTH / 2.0, yPos + height + 30, Color.LIGHTGREEN);
+            drawOutlinedText(gc, feedbackText, GameConstants.WINDOW_WIDTH / 2.0, yPos + PANEL_HEIGHT + 30, Color.LIGHTGREEN);
         }
         gc.restore();
     }
@@ -408,11 +426,7 @@ public class Npc extends StaticEntity {
                     frameIndex++;
                 }
             } else if (spriteSheet == dialogue) {
-                if (frameIndex >= 6) {
-                    frameIndex = 3;
-                } else {
-                    frameIndex++;
-                }
+                frameIndex = (frameIndex + 1) % numFrames;
             } else {
                 frameIndex = (frameIndex + 1) % numFrames;
             }
@@ -434,10 +448,10 @@ public class Npc extends StaticEntity {
             numFrames = 6;
         } else if (sheet == idle2) {
             numFrames = 8;
-        } else if (sheet == idle3) {
-            numFrames = 7;
         } else if (sheet == dialogue) {
             numFrames = 8;
+        } else if (sheet == idle3) {
+            numFrames = 7;
         } else if (sheet == approval) {
             numFrames = 8;
         }

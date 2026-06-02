@@ -1369,7 +1369,12 @@ public class App extends Application {
     }
 
     private Npc getActiveNpc() {
-        if (gameManager == null || gameManager.getCurrentLevelIndex() != 1) {
+        if (gameManager == null) {
+            return null;
+        }
+
+        int currentLevel = gameManager.getCurrentLevelIndex();
+        if (currentLevel != 1 && currentLevel != 3) {
             return null;
         }
         return gameManager.getNpc();

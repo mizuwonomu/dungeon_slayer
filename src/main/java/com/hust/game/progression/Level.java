@@ -29,6 +29,11 @@ public class Level {
             {21, 18}
     };
     private static final long LEVEL1_NPC_SEED = 1001L;
+    private static final String LEVEL1_NPC_TIP = "Cách đánh quái đơn giản lắm! Bạn chỉ cần canh thời gian đánh trúng!\n"
+            + "Nếu thấy quái chuẩn bị đánh, hãy né hoặc chém đúng nhịp để phản đòn.";
+    private static final String BOSS_NPC_TIP = "Skill có sự thay đổi đó!\n"
+            + "Bấm K để triệu hồi companion hỗ trợ đánh boss.\n"
+            + "Hãy tận dụng nó đúng lúc nhé!";
 
     private int lvlID;
 
@@ -315,29 +320,47 @@ public class Level {
     }
 
     private void spawnNpc() {
-        if (lvlID != 1) {
+        if (lvlID != 1 && lvlID != 3) {
             npc = null;
             return;
         }
 
         Image idle1 = loadFirstAvailableImage("/assets/npc/Idle.png", "/assets/npc/Idle.png");
         Image idle2 = loadOptionalImage("/assets/npc/Idle_2.png");
-        Image idle3 = loadOptionalImage("/assets/npc/Idle_3.png");
         Image dialogue = loadOptionalImage("/assets/npc/Dialogue.png");
-        Image approval = loadOptionalImage("/assets/npc/Approval.png");
+        Image idle3 = dialogue;
+        Image approval = idle2;
         Image manaPotion = loadOptionalImage("/assets/items/mana_potion.png");
         Image healthPotion = loadOptionalImage("/assets/items/health_potion.png");
 
         if (idle1 == null || idle2 == null || dialogue == null || manaPotion == null || healthPotion == null) {
-            System.err.println("Không thể sinh NPC level 1 vì thiếu sprite sheet NPC hoặc item.");
+            System.err.println("Không thể sinh NPC level " + lvlID + " vì thiếu sprite sheet NPC hoặc item.");
             npc = null;
             return;
         }
 
-        int[] tile = chooseNpcTile();
+        int[] tile = lvlID == 3 ? chooseBossNpcTile() : chooseNpcTile();
         double x = tile[0] * TILE_SIZE;
         double y = tile[1] * TILE_SIZE;
-        npc = new Npc(x, y, idle1, idle2, idle3, dialogue, approval, manaPotion, healthPotion);
+        String tipText = lvlID == 3 ? BOSS_NPC_TIP : LEVEL1_NPC_TIP;
+        npc = new Npc(x, y, idle1, idle2, idle3, dialogue, approval, manaPotion, healthPotion, tipText);
+    }
+
+    private int[] chooseBossNpcTile() {
+        int[][] preferredTiles = {
+                {4, 18},
+                {4, 19},
+                {3, 19},
+                {5, 18}
+        };
+
+        for (int[] tile : preferredTiles) {
+            if (isWalkableTile(tile[0], tile[1])) {
+                return tile;
+            }
+        }
+
+        return new int[]{4, 19};
     }
 
     private int[] chooseNpcTile() {
@@ -369,6 +392,16 @@ public class Level {
 
         Random random = new Random(LEVEL1_NPC_SEED);
         return candidates.get(random.nextInt(candidates.size()));
+    }
+
+    private boolean isWalkableTile(int col, int row) {
+        if (row < 0 || row >= map.getLoadedRowCount() || col < 0 || col >= map.getLoadedColCount()) {
+            return false;
+        }
+
+        int tileId = map.mapTileNum[row][col];
+        com.hust.game.map.Tile tile = map.tiles.get(tileId);
+        return tile != null && !tile.collision;
     }
 
     private Image loadOptionalImage(String path) {
