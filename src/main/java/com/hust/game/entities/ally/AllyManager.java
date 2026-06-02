@@ -9,6 +9,7 @@ import javafx.scene.canvas.GraphicsContext;
 
 public class AllyManager {
     private static final int SUMMON_COOLDOWN_FRAMES = 30 * 60;
+    private static final int SUMMON_MANA_COST = 20;
     private static final double SPAWN_OFFSET_X = 34.0;
     private static final double SPAWN_OFFSET_Y = 10.0;
 
@@ -100,6 +101,9 @@ public class AllyManager {
     public boolean trySummon(Player player) {
         FinalBoss boss = findLiveBoss();
         if (player == null || boss == null || activeMinion != null || summonCooldown > 0 || isPlayingSummonAnim) {
+            return false;
+        }
+        if (!player.spendMana(SUMMON_MANA_COST)) {
             return false;
         }
 

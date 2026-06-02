@@ -675,6 +675,18 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         currentMana = Math.max(0, currentMana - amount);
     }
 
+    public boolean canSpendMana(int amount) {
+        return amount >= 0 && currentMana >= amount;
+    }
+
+    public boolean spendMana(int amount) {
+        if (!canSpendMana(amount)) {
+            return false;
+        }
+        currentMana -= amount;
+        return true;
+    }
+
     @Override
     public int getCurrentHp() {
         return currentHp;
@@ -810,6 +822,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.currentMana = maxMana;
         this.healthPotionCount = 0;
         this.manaPotionCount = 0;
+        this.coins = 0;
         mergeController.clearAll();
         resetAttackCooldown();
     }
@@ -820,6 +833,19 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
     public boolean activateStoredMergeForm() {
         return mergeController.activateStoredForm();
+    }
+
+    public boolean activateStoredMergeForm(int manaCost) {
+        if (!mergeController.hasStoredForm() || !canSpendMana(manaCost)) {
+            return false;
+        }
+
+        if (!mergeController.activateStoredForm()) {
+            return false;
+        }
+
+        spendMana(manaCost);
+        return true;
     }
 
     public boolean hasStoredMergeForm() {
