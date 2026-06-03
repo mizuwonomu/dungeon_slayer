@@ -8,6 +8,7 @@ import javafx.geometry.Rectangle2D;
 public class Tree extends Enemy {
     private int skillCoolDown = 0;
     private final int SKILL_TIMING = 120;
+    private static final int SKILL_DAMAGE_COOLDOWN_FRAMES = 30;
 
     private Image normalSprite;
     private Image skillSprite;
@@ -85,6 +86,8 @@ public class Tree extends Enemy {
         }
 
         if (isCastingSkill) {
+            updatePlayerDamageCooldown();
+
             if (this.flashTimer > 0)
                 this.flashTimer--;
             if (this.attackPauseTimer > 0)
@@ -125,7 +128,7 @@ public class Tree extends Enemy {
                 // Tính sát thương vào frame thứ 6 (index 5) để khớp với animation mới
                 if (skillFrameIndex == 5 && !hasDealtSkillDamage) {
                     if (isInAttackRange()) {
-                        targetPlayer.takeDamage(this.damage, this);
+                        tryDamagePlayer(targetPlayer, this.damage, SKILL_DAMAGE_COOLDOWN_FRAMES);
                     }
                     hasDealtSkillDamage = true;
                 }
@@ -166,6 +169,10 @@ public class Tree extends Enemy {
     }
 
     private boolean isInAttackRange() {
+        if (targetPlayer == null) {
+            return false;
+        }
+
         double attackRange = 45.0; // Tầm đánh mở rộng để có thể dễ dàng chạm Player ở cả trên và dưới
         javafx.geometry.Rectangle2D treeBox = this.getBoundary();
         javafx.geometry.Rectangle2D attackBox = new javafx.geometry.Rectangle2D(
@@ -178,7 +185,20 @@ public class Tree extends Enemy {
             return false;
         }
         
-        return true;
+        return hasLineOfSightToPlayer();
+    }
+
+    private boolean hasLineOfSightToPlayer() {
+        if (collisionChecker == null || targetPlayer == null) {
+            return true;
+        }
+
+        Rectangle2D treeBox = this.getCollisionBoundary();
+        Rectangle2D playerBox = targetPlayer.getCollisionBoundary();
+        double treeCenterX = treeBox.getMinX() + treeBox.getWidth() / 2.0;
+        double treeCenterY = treeBox.getMinY() + treeBox.getHeight() / 2.0;
+
+        return collisionChecker.hasUnblockedAttackLine(treeCenterX, treeCenterY, playerBox);
     }
 
     private void castSkill() {
@@ -194,8 +214,8 @@ public class Tree extends Enemy {
             this.frameWidth = skillSprite.getWidth() / SKILL_NUM_FRAMES;
             this.frameHeight = skillSprite.getHeight();
             this.frameIndex = 0;
-        } else {
-            targetPlayer.takeDamage(this.damage, this);
+        } else if (isInAttackRange()) {
+            tryDamagePlayer(targetPlayer, this.damage, SKILL_DAMAGE_COOLDOWN_FRAMES);
         }
     }
 

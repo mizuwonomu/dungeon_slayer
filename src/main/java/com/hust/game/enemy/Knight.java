@@ -9,6 +9,7 @@ public class Knight extends Enemy {
 
     private int dashCooldownTimer = 120;
     private final int MAX_DASH_COOLDOWN = 180;
+    private static final int DASH_DAMAGE_COOLDOWN_FRAMES = 30;
     private int MAX_DASH_DURATION = 30;
     private Image normalSprite;
     private Image skillSprite;
@@ -92,6 +93,8 @@ public class Knight extends Enemy {
 
     @Override
     public void update() {
+        updatePlayerDamageCooldown();
+
         if (this.hp > 0) {
             if (this.flashTimer > 0) {
                 this.flashTimer--;
@@ -289,7 +292,7 @@ public class Knight extends Enemy {
             // thay vì phụ thuộc vào Hitbox vật lý nhỏ dưới chân
             if (this.isDealingDamage()) {
                 if (this.getBoundary().intersects(targetPlayer.getBoundary())) {
-                    targetPlayer.takeDamage(this.damage, this);
+                    tryDamagePlayer(targetPlayer, this.damage, DASH_DAMAGE_COOLDOWN_FRAMES);
                 }
             }
 

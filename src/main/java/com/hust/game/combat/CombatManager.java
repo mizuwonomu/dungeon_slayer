@@ -222,7 +222,10 @@ public class CombatManager {
 
             // Nếu hitbox chém intersects với boundary của enemy → gây damage
             if (attackBox.intersects(enemyBox)) {
-                
+                if (!hasAttackLineOfSight(enemy)) {
+                    continue;
+                }
+
                 enemy.takeDamage(actualDamage);
 
                 // Bật hiệu ứng knockback (với đòn chọc thì chỉ đẩy lùi ở phát cuối cùng)
@@ -487,5 +490,18 @@ public class CombatManager {
 
     private boolean isCoinRewardLevel() {
         return currentLevelIndex == 1 || currentLevelIndex == 2;
+    }
+
+    private boolean hasAttackLineOfSight(Enemy enemy) {
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        Rectangle2D playerBox = player.getBoundary();
+        Rectangle2D targetBox = enemy.getCollisionBoundary();
+        double playerCenterX = playerBox.getMinX() + playerBox.getWidth() / 2.0;
+        double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
+
+        return collisionChecker.hasUnblockedAttackLine(playerCenterX, playerCenterY, targetBox);
     }
 }

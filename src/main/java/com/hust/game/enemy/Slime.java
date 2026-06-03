@@ -6,7 +6,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.geometry.Rectangle2D;
 
 public class Slime extends Enemy {
-    private int damageTick = 0;
+    private static final int CONTACT_DAMAGE_COOLDOWN_FRAMES = 30;
     private Image dieSprite;
     private boolean isDying = false;
 
@@ -93,14 +93,8 @@ public class Slime extends Enemy {
      * Tách ra thành hàm riêng để có thể gọi cả lúc di chuyển và đứng im.
      */
     private void handleTouchDamage() {
-        if (damageTick > 0) {
-            damageTick--;
-        }
-        // Chỉ tấn công nếu đang không trong cooldown nhỏ sau đòn đánh
-        if (!this.isHarmless && this.intersects(targetPlayer) && damageTick <= 0) {
-            targetPlayer.takeDamage(this.damage, this);
-            damageTick = 30; // Cooldown 0.5s để tránh gây damage mỗi frame
-            
+        if (this.intersects(targetPlayer)
+                && tryDamagePlayer(targetPlayer, this.damage, CONTACT_DAMAGE_COOLDOWN_FRAMES)) {
             // Tính toán hướng để đẩy Slime lùi ra xa
             double pCenterX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0;
             double pCenterY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0;

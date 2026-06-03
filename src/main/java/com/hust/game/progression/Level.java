@@ -8,6 +8,7 @@ import com.hust.game.constants.GameConstants;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.geometry.Rectangle2D;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -20,6 +21,9 @@ public class Level {
     private static final int HEIGHT = 624; // 13 * 48
     private static final int TILE_SIZE = GameConstants.TILE_SIZE;
     private static final int LEVEL1_TEST_ENEMY_LIMIT = 2;
+    private static final double ENEMY_FOOT_COLLISION_WIDTH_RATIO = 0.4;
+    private static final double ENEMY_FOOT_COLLISION_HEIGHT_RATIO = 0.2;
+    private static final double LEVEL2_WITCH_RENDER_HEIGHT = 150.0;
     private static final int[][] LEVEL1_TREE_TEST_SPAWNS = {
             {15, 16},
             {18, 16},
@@ -290,17 +294,169 @@ public class Level {
             }
         }
         else if(lvlID == 2){
-            enemyManager.spawnEnemy("Knight", WIDTH / 2 - 200, HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
-                                    player, knightSkillImg);
-            enemyManager.spawnEnemy("Knight", WIDTH / 2 + 50 , HEIGHT / 2 - 200, knightImg, 8, TILE_SIZE * 2, TILE_SIZE * 2, 
-                                    player, knightSkillImg);
-            enemyManager.spawnEnemy("Witch", WIDTH / 2 - 100, HEIGHT / 2 - 100, witchImg, 25, TILE_SIZE, TILE_SIZE,
-                                    player, witchSkillImg);
+            spawnLevel2Enemies();
         }
         else if (lvlID == 3) {
             // Spawn boss ở ô (31, 20)
             enemyManager.spawnEnemy("FinalBoss", 30 * TILE_SIZE, 19 * TILE_SIZE, bossImg, 5, TILE_SIZE * 3, TILE_SIZE * 3, player);
         }
+    }
+
+    private void spawnLevel2Enemies() {
+        double knightW = TILE_SIZE * 2.0;
+        double knightH = TILE_SIZE * 2.0;
+        double witchH = LEVEL2_WITCH_RENDER_HEIGHT;
+        double witchW = calculateWitchRenderWidth(witchH);
+
+        double[] knight1 = findSafeEnemySpawn(WIDTH / 2.0 - 200, HEIGHT / 2.0 - 200, knightW, knightH);
+        enemyManager.spawnEnemy("Knight", knight1[0], knight1[1], knightImg, 8, knightW, knightH, player, knightSkillImg);
+
+        double[] knight2 = findSafeEnemySpawn(WIDTH / 2.0 + 50, HEIGHT / 2.0 - 200, knightW, knightH);
+        enemyManager.spawnEnemy("Knight", knight2[0], knight2[1], knightImg, 8, knightW, knightH, player, knightSkillImg);
+
+        double[] witch = findSafeEnemySpawn(WIDTH / 2.0 - 100, HEIGHT / 2.0 - 100, witchW, witchH);
+        enemyManager.spawnEnemy("Witch", witch[0], witch[1], witchImg, 25, witchW, witchH, player, witchSkillImg);
+    }
+
+    private double calculateWitchRenderWidth(double renderHeight) {
+        if (witchSkillImg == null || witchSkillImg.getHeight() <= 0) {
+            return TILE_SIZE;
+        }
+        double frameWidth = witchSkillImg.getWidth() / 20.0;
+        return renderHeight * (frameWidth / witchSkillImg.getHeight());
+    }
+
+    private double[] findSafeEnemySpawn(double preferredX, double preferredY, double renderWidth, double renderHeight) {
+        if (isSafeEnemySpawn(preferredX, preferredY, renderWidth, renderHeight)) {
+            return new double[]{preferredX, preferredY};
+        }
+
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        int startCol = clampToRange((int) Math.round(collisionCenterX(preferredX, renderWidth) / TILE_SIZE), 0, cols - 1);
+        int startRow = clampToRange((int) Math.round(collisionCenterY(preferredY, renderHeight) / TILE_SIZE), 0, rows - 1);
+        int maxRadius = Math.max(rows, cols);
+
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            double[] best = null;
+            double bestDistance = Double.MAX_VALUE;
+
+            for (int row = startRow - radius; row <= startRow + radius; row++) {
+                for (int col = startCol - radius; col <= startCol + radius; col++) {
+                    if (Math.abs(row - startRow) != radius && Math.abs(col - startCol) != radius) {
+                        continue;
+                    }
+                    if (row < 0 || row >= rows || col < 0 || col >= cols) {
+                        continue;
+                    }
+
+                    double centerX = col * TILE_SIZE + TILE_SIZE / 2.0;
+                    double centerY = row * TILE_SIZE + TILE_SIZE / 2.0;
+                    double candidateX = centerX - renderWidth / 2.0;
+                    double candidateY = centerY - renderHeight + (renderHeight * ENEMY_FOOT_COLLISION_HEIGHT_RATIO) / 2.0;
+
+                    if (!isSafeEnemySpawn(candidateX, candidateY, renderWidth, renderHeight)) {
+                        continue;
+                    }
+
+                    double dx = candidateX - preferredX;
+                    double dy = candidateY - preferredY;
+                    double distance = dx * dx + dy * dy;
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new double[]{candidateX, candidateY};
+                    }
+                }
+            }
+
+            if (best != null) {
+                return best;
+            }
+        }
+
+        System.err.println("Khong tim thay vi tri spawn an toan cho enemy level " + lvlID);
+        return new double[]{preferredX, preferredY};
+    }
+
+    private boolean isSafeEnemySpawn(double x, double y, double renderWidth, double renderHeight) {
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        if (x < 0 || y < 0 || x + renderWidth > cols * TILE_SIZE || y + renderHeight > rows * TILE_SIZE) {
+            return false;
+        }
+
+        Rectangle2D collisionBox = spawnCollisionBox(x, y, renderWidth, renderHeight);
+        int left = (int) Math.floor(collisionBox.getMinX());
+        int right = (int) Math.floor(collisionBox.getMaxX() - 1);
+        int top = (int) Math.floor(collisionBox.getMinY());
+        int bottom = (int) Math.floor(collisionBox.getMaxY() - 1);
+        int centerX = (int) Math.floor(collisionBox.getMinX() + collisionBox.getWidth() / 2.0);
+        int centerY = (int) Math.floor(collisionBox.getMinY() + collisionBox.getHeight() / 2.0);
+
+        if (isBlockedByMap(left, top) || isBlockedByMap(right, top)
+                || isBlockedByMap(left, bottom) || isBlockedByMap(right, bottom)
+                || isBlockedByMap(centerX, centerY)) {
+            return false;
+        }
+
+        if (player != null && player.getCollisionBoundary().intersects(collisionBox)) {
+            return false;
+        }
+
+        for (Enemy enemy : enemyManager.getEnemyList()) {
+            if (enemy.getHp() > 0 && enemy.getCollisionBoundary().intersects(collisionBox)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private Rectangle2D spawnCollisionBox(double x, double y, double renderWidth, double renderHeight) {
+        double w = renderWidth * ENEMY_FOOT_COLLISION_WIDTH_RATIO;
+        double h = renderHeight * ENEMY_FOOT_COLLISION_HEIGHT_RATIO;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
+    }
+
+    private boolean isBlockedByMap(int pixelX, int pixelY) {
+        int col = pixelX / TILE_SIZE;
+        int row = pixelY / TILE_SIZE;
+        if (row < 0 || row >= map.getLoadedRowCount() || col < 0 || col >= map.getLoadedColCount()) {
+            return true;
+        }
+
+        int tileId1 = map.mapTileNum[row][col];
+        com.hust.game.map.Tile tile1 = map.tiles.get(tileId1);
+        if (tile1 == null || tile1.collision) {
+            return true;
+        }
+
+        int tileId2 = map.mapTileNumLayer2[row][col];
+        if (tileId2 == -15) {
+            return true;
+        }
+        if (tileId2 > 0) {
+            com.hust.game.map.Tile tile2 = map.tiles.get(tileId2);
+            return tile2 != null && tile2.collision;
+        }
+        return false;
+    }
+
+    private double collisionCenterX(double x, double renderWidth) {
+        return x + renderWidth / 2.0;
+    }
+
+    private double collisionCenterY(double y, double renderHeight) {
+        return y + renderHeight - (renderHeight * ENEMY_FOOT_COLLISION_HEIGHT_RATIO) / 2.0;
+    }
+
+    private int clampToRange(int value, int min, int max) {
+        if (max < min) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     private void spawnLevel1TestTrees() {
