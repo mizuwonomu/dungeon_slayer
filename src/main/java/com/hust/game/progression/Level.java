@@ -20,18 +20,15 @@ public class Level {
     private static final int WIDTH = 816; // 17 * 48
     private static final int HEIGHT = 624; // 13 * 48
     private static final int TILE_SIZE = GameConstants.TILE_SIZE;
-    private static final int LEVEL1_TEST_ENEMY_LIMIT = 2;
+    private static final int SMART_ROOM_SIZE = 7;
+    private static final int SMART_ROOM_MIN_WALKABLE_TILES = 28;
+    private static final int LEVEL1_SMART_ROOM_LIMIT = 8;
+    private static final int LEVEL1_TEST_ENEMY_LIMIT = LEVEL1_SMART_ROOM_LIMIT * 2;
+    private static final int LEVEL2_SMART_ROOM_LIMIT = 7;
+    private static final int LEVEL2_WITCH_COUNT = 5;
     private static final double ENEMY_FOOT_COLLISION_WIDTH_RATIO = 0.4;
     private static final double ENEMY_FOOT_COLLISION_HEIGHT_RATIO = 0.2;
     private static final double LEVEL2_WITCH_RENDER_HEIGHT = 150.0;
-    private static final int[][] LEVEL1_TREE_TEST_SPAWNS = {
-            {15, 16},
-            {18, 16},
-            {21, 16},
-            {15, 18},
-            {18, 18},
-            {21, 18}
-    };
     private static final long LEVEL1_NPC_SEED = 1001L;
 
     private int lvlID;
@@ -209,7 +206,6 @@ public class Level {
                 e.setHarmless(true);
             }
         } else if(lvlID == 1){
-            spawnLevel1TestTrees();
 
             // --- THUẬT TOÁN SINH QUÁI THÔNG MINH CHO LEVEL 1 ---
             
@@ -248,7 +244,7 @@ public class Level {
             int spawnedForTest = 0;
 
             // 2. Quét map theo các vùng 7x7 để phát hiện "Phòng" và bỏ qua "Hành lang"
-            for (int r = 0; r < GameConstants.MAX_WORLD_ROW && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; r += 7) {
+            for (int r = 0; r < GameConstants.MAX_WORLD_ROW && spawnedForTest < LEVEL1_SMART_ROOM_LIMIT * 2; r += 7) {
                 for (int c = 15; c < GameConstants.MAX_WORLD_COL && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; c += 7) { // c >= 15 để chừa trống phòng spawn đầu tiên
                     int reachableCount = 0;
                     List<int[]> roomTiles = new ArrayList<>();
@@ -265,7 +261,7 @@ public class Level {
                     
                     // Nếu vùng 7x7 có >= 28 ô đi được -> Đủ rộng để coi là Phòng (Hành lang 3 ô chỉ có tối đa ~21 ô)
                     if (reachableCount >= 28) {
-                        int numEnemies = LEVEL1_TEST_ENEMY_LIMIT - spawnedForTest;
+                        int numEnemies = Math.min(2, LEVEL1_SMART_ROOM_LIMIT * 2 - spawnedForTest);
                         for (int k = 0; k < numEnemies && !roomTiles.isEmpty(); k++) {
                             int randIdx = (int)(Math.random() * roomTiles.size());
                             int[] pos = roomTiles.get(randIdx);
@@ -278,9 +274,11 @@ public class Level {
                             if (Math.random() > 0.5) {
                                 // Ảnh Tree cao 96px (2 ô), mà điểm xét tường là dưới chân. 
                                 // Phải lùi Y lên 1 ô (-48) để chân Tree đáp đúng vào ô trống đã quét được
-                                enemyManager.spawnEnemy("Tree", spawnX, spawnY - 48, treeImg, 8, 96, 96, player, treeSkillImg);
+                                double[] safeTree = findSafeEnemySpawn(spawnX, spawnY - 48, 96, 96);
+                                enemyManager.spawnEnemy("Tree", safeTree[0], safeTree[1], treeImg, 8, 96, 96, player, treeSkillImg);
                             } else {
-                                enemyManager.spawnEnemy("Slime", spawnX, spawnY, slimeImg, 8, 51, 31.5, player);
+                                double[] safeSlime = findSafeEnemySpawn(spawnX, spawnY, 51, 31.5);
+                                enemyManager.spawnEnemy("Slime", safeSlime[0], safeSlime[1], slimeImg, 8, 51, 31.5, player);
                             }
                             spawnedForTest++;
                         }
@@ -303,14 +301,239 @@ public class Level {
         double witchH = LEVEL2_WITCH_RENDER_HEIGHT;
         double witchW = calculateWitchRenderWidth(witchH);
 
-        double[] knight1 = findSafeEnemySpawn(WIDTH / 2.0 - 200, HEIGHT / 2.0 - 200, knightW, knightH);
-        enemyManager.spawnEnemy("Knight", knight1[0], knight1[1], knightImg, 8, knightW, knightH, player, knightSkillImg);
+        boolean[][] reachable = buildReachableTilesFromPlayer();
+        List<int[]> anchors = new ArrayList<>();
+        addLevel2Anchor(anchors, reachable, 0.30, 0.20); // khu tren
+        addLevel2Anchor(anchors, reachable, 0.32, 0.78); // khu duoi
+        addLevel2Anchor(anchors, reachable, 0.66, 0.32); // ben phai, cum 1
+        addLevel2Anchor(anchors, reachable, 0.82, 0.68); // ben phai, cum 2
+        addLevel2Anchor(anchors, reachable, 0.52, 0.52); // cum giua de level khong bi trong
 
-        double[] knight2 = findSafeEnemySpawn(WIDTH / 2.0 + 50, HEIGHT / 2.0 - 200, knightW, knightH);
-        enemyManager.spawnEnemy("Knight", knight2[0], knight2[1], knightImg, 8, knightW, knightH, player, knightSkillImg);
+        for (int i = 0; i < anchors.size(); i++) {
+            int[] anchor = anchors.get(i);
 
-        double[] witch = findSafeEnemySpawn(WIDTH / 2.0 - 100, HEIGHT / 2.0 - 100, witchW, witchH);
-        enemyManager.spawnEnemy("Witch", witch[0], witch[1], witchImg, 25, witchW, witchH, player, witchSkillImg);
+            if (i < LEVEL2_WITCH_COUNT) {
+                spawnEnemyAtTile("Witch", anchor[0], anchor[1], witchW, witchH, witchImg, 25, witchSkillImg);
+            }
+
+            if (i < 2) {
+                spawnEnemyAtTile("Knight", anchor[0], anchor[1] + 2, knightW, knightH, knightImg, 8, knightSkillImg);
+            }
+        }
+    }
+
+    private void addLevel2Anchor(List<int[]> anchors, boolean[][] reachable, double colRatio, double rowRatio) {
+        int[] tile = findReachableTileNear(reachable, colRatio, rowRatio, 8, anchors, 10);
+        if (tile == null) {
+            tile = findReachableTileNear(reachable, colRatio, rowRatio, 8, anchors, 4);
+        }
+        if (tile == null) {
+            tile = findReachableTileNear(reachable, colRatio, rowRatio, 8, anchors, 0);
+        }
+        if (tile != null) {
+            anchors.add(tile);
+        }
+    }
+
+    private int[] findReachableTileNear(boolean[][] reachable, double colRatio, double rowRatio,
+            int minPlayerDistance, List<int[]> anchors, int minAnchorDistance) {
+        if (reachable == null || reachable.length == 0 || reachable[0].length == 0) {
+            return null;
+        }
+
+        int rows = reachable.length;
+        int cols = reachable[0].length;
+        int targetCol = clampToRange((int) Math.round((cols - 1) * colRatio), 0, cols - 1);
+        int targetRow = clampToRange((int) Math.round((rows - 1) * rowRatio), 0, rows - 1);
+        int playerCol = player != null ? (int) (player.getCollisionBoundary().getMinX() / TILE_SIZE) : 4;
+        int playerRow = player != null ? (int) (player.getCollisionBoundary().getMinY() / TILE_SIZE) : 16;
+        int maxRadius = Math.max(rows, cols);
+
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            int[] best = null;
+            int bestDistance = Integer.MAX_VALUE;
+
+            for (int row = targetRow - radius; row <= targetRow + radius; row++) {
+                for (int col = targetCol - radius; col <= targetCol + radius; col++) {
+                    if (Math.abs(row - targetRow) != radius && Math.abs(col - targetCol) != radius) {
+                        continue;
+                    }
+                    if (row < 0 || row >= rows || col < 0 || col >= cols || !reachable[row][col]) {
+                        continue;
+                    }
+                    if (Math.abs(col - playerCol) + Math.abs(row - playerRow) < minPlayerDistance) {
+                        continue;
+                    }
+                    if (!isFarFromAnchors(col, row, anchors, minAnchorDistance)) {
+                        continue;
+                    }
+
+                    int distance = Math.abs(col - targetCol) + Math.abs(row - targetRow);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        best = new int[]{col, row};
+                    }
+                }
+            }
+
+            if (best != null) {
+                return best;
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isFarFromAnchors(int col, int row, List<int[]> anchors, int minDistance) {
+        for (int[] anchor : anchors) {
+            if (Math.abs(col - anchor[0]) + Math.abs(row - anchor[1]) < minDistance) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean[][] buildReachableTilesFromPlayer() {
+        int startCol = 4;
+        int startRow = 16;
+
+        if (player != null) {
+            Rectangle2D playerBox = player.getCollisionBoundary();
+            startCol = clampToRange((int) ((playerBox.getMinX() + playerBox.getWidth() / 2.0) / TILE_SIZE),
+                    0, Math.max(0, map.getLoadedColCount() - 1));
+            startRow = clampToRange((int) ((playerBox.getMinY() + playerBox.getHeight() / 2.0) / TILE_SIZE),
+                    0, Math.max(0, map.getLoadedRowCount() - 1));
+        }
+
+        return buildReachableTiles(startCol, startRow);
+    }
+
+    private boolean[][] buildReachableTiles(int startCol, int startRow) {
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        boolean[][] reachable = new boolean[rows][cols];
+
+        if (!isWalkableSpawnTile(startCol, startRow)) {
+            int[] nearest = findNearestWalkableTile(startCol, startRow);
+            if (nearest == null) {
+                return reachable;
+            }
+            startCol = nearest[0];
+            startRow = nearest[1];
+        }
+
+        java.util.Queue<int[]> queue = new java.util.LinkedList<>();
+        queue.add(new int[]{startCol, startRow});
+        reachable[startRow][startCol] = true;
+
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        while (!queue.isEmpty()) {
+            int[] current = queue.poll();
+            for (int[] dir : dirs) {
+                int nextCol = current[0] + dir[0];
+                int nextRow = current[1] + dir[1];
+                if (nextRow < 0 || nextRow >= rows || nextCol < 0 || nextCol >= cols
+                        || reachable[nextRow][nextCol] || !isWalkableSpawnTile(nextCol, nextRow)) {
+                    continue;
+                }
+
+                reachable[nextRow][nextCol] = true;
+                queue.add(new int[]{nextCol, nextRow});
+            }
+        }
+
+        return reachable;
+    }
+
+    private List<List<int[]>> findReachableRooms(boolean[][] reachable, int minCol, int roomLimit, int minPlayerDistance) {
+        List<List<int[]>> rooms = new ArrayList<>();
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        int playerCol = player != null ? (int) (player.getCollisionBoundary().getMinX() / TILE_SIZE) : 4;
+        int playerRow = player != null ? (int) (player.getCollisionBoundary().getMinY() / TILE_SIZE) : 16;
+
+        for (int r = 0; r < rows && rooms.size() < roomLimit; r += SMART_ROOM_SIZE) {
+            for (int c = minCol; c < cols && rooms.size() < roomLimit; c += SMART_ROOM_SIZE) {
+                List<int[]> roomTiles = new ArrayList<>();
+
+                for (int i = 0; i < SMART_ROOM_SIZE; i++) {
+                    for (int j = 0; j < SMART_ROOM_SIZE; j++) {
+                        int row = r + i;
+                        int col = c + j;
+                        if (row >= rows || col >= cols || !reachable[row][col]) {
+                            continue;
+                        }
+                        int distance = Math.abs(col - playerCol) + Math.abs(row - playerRow);
+                        if (distance < minPlayerDistance) {
+                            continue;
+                        }
+                        roomTiles.add(new int[]{col, row});
+                    }
+                }
+
+                if (roomTiles.size() >= SMART_ROOM_MIN_WALKABLE_TILES) {
+                    rooms.add(roomTiles);
+                }
+            }
+        }
+
+        return rooms;
+    }
+
+    private void spawnEnemyFromRoom(String enemyType, List<int[]> roomTiles, int tileOffset,
+            double renderWidth, double renderHeight, Image sprite, int frames, Image skillSprite) {
+        if (roomTiles == null || roomTiles.isEmpty()) {
+            return;
+        }
+
+        int index = Math.floorMod((tileOffset + 1) * roomTiles.size() / 3, roomTiles.size());
+        int[] tile = roomTiles.get(index);
+        spawnEnemyAtTile(enemyType, tile[0], tile[1], renderWidth, renderHeight, sprite, frames, skillSprite);
+    }
+
+    private void spawnEnemyAtTile(String enemyType, int col, int row,
+            double renderWidth, double renderHeight, Image sprite, int frames, Image skillSprite) {
+        double centerX = col * TILE_SIZE + TILE_SIZE / 2.0;
+        double centerY = row * TILE_SIZE + TILE_SIZE / 2.0;
+        double preferredX = centerX - renderWidth / 2.0;
+        double preferredY = centerY - renderHeight + (renderHeight * ENEMY_FOOT_COLLISION_HEIGHT_RATIO) / 2.0;
+        double[] safe = findSafeEnemySpawn(preferredX, preferredY, renderWidth, renderHeight);
+
+        enemyManager.spawnEnemy(enemyType, safe[0], safe[1], sprite, frames,
+                renderWidth, renderHeight, player, skillSprite);
+    }
+
+    private int[] findNearestWalkableTile(int startCol, int startRow) {
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        int maxRadius = Math.max(rows, cols);
+
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            for (int row = startRow - radius; row <= startRow + radius; row++) {
+                for (int col = startCol - radius; col <= startCol + radius; col++) {
+                    if (Math.abs(row - startRow) != radius && Math.abs(col - startCol) != radius) {
+                        continue;
+                    }
+                    if (isWalkableSpawnTile(col, row)) {
+                        return new int[]{col, row};
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isWalkableSpawnTile(int col, int row) {
+        int rows = Math.max(1, map.getLoadedRowCount());
+        int cols = Math.max(1, map.getLoadedColCount());
+        if (row < 0 || row >= rows || col < 0 || col >= cols) {
+            return false;
+        }
+
+        int centerX = col * TILE_SIZE + TILE_SIZE / 2;
+        int centerY = row * TILE_SIZE + TILE_SIZE / 2;
+        return !isBlockedByMap(centerX, centerY);
     }
 
     private double calculateWitchRenderWidth(double renderHeight) {
@@ -452,14 +675,6 @@ public class Level {
             return min;
         }
         return Math.max(min, Math.min(max, value));
-    }
-
-    private void spawnLevel1TestTrees() {
-        for (int[] pos : LEVEL1_TREE_TEST_SPAWNS) {
-            double spawnX = pos[0] * TILE_SIZE;
-            double spawnY = (pos[1] - 1) * TILE_SIZE;
-            enemyManager.spawnEnemy("Tree", spawnX, spawnY, treeImg, 8, 96, 96, player, treeSkillImg);
-        }
     }
 
     boolean isVictory(){
