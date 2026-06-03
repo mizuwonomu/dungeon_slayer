@@ -12,6 +12,8 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Rectangle;
 
+import java.util.function.Function;
+
 public class Minimap {
 
     private Group root;
@@ -38,9 +40,10 @@ public class Minimap {
             int width,
             int height,
             Runnable onClose,
-            java.util.function.Function<String, Image> imageLoader,
+            Function<String, Image> imageLoader,
             Player player,
-            MapManager mapManager
+            MapManager mapManager,
+            double zoom
     ) {
 
         // ===== DARK OVERLAY =====
@@ -99,8 +102,8 @@ public class Minimap {
                 mapView.setFitWidth(width * 0.9);
                 mapView.setPreserveRatio(true);
 
-                worldWidth = 5820;
-                worldHeight = 3023;
+                worldWidth = 6000;
+                worldHeight = 3150;
                 break;
 
             default:
@@ -115,6 +118,9 @@ public class Minimap {
                 minimapImage.getHeight()
                         * (mapView.getFitWidth() / minimapImage.getWidth());
 
+        mapView.setLayoutX(-minimapWidth / 2.0);
+        mapView.setLayoutY(-minimapHeight / 2.0);
+
         // ===== PLAYER POSITION =====
         double miniX =
                 (player.getX() / worldWidth)
@@ -127,6 +133,9 @@ public class Minimap {
                         * minimapHeight
                         * miniYMultiplier
                         - offsetY;
+
+        miniX -= minimapWidth / 2.0;
+        miniY -= minimapHeight / 2.0;
 
         // ===== APPLY POSITION =====
         playerDot.setLayoutX(miniX);
@@ -147,12 +156,30 @@ public class Minimap {
                 playerDot
         );
 
+        this.zoom = zoom;
+        panX = -miniX * zoom;
+        panY = -miniY * zoom;
+
+        applyTransform();
+
         overlay.getChildren().addAll(
                 background,
                 mapContainer
         );
 
         root = new Group(overlay);
+    }
+
+    public double getZoom() {
+        return zoom;
+    }
+
+    public double getPanX() {
+        return panX;
+    }
+
+    public double getPanY() {
+        return panY;
     }
 
     public void zoomIn() {
