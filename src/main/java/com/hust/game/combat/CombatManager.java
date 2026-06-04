@@ -1,9 +1,12 @@
 package com.hust.game.combat;
 
 import com.hust.game.enemy.Enemy;
+import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.items.Chest;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.player.PlayerCombat;
 import com.hust.game.entities.player.merge.MergeFormType;
+import com.hust.game.map.MapManager;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
@@ -74,6 +77,7 @@ public class CombatManager {
     private boolean hasDealtDamageThisAttack = true;
     private boolean hasIncreasedComboThisAttack = false;
     private com.hust.game.collision.CollisionChecker collisionChecker;
+    private MapManager mapManager;
     private int currentLevelIndex = 1;
 
     public CombatManager(Player player, List<Enemy> enemyList) {
@@ -83,6 +87,10 @@ public class CombatManager {
 
     public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
         this.collisionChecker = checker;
+    }
+
+    public void setMapManager(MapManager mapManager) {
+        this.mapManager = mapManager;
     }
 
     public void setCurrentLevelIndex(int currentLevelIndex) {
@@ -211,6 +219,10 @@ public class CombatManager {
         boolean hitBoss = false;
         boolean isFinalHit = false;
         boolean isBossDefeated = false;
+
+        if (openHitChests(attackBox)) {
+            hitAny = true;
+        }
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
@@ -503,5 +515,86 @@ public class CombatManager {
         double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
 
         return collisionChecker.hasUnblockedAttackLine(playerCenterX, playerCenterY, targetBox);
+    }
+
+    private boolean openHitChests(Rectangle2D attackBox) {
+        if (mapManager == null || mapManager.mapEntities == null || attackBox == null) {
+            return false;
+        }
+
+        boolean openedAny = false;
+        for (BaseEntity entity : mapManager.mapEntities) {
+            if (!(entity instanceof Chest chest) || chest.isOpened()) {
+                continue;
+            }
+            if (!attackBox.intersects(chest.getBoundary()) || !hasAttackLineOfSight(chest.getBoundary())) {
+                continue;
+            }
+            if (chest.open()) {
+                grantChestReward(chest);
+                openedAny = true;
+            }
+        }
+        return openedAny;
+    }
+
+    private void grantChestReward(Chest chest) {
+        ChestReward reward = resolveChestReward();
+        switch (reward) {
+            case HEALTH_POTION -> player.addHealthPotion();
+            case MANA_POTION -> player.addManaPotion();
+            case COINS -> player.addCoins(2);
+        }
+
+        double rewardX = chest.getX() + chest.getRenderWidth() / 2.0;
+        double rewardY = chest.getY();
+        coinRewardEffectManager.spawn(rewardX, rewardY, reward.icon);
+        com.hust.game.ui.DamageTextManager.addText(
+                chest,
+                rewardX - 32,
+                rewardY - 18,
+                reward.text,
+                reward.color
+        );
+    }
+
+    private ChestReward resolveChestReward() {
+        List<ChestReward> rewards = new ArrayList<>();
+        rewards.add(ChestReward.COINS);
+        if (player.getHealthPotionCount() < com.hust.game.constants.GameConstants.MAX_POTIONS_PER_TYPE) {
+            rewards.add(ChestReward.HEALTH_POTION);
+        }
+        if (player.getManaPotionCount() < com.hust.game.constants.GameConstants.MAX_POTIONS_PER_TYPE) {
+            rewards.add(ChestReward.MANA_POTION);
+        }
+        return rewards.get((int) (Math.random() * rewards.size()));
+    }
+
+    private boolean hasAttackLineOfSight(Rectangle2D targetBox) {
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        Rectangle2D playerBox = player.getBoundary();
+        double playerCenterX = playerBox.getMinX() + playerBox.getWidth() / 2.0;
+        double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
+
+        return collisionChecker.hasUnblockedAttackLine(playerCenterX, playerCenterY, targetBox);
+    }
+
+    private enum ChestReward {
+        COINS("+2 coins", javafx.scene.paint.Color.GOLD, CoinRewardEffectManager.RewardIcon.COIN),
+        HEALTH_POTION("+1 Health Potion", javafx.scene.paint.Color.LIGHTGREEN, CoinRewardEffectManager.RewardIcon.HEALTH_POTION),
+        MANA_POTION("+1 Mana Potion", javafx.scene.paint.Color.CORNFLOWERBLUE, CoinRewardEffectManager.RewardIcon.MANA_POTION);
+
+        final String text;
+        final javafx.scene.paint.Color color;
+        final CoinRewardEffectManager.RewardIcon icon;
+
+        ChestReward(String text, javafx.scene.paint.Color color, CoinRewardEffectManager.RewardIcon icon) {
+            this.text = text;
+            this.color = color;
+            this.icon = icon;
+        }
     }
 }

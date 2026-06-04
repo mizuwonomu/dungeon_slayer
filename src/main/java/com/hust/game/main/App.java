@@ -9,6 +9,7 @@ import com.hust.game.entities.npc.Npc;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.Direction;
 import com.hust.game.entities.EntityState;
+import com.hust.game.entities.items.Chest;
 import com.hust.game.entities.interfaces.Interactable;
 import com.hust.game.combat.CombatManager;
 import com.hust.game.enemy.EnemyManager;
@@ -822,6 +823,35 @@ public class App extends Application {
                         double yPos = r * TILE_SIZE;
                         gc.strokeLine(Math.max(0, cameraX), yPos, cameraX + viewW, yPos);
                     }
+
+                    gc.setFont(javafx.scene.text.Font.font("Consolas", javafx.scene.text.FontWeight.BOLD, 10));
+                    gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+                    gc.setTextBaseline(javafx.geometry.VPos.TOP);
+                    for (int r = startRow; r <= endRow; r++) {
+                        if (r < 0 || r >= GameConstants.MAX_WORLD_ROW) continue;
+                        for (int c = startCol; c <= endCol; c++) {
+                            if (c < 0 || c >= GameConstants.MAX_WORLD_COL) continue;
+                            String coord = c + "," + r;
+                            double textX = c * TILE_SIZE + 3;
+                            double textY = r * TILE_SIZE + 3;
+                            gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.65));
+                            gc.fillRect(textX - 1, textY - 1, 38, 13);
+                            gc.setFill(javafx.scene.paint.Color.WHITE);
+                            gc.fillText(coord, textX, textY);
+                        }
+                    }
+
+                    if (player != null) {
+                        int playerCol = (int) (player.getCollisionBoundary().getMinX() / TILE_SIZE);
+                        int playerRow = (int) (player.getCollisionBoundary().getMinY() / TILE_SIZE);
+                        String playerCoord = "Player " + playerCol + "," + playerRow;
+                        double labelX = player.getX();
+                        double labelY = player.getY() - 18;
+                        gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
+                        gc.fillRect(labelX - 3, labelY - 2, 84, 16);
+                        gc.setFill(javafx.scene.paint.Color.LIGHTGREEN);
+                        gc.fillText(playerCoord, labelX, labelY);
+                    }
                     
                     gc.restore();
                 }
@@ -1062,6 +1092,7 @@ public class App extends Application {
                                 task.setOnSucceeded(ev -> {
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
                                     combatManager.setCollisionChecker(collisionChecker);
+                                    combatManager.setMapManager(gameManager.getMap());
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
@@ -1109,6 +1140,7 @@ public class App extends Application {
                                 task.setOnSucceeded(ev -> {
                                     collisionChecker = new CollisionChecker(gameManager.getMap());
                                     combatManager.setCollisionChecker(collisionChecker);
+                                    combatManager.setMapManager(gameManager.getMap());
                                     combatManager.setCurrentLevelIndex(gameManager.getCurrentLevelIndex());
                                     enemyManager.setCollisionChecker(collisionChecker);
                                     combatManager.resetSkill();
@@ -1417,6 +1449,7 @@ public class App extends Application {
         }
         collisionChecker = new CollisionChecker(gameManager.getMap());
         combatManager.setCollisionChecker(collisionChecker);
+        combatManager.setMapManager(gameManager.getMap());
         enemyManager.setCollisionChecker(collisionChecker);
         hud = new HUD(player, combatManager, enemyManager.getEnemyList(), allyManager);
     }
@@ -1617,6 +1650,9 @@ public class App extends Application {
                 }
             }
         }
+        if (!hitX && hitsSolidChest(pCol)) {
+            hitX = true;
+        }
 
         if (hitX) {
             player.setX(lastX); // Chạm tường trục X -> Hủy di chuyển X
@@ -1640,6 +1676,9 @@ public class App extends Application {
                     break;
                 }
             }
+        }
+        if (!hitY && hitsSolidChest(pCol)) {
+            hitY = true;
         }
 
         if (hitY) {
@@ -1787,6 +1826,21 @@ public class App extends Application {
                 }
             }
         }
+    }
+
+    private boolean hitsSolidChest(javafx.geometry.Rectangle2D playerCollisionBox) {
+        if (gameManager.getMap() == null || gameManager.getMap().mapEntities == null) {
+            return false;
+        }
+
+        for (BaseEntity entity : gameManager.getMap().mapEntities) {
+            if (entity instanceof Chest chest
+                    && chest.isSolid()
+                    && playerCollisionBox.intersects(chest.getBoundary())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private StackPane createSpriteBtn(Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {

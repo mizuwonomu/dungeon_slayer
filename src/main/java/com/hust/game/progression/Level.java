@@ -3,6 +3,7 @@ package com.hust.game.progression;
 import com.hust.game.map.MapManager;
 import com.hust.game.enemy.*;
 import com.hust.game.entities.npc.Npc;
+import com.hust.game.entities.items.Chest;
 import com.hust.game.entities.player.Player;
 import com.hust.game.constants.GameConstants;
 
@@ -120,6 +121,7 @@ public class Level {
         for (com.hust.game.entities.base.BaseEntity entity : map.mapEntities) {
             entity.update();
         }
+        map.mapEntities.removeIf(entity -> entity instanceof Chest chest && chest.isReadyToRemove());
         
         // Logic mở cổng Tutorial
         if (lvlID == 0) {
