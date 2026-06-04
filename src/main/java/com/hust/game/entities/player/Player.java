@@ -120,7 +120,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     private int attackCooldown = 0; 
     private static final int ATTACK_COOLDOWN_MAX = (8 * 2); // Giảm thời gian chờ xuống còn một nửa (16 frames)
-    private final int attackDamage = 50; // sát thương mỗi đòn
+    private final int attackDamage = 20; // sát thương mỗi đòn
     private final PlayerMergeController mergeController = new PlayerMergeController();
 
     // -------------------------------------------------------

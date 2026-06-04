@@ -9,8 +9,20 @@ public class Slime extends Enemy {
     private static final int CONTACT_DAMAGE_COOLDOWN_FRAMES = 30;
     private Image dieSprite;
     private boolean isDying = false;
+    private static Image cachedDieSprite;
 
     private Rectangle2D[] frameHitboxes = new Rectangle2D[8]; // Lưu cache hitbox riêng cho từng frame
+
+    public static void preloadAssets() {
+        if (cachedDieSprite == null) {
+            try {
+                cachedDieSprite = new Image(Slime.class.getResourceAsStream("/assets/enemy/slime_die.png"));
+                preBakeWhiteSprite(cachedDieSprite);
+            } catch (Exception e) {
+                System.err.println("Không tìm thấy slime_die.png");
+            }
+        }
+    }
 
     public Slime(double x, double y, Image spriteSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer) {
@@ -21,13 +33,47 @@ public class Slime extends Enemy {
         this.damage = 5;
         this.knockback = 3;
         
-        try {
-            this.dieSprite = new Image(getClass().getResourceAsStream("/assets/enemy/slime_die.png"));
-        } catch (Exception e) {
-            System.err.println("Không tìm thấy slime_die.png");
-        }
+        this.dieSprite = cachedDieSprite;
+        
+        // Pre-bake: Tính toán sẵn toàn bộ mảng hitbox ngay lúc khởi động
+        warmUpHitboxes();
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.spriteSheet);
     }
 
+    private void warmUpHitboxes() {
+        javafx.scene.image.PixelReader pr = this.spriteSheet.getPixelReader();
+        if (pr == null) return;
+        
+        int fw = (int) this.frameWidth;
+        int fh = (int) this.frameHeight;
+        
+        for (int idx = 0; idx < 8; idx++) {
+            int sx = idx * fw;
+            int minX = fw, maxX = 0, minY = fh, maxY = 0;
+            for (int py = 0; py < fh; py++) {
+                for (int px = 0; px < fw; px++) {
+                    if (sx + px >= this.spriteSheet.getWidth() || py >= this.spriteSheet.getHeight()) continue;
+                    if (pr.getColor(sx + px, py).getOpacity() > 0.1) {
+                        if (px < minX) minX = px;
+                        if (px > maxX) maxX = px;
+                        if (py < minY) minY = py;
+                        if (py > maxY) maxY = py;
+                    }
+                }
+            }
+            if (minX <= maxX && minY <= maxY) {
+                double scaleX = this.renderWidth / fw;
+                double scaleY = this.renderHeight / fh;
+                double boxW = (maxX - minX + 1) * scaleX;
+                double boxH = (maxY - minY + 1) * scaleY;
+                frameHitboxes[idx] = new Rectangle2D(minX * scaleX, minY * scaleY, boxW, boxH);
+            } else {
+                frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
+            }
+        }
+    }
 
     @Override
     public void update() {
@@ -149,39 +195,8 @@ public class Slime extends Enemy {
         int idx = this.frameIndex;
         if (idx < 0 || idx >= frameHitboxes.length) return new Rectangle2D(x, y, renderWidth, renderHeight);
         
-        // Cắt hitbox động: Quét pixel loại bỏ điểm ảnh rỗng (trong suốt) khi Slime nhảy lên
         if (frameHitboxes[idx] == null) {
-            javafx.scene.image.PixelReader pr = this.spriteSheet.getPixelReader();
-            if (pr != null) {
-                int fw = (int) this.frameWidth;
-                int fh = (int) this.frameHeight;
-                int sx = idx * fw;
-
-                int minX = fw, maxX = 0, minY = fh, maxY = 0;
-                for (int py = 0; py < fh; py++) {
-                    for (int px = 0; px < fw; px++) {
-                        if (sx + px >= this.spriteSheet.getWidth() || py >= this.spriteSheet.getHeight()) continue;
-                        if (pr.getColor(sx + px, py).getOpacity() > 0.1) {
-                            if (px < minX) minX = px;
-                            if (px > maxX) maxX = px;
-                            if (py < minY) minY = py;
-                            if (py > maxY) maxY = py;
-                        }
-                    }
-                }
-                if (minX <= maxX && minY <= maxY) {
-                    double scaleX = this.renderWidth / fw;
-                    double scaleY = this.renderHeight / fh;
-                    
-                    double boxW = (maxX - minX + 1) * scaleX;
-                    double boxH = (maxY - minY + 1) * scaleY;
-                    frameHitboxes[idx] = new Rectangle2D(minX * scaleX, minY * scaleY, boxW, boxH);
-                } else {
-                    frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
-                }
-            } else {
-                frameHitboxes[idx] = new Rectangle2D(0, 0, renderWidth, renderHeight);
-            }
+            return new Rectangle2D(x, y, renderWidth, renderHeight);
         }
         
         Rectangle2D box = frameHitboxes[idx];

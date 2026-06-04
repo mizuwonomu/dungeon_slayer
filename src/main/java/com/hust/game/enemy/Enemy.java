@@ -36,6 +36,7 @@ public abstract class Enemy extends MovingEntity {
     protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
     protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
     protected double detectionRangePixels = com.hust.game.constants.GameConstants.TILE_SIZE * 7.0;
+    protected boolean hasAggro = false; // Cờ khóa mục tiêu khi đã phát hiện người chơi
     private int playerDamageCooldownTimer = 0;
 
     protected com.hust.game.collision.CollisionChecker collisionChecker;
@@ -46,21 +47,30 @@ public abstract class Enemy extends MovingEntity {
 
     private boolean coinRewarded = false;
 
-    // Cache bản "all-white" của spriteSheet hiện tại
-    // Pixel có alpha > 0 → trắng cùng opacity; pixel trong suốt → giữ nguyên trong suốt
-    // Cách này không đụng blend mode của canvas nên không bị ảnh hưởng bởi background đã vẽ trước đó
-    private transient javafx.scene.image.Image cachedWhiteSheet = null;
-    private transient javafx.scene.image.Image lastCachedSource = null;
+    public double getDetectionRangePixels() {
+        return this.detectionRangePixels;
+    }
+
+    public boolean hasAggro() {
+        return this.hasAggro;
+    }
+
+    // Sử dụng Map tĩnh toàn cục để lưu trữ ảnh trắng. Các con quái vật cùng loại sẽ dùng chung!
+    private static final java.util.Map<javafx.scene.image.Image, javafx.scene.image.Image> globalWhiteSpriteCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    // Hàm gọi lúc khởi tạo để tính toán sẵn (Pre-bake) trong lúc màn hình Loading
+    protected static void preBakeWhiteSprite(javafx.scene.image.Image source) {
+        if (source != null && !globalWhiteSpriteCache.containsKey(source)) {
+            globalWhiteSpriteCache.put(source, buildWhiteSprite(source));
+        }
+    }
 
     /**
      * Trả về bản white của spriteSheet hiện tại (tự động cache và regenerate khi sprite đổi).
      */
     protected javafx.scene.image.Image getWhiteSprite() {
-        if (cachedWhiteSheet == null || lastCachedSource != this.spriteSheet) {
-            lastCachedSource = this.spriteSheet;
-            cachedWhiteSheet = buildWhiteSprite(this.spriteSheet);
-        }
-        return cachedWhiteSheet;
+        if (this.spriteSheet == null) return null;
+        return globalWhiteSpriteCache.computeIfAbsent(this.spriteSheet, Enemy::buildWhiteSprite);
     }
 
     /**
@@ -114,6 +124,8 @@ public abstract class Enemy extends MovingEntity {
         if (targetPlayer == null) {
             return false;
         }
+        
+        if (hasAggro) return true; // Đã phát hiện thì đuổi tới cùng miễn là còn nằm trong màn hình
 
         javafx.geometry.Rectangle2D playerBox = targetPlayer.getCollisionBoundary();
         javafx.geometry.Rectangle2D enemyBox = this.getCollisionBoundary();
@@ -124,7 +136,53 @@ public abstract class Enemy extends MovingEntity {
         double dx = playerCenterX - enemyCenterX;
         double dy = playerCenterY - enemyCenterY;
 
-        return dx * dx + dy * dy <= detectionRangePixels * detectionRangePixels;
+        if (dx * dx + dy * dy <= detectionRangePixels * detectionRangePixels) {
+            // Nằm trong tầm bán kính, tiếp tục kiểm tra xem có bị tường chặn tầm nhìn không (Line of Sight)
+            if (checkLineOfSight(enemyCenterX, enemyCenterY, playerCenterX, playerCenterY)) {
+                hasAggro = true; // Kích hoạt cờ bám đuôi
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Thuật toán Bresenham tối ưu để kiểm tra tầm nhìn (Line of Sight) trên hệ thống ô lưới (Grid)
+    protected boolean checkLineOfSight(double x0, double y0, double x1, double y1) {
+        if (collisionChecker == null) return true;
+
+        int tileSize = com.hust.game.constants.GameConstants.TILE_SIZE;
+        int x0Grid = (int) (x0 / tileSize);
+        int y0Grid = (int) (y0 / tileSize);
+        int x1Grid = (int) (x1 / tileSize);
+        int y1Grid = (int) (y1 / tileSize);
+
+        int dx = Math.abs(x1Grid - x0Grid);
+        int dy = Math.abs(y1Grid - y0Grid);
+        
+        int sx = x0Grid < x1Grid ? 1 : -1;
+        int sy = y0Grid < y1Grid ? 1 : -1;
+        
+        int err = dx - dy;
+        
+        while (true) {
+            // collisionChecker.checkTile nhận tọa độ pixel, lấy tâm của ô lưới hiện tại để kiểm tra xem có phải tường không
+            if (collisionChecker.checkTile(x0Grid * tileSize + tileSize / 2, y0Grid * tileSize + tileSize / 2)) {
+                return false; // Phát hiện tường chặn tầm nhìn
+            }
+            
+            if (x0Grid == x1Grid && y0Grid == y1Grid) break;
+            
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0Grid += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0Grid += sy;
+            }
+        }
+        return true;
     }
 
     @Override
@@ -428,6 +486,9 @@ public abstract class Enemy extends MovingEntity {
 
     public void setActive(boolean active) {
         this.isActive = active;
+        if (!active) {
+            this.hasAggro = false; // Nếu Player chạy ra khỏi camera và quái bị tắt, reset lại cờ khóa mục tiêu
+        }
     }
 
     public boolean isActive() {

@@ -127,6 +127,10 @@ public class App extends Application {
     private int nextLevelToLoadMusic = -1;
     private Image backScreenImg;
     private int loadedFrames = 0;
+    private javafx.scene.media.Media tutorialMedia;
+    private javafx.scene.media.Media level1Media;
+    private javafx.scene.media.Media bossMedia;
+    private javafx.scene.text.Font finishFont;
 
     private double minimapZoom = 1.0;
     private double minimapPanX = 0;
@@ -718,6 +722,110 @@ public class App extends Application {
                 // Draw map
                 gameManager.draw(gc);
 
+                 // --- VẼ LƯỚI VÀ TẦM NHÌN QUÁI VẬT TRONG DEV MODE ---
+                if (DevSettings.isDevMode()) {
+                    gc.save();
+                    
+                    // 1. Vẽ tầm nhìn quái vật (màu xám bán trong suốt)
+                    for (Enemy e : enemyManager.getEnemyList()) {
+                        if (e.isActive() && e.getHp() > 0) {
+                            double range = e.getDetectionRangePixels();
+                            javafx.geometry.Rectangle2D eCol = e.getCollisionBoundary();
+                            if (eCol != null) {
+                                gc.setFill(javafx.scene.paint.Color.rgb(128, 128, 128, 0.4)); // Đặt lại màu xám cho mỗi quái vật, tránh bị lem màu
+                                double cx = eCol.getMinX() + eCol.getWidth() / 2.0;
+                                double cy = eCol.getMinY() + eCol.getHeight() / 2.0;
+                                int startC = (int) ((cx - range) / TILE_SIZE);
+                                int endC = (int) ((cx + range) / TILE_SIZE);
+                                int startR = (int) ((cy - range) / TILE_SIZE);
+                                int endR = (int) ((cy + range) / TILE_SIZE);
+
+                                for (int r = startR; r <= endR; r++) {
+                                    for (int c = startC; c <= endC; c++) {
+                                        double tileCx = c * TILE_SIZE + TILE_SIZE / 2.0;
+                                        double tileCy = r * TILE_SIZE + TILE_SIZE / 2.0;
+                                        double distSq = (tileCx - cx) * (tileCx - cx) + (tileCy - cy) * (tileCy - cy);
+                                        if (distSq <= range * range) {
+                                            gc.fillRect(c * TILE_SIZE, r * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                                        }
+                                    }
+                                }
+                                
+                                // 1.5. Vẽ tia Line of Sight (Bresenham) bằng các ô lưới màu cam
+                                if (player != null && !e.hasAggro()) {
+                                    javafx.geometry.Rectangle2D pCol = player.getCollisionBoundary();
+                                    if (pCol != null) {
+                                        double px = pCol.getMinX() + pCol.getWidth() / 2.0;
+                                        double py = pCol.getMinY() + pCol.getHeight() / 2.0;
+                                        
+                                        if ((px - cx) * (px - cx) + (py - cy) * (py - cy) <= range * range) {
+                                            gc.setFill(javafx.scene.paint.Color.rgb(255, 165, 0, 0.5)); // Cam bán trong suốt
+                                            
+                                            int x0Grid = (int) (cx / TILE_SIZE);
+                                            int y0Grid = (int) (cy / TILE_SIZE);
+                                            int x1Grid = (int) (px / TILE_SIZE);
+                                            int y1Grid = (int) (py / TILE_SIZE);
+
+                                            int bdx = Math.abs(x1Grid - x0Grid);
+                                            int bdy = Math.abs(y1Grid - y0Grid);
+                                            
+                                            int sx = x0Grid < x1Grid ? 1 : -1;
+                                            int sy = y0Grid < y1Grid ? 1 : -1;
+                                            
+                                            int err = bdx - bdy;
+                                            int currX = x0Grid;
+                                            int currY = y0Grid;
+                                            
+                                            while (true) {
+                                                gc.fillRect(currX * TILE_SIZE, currY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                                                
+                                                if (collisionChecker != null && collisionChecker.checkTile(currX * TILE_SIZE + TILE_SIZE / 2, currY * TILE_SIZE + TILE_SIZE / 2)) {
+                                                    gc.setFill(javafx.scene.paint.Color.rgb(255, 0, 0, 0.6)); // Bị vướng tường thì tô đỏ ô đó rồi dừng
+                                                    gc.fillRect(currX * TILE_SIZE, currY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+                                                    break;
+                                                }
+                                                
+                                                if (currX == x1Grid && currY == y1Grid) break;
+                                                
+                                                int e2 = 2 * err;
+                                                if (e2 > -bdy) {
+                                                    err -= bdy;
+                                                    currX += sx;
+                                                }
+                                                if (e2 < bdx) {
+                                                    err += bdx;
+                                                    currY += sy;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Vẽ lưới (Grid) toàn bản đồ
+                    gc.setStroke(javafx.scene.paint.Color.rgb(255, 255, 255, 0.2)); // Đường lưới màu trắng nhạt
+                    gc.setLineWidth(1.0);
+                    double viewW = WIDTH / ZOOM;
+                    double viewH = HEIGHT / ZOOM;
+                    int startCol = Math.max(0, (int) (cameraX / TILE_SIZE));
+                    int startRow = Math.max(0, (int) (cameraY / TILE_SIZE));
+                    int endCol = (int) ((cameraX + viewW) / TILE_SIZE) + 1;
+                    int endRow = (int) ((cameraY + viewH) / TILE_SIZE) + 1;
+
+                    for (int c = startCol; c <= endCol; c++) {
+                        double xPos = c * TILE_SIZE;
+                        gc.strokeLine(xPos, Math.max(0, cameraY), xPos, cameraY + viewH);
+                    }
+                    for (int r = startRow; r <= endRow; r++) {
+                        double yPos = r * TILE_SIZE;
+                        gc.strokeLine(Math.max(0, cameraX), yPos, cameraX + viewW, yPos);
+                    }
+                    
+                    gc.restore();
+                }
+
                 // --- 2.5D DEPTH SORTING (Z-INDEX) ---
                 // Gom tất cả Entity lại để sắp xếp thứ tự vẽ (Y-Sorting)
                 List<BaseEntity> renderList = new ArrayList<>();
@@ -1037,12 +1145,12 @@ public class App extends Application {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.7));
                     gc.fillRect(0, 0, WIDTH, HEIGHT);
 
-                    // Load font chữ pixel
-                    javafx.scene.text.Font finishFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 100);
-                    if (finishFont == null) {
-                        finishFont = new javafx.scene.text.Font("Arial", 100); // Fallback
+                    // Sử dụng font đã được preload từ lúc Loading
+                    if (finishFont != null) {
+                        gc.setFont(finishFont);
+                    } else {
+                        gc.setFont(new javafx.scene.text.Font("Arial", 100)); // Fallback
                     }
-                    gc.setFont(finishFont);
                     gc.setStroke(javafx.scene.paint.Color.WHITE);
                     gc.setLineWidth(4);
                     gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
@@ -1197,6 +1305,21 @@ public class App extends Application {
 
     private void initializeEntities(int level) {
         try {
+            try {
+                tutorialMedia = new javafx.scene.media.Media(getClass().getResource("/sounds/tutorial.mp3").toExternalForm());
+                level1Media = new javafx.scene.media.Media(getClass().getResource("/sounds/Music_lvl_1.mp3").toExternalForm());
+                bossMedia = new javafx.scene.media.Media(getClass().getResource("/sounds/boss_fight_music.mp3").toExternalForm());
+            } catch (Exception e) { System.err.println("Lỗi load Media nhạc nền: " + e.getMessage()); }
+            
+            finishFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 100);
+            if (finishFont == null) finishFont = new javafx.scene.text.Font("Arial", 100);
+
+            // Preload sub-sprites và tạo sẵn ảnh chớp trắng cho tất cả quái vật lúc Loading
+            com.hust.game.enemy.Slime.preloadAssets();
+            com.hust.game.enemy.Knight.preloadAssets();
+            com.hust.game.enemy.Tree.preloadAssets();
+            com.hust.game.enemy.Witch.preloadAssets();
+
             Image iDown = loadImg("/assets/player/idle_down.png");
             Image iUp = loadImg("/assets/player/idle_up.png");
             Image iLeft = loadImg("/assets/player/idle_left.png");
@@ -1528,15 +1651,35 @@ public class App extends Application {
             List<Enemy> enemies = enemyManager.getEnemyList();
 
             // Bước 1: Tính toán lực đẩy (Soft Collision) giữa các quái vật trước
-            for (int i = 0; i < enemies.size(); i++) {
-                Enemy enemy = enemies.get(i);
-                if (!enemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
+            // Tối ưu: Phân hoạch không gian (Spatial Hashing) O(N^2) -> O(N)
+            int cellSize = TILE_SIZE * 2;
+            java.util.Map<Integer, java.util.List<Enemy>> spatialGrid = new java.util.HashMap<>();
+            
+            for (Enemy e : enemies) {
+                if (!e.isActive()) continue;
+                int col = (int) (e.getX() / cellSize);
+                int row = (int) (e.getY() / cellSize);
+                int key = (col << 16) | (row & 0xFFFF);
+                spatialGrid.computeIfAbsent(key, k -> new java.util.ArrayList<>()).add(e);
+            }
+
+            for (Enemy enemy : enemies) {
+                if (!enemy.isActive()) continue;
                 
-                // Kiểm tra va chạm với các quái vật khác (tránh đè lên nhau)
-                for (int j = i + 1; j < enemies.size(); j++) {
-                    Enemy otherEnemy = enemies.get(j);
-                    if (!otherEnemy.isActive()) continue; // Tối ưu: Bỏ qua quái ngoài màn hình
-                    
+                int col = (int) (enemy.getX() / cellSize);
+                int row = (int) (enemy.getY() / cellSize);
+                
+                // Kiểm tra 9 ô xung quanh (3x3 grid)
+                for (int c = col - 1; c <= col + 1; c++) {
+                    for (int r = row - 1; r <= row + 1; r++) {
+                        int key = (c << 16) | (r & 0xFFFF);
+                        java.util.List<Enemy> cellEnemies = spatialGrid.get(key);
+                        if (cellEnemies == null) continue;
+                        
+                        for (Enemy otherEnemy : cellEnemies) {
+                            // Dùng identityHashCode để đảm bảo mỗi cặp chỉ được tính lực đẩy 1 lần (i < j)
+                            if (System.identityHashCode(enemy) >= System.identityHashCode(otherEnemy)) continue;
+                            
                     if (enemy.getCollisionBoundary().intersects(otherEnemy.getCollisionBoundary())) {
                         // Soft collision: Đẩy nhẹ 2 quái vật ra xa nhau thay vì giật lùi (tránh bị kẹt
                         // thành 1 cục)
@@ -1561,6 +1704,8 @@ public class App extends Application {
                         enemy.setY(enemy.getY() + (dy / dist) * pushStrength);
                         otherEnemy.setX(otherEnemy.getX() - (dx / dist) * pushStrength);
                         otherEnemy.setY(otherEnemy.getY() - (dy / dist) * pushStrength);
+                    }
+                        }
                     }
                 }
             }
@@ -1739,30 +1884,26 @@ public class App extends Application {
     private void playInGameMusic(int level) {
         stopMenuMusic();
         stopInGameMusic();
-        String musicPath = "";
+        javafx.scene.media.Media selectedMedia = null;
         double volMultiplier = 1.0;
         
         if (level == 0) {
-            musicPath = "/sounds/tutorial.mp3";
+            selectedMedia = tutorialMedia;
             volMultiplier = 0.5;
         } else if (level == 1 || level == 2) {
-            musicPath = "/sounds/Music_lvl_1.mp3";
+            selectedMedia = level1Media;
             volMultiplier = 0.7;
         } else if (level == 3) {
-            musicPath = "/sounds/boss_fight_music.mp3";
+            selectedMedia = bossMedia;
             volMultiplier = 0.8; // Âm lượng nhạc Boss (có thể chỉnh lại nếu thấy quá to/nhỏ)
         }
 
-        if (!musicPath.isEmpty()) {
+        if (selectedMedia != null) {
             try {
-                java.net.URL url = getClass().getResource(musicPath);
-                if (url != null) {
-                    javafx.scene.media.Media media = new javafx.scene.media.Media(url.toExternalForm());
-                    inGameMusicPlayer = new javafx.scene.media.MediaPlayer(media);
-                    inGameMusicPlayer.setCycleCount(javafx.scene.media.MediaPlayer.INDEFINITE); // Lặp vô hạn
-                    inGameMusicPlayer.setVolume(volMultiplier * SoundManager.getBgmVolume());
-                    inGameMusicPlayer.play();
-                }
+                inGameMusicPlayer = new javafx.scene.media.MediaPlayer(selectedMedia);
+                inGameMusicPlayer.setCycleCount(javafx.scene.media.MediaPlayer.INDEFINITE); 
+                inGameMusicPlayer.setVolume(volMultiplier * SoundManager.getBgmVolume());
+                inGameMusicPlayer.play();
             } catch (Exception e) {
                 System.err.println("Lỗi load nhạc in-game: " + e.getMessage());
             }

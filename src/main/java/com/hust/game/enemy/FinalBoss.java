@@ -177,6 +177,13 @@ public class FinalBoss extends Enemy {
         this.skill2Item2Sprite = loadOptionalImage("/assets/enemy/atk_2_item_2.png");
         this.explosionSprite = loadOptionalImage("/assets/enemy/explosion.png");
         this.dangerZoneSprite = loadOptionalImage("/assets/enemy/danger_zone.png");
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.idleSprite);
+        preBakeWhiteSprite(this.attackSprite1);
+        preBakeWhiteSprite(this.attackSprite2);
+        preBakeWhiteSprite(this.teleSprite);
+        preBakeWhiteSprite(this.walkSprite);
     }
 
     @Override

@@ -18,6 +18,21 @@ public class Knight extends Enemy {
     private Image dieSprite;
     private boolean isDying = false;
     private double dashVectorX, dashVectorY;
+    private static Image cachedDieSprite;
+    private static Image cachedWalkSprite;
+
+    public static void preloadAssets() {
+        if (cachedDieSprite == null) {
+            try {
+                cachedDieSprite = new Image(Knight.class.getResourceAsStream("/assets/enemy/knight_die.png"));
+                cachedWalkSprite = new Image(Knight.class.getResourceAsStream("/assets/enemy/knight_walk.png"));
+                preBakeWhiteSprite(cachedDieSprite);
+                preBakeWhiteSprite(cachedWalkSprite);
+            } catch (Exception e) {
+                System.err.println("Không tìm thấy ảnh die/walk của Knight!");
+            }
+        }
+    }
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer, Image skillSprite) {
@@ -31,12 +46,12 @@ public class Knight extends Enemy {
         this.normalSprite = sprSheet;
         this.skillSprite = skillSprite;
         
-        try {
-            this.dieSprite = new Image(getClass().getResourceAsStream("/assets/enemy/knight_die.png"));
-            this.walkSprite = new Image(getClass().getResourceAsStream("/assets/enemy/knight_walk.png"));
-        } catch (Exception e) {
-            System.err.println("Không tìm thấy ảnh die/walk của Knight!");
-        }
+        this.dieSprite = cachedDieSprite;
+        this.walkSprite = cachedWalkSprite;
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.normalSprite);
+        preBakeWhiteSprite(this.skillSprite);
     }
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
@@ -48,34 +63,45 @@ public class Knight extends Enemy {
     private boolean hasClearDashPath(double startX, double startY, double startH, double endX, double endY, double endH) {
         if (collisionChecker == null) return true;
         
-        // Số lượng đường thẳng nằm ngang cần quét từ đỉnh tới đáy
-        double maxHeight = Math.max(startH, endH);
-        // Quét mỗi khoảng TILE_SIZE/4 (12 pixel) để đảm bảo quét kín hình bình hành, không lọt khe tường
-        int lineSteps = (int) (maxHeight / (com.hust.game.constants.GameConstants.TILE_SIZE / 4.0));
-        lineSteps = Math.max(2, lineSteps); // Ít nhất 2 đường: trên đỉnh và dưới chân
+        // Quét viền thay vì quét khối: Chỉ bắn 2 tia Raycast ở mép trên và mép dưới
+        boolean topClear = checkLineBresenham(startX, startY, endX, endY);
+        boolean bottomClear = checkLineBresenham(startX, startY + startH, endX, endY + endH);
+        
+        return topClear && bottomClear;
+    }
 
-        for (int j = 0; j <= lineSteps; j++) {
-            double currentStartY = startY + (startH * j) / lineSteps;
-            double currentEndY = endY + (endH * j) / lineSteps;
+    // Thuật toán Bresenham quét theo ô lưới (Grid) thay vì tính toán số thực (Lượng giác)
+    private boolean checkLineBresenham(double x0, double y0, double x1, double y1) {
+        int tileSize = com.hust.game.constants.GameConstants.TILE_SIZE;
+        int x0Grid = (int) (x0 / tileSize);
+        int y0Grid = (int) (y0 / tileSize);
+        int x1Grid = (int) (x1 / tileSize);
+        int y1Grid = (int) (y1 / tileSize);
 
-            double dx = endX - startX;
-            double dy = currentEndY - currentStartY;
-            double distance = Math.sqrt(dx * dx + dy * dy);
-
-            if (distance == 0) continue;
-
-            // Dọc theo mỗi đường thẳng, quét các điểm cách nhau nửa ô TILE
-            int pointSteps = (int) (distance / (com.hust.game.constants.GameConstants.TILE_SIZE / 2.0));
-            pointSteps = Math.max(1, pointSteps);
-
-            for (int i = 0; i <= pointSteps; i++) {
-                double checkX = startX + (dx * i) / pointSteps;
-                double checkY = currentStartY + (dy * i) / pointSteps;
-                
-                // Nếu bất kỳ phần nào của hình bình hành này cắt vào tường -> Bị cản
-                if (collisionChecker.checkTile((int) checkX, (int) checkY)) {
-                    return false; 
-                }
+        int dx = Math.abs(x1Grid - x0Grid);
+        int dy = Math.abs(y1Grid - y0Grid);
+        
+        int sx = x0Grid < x1Grid ? 1 : -1;
+        int sy = y0Grid < y1Grid ? 1 : -1;
+        
+        int err = dx - dy;
+        
+        while (true) {
+            // collisionChecker.checkTile nhận tọa độ pixel, nên ta lấy tâm của ô lưới hiện tại để check
+            if (collisionChecker.checkTile(x0Grid * tileSize + tileSize / 2, y0Grid * tileSize + tileSize / 2)) {
+                return false;
+            }
+            
+            if (x0Grid == x1Grid && y0Grid == y1Grid) break;
+            
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0Grid += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0Grid += sy;
             }
         }
         return true;
@@ -112,34 +138,33 @@ public class Knight extends Enemy {
             this.hitStunTimer = 0;
             this.isDashing = false;
             
-            if (!isDying) {
-                isDying = true;
-                if (dieSprite != null) {
-                    this.spriteSheet = dieSprite;
-                    this.numFrames = 6;
-                    this.frameWidth = dieSprite.getWidth() / 6.0;
-                    this.frameHeight = dieSprite.getHeight();
-                }
-                this.frameIndex = 0;
-                this.animationTimer = 0;
-            }
-            
-            // Chớp trắng 6 frame đầu tiên
             if (this.flashTimer > 54) {
-                this.flashTimer--;
-            }
-
-            // Chạy animation chết đến frame cuối
-            if (this.frameIndex < 5) {
-                this.animationTimer++;
-                if (this.animationTimer >= 9) { // 54 / 6 = 9 frames game mỗi ảnh
-                    this.animationTimer = 0;
-                    this.frameIndex++;
-                }
+                this.flashTimer--; // Chớp trắng 6 frame đầu tiên với ảnh cũ
             } else {
-                // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
-                if (this.flashTimer > 0 && this.flashTimer <= 54) {
-                    this.flashTimer--;
+                if (!isDying) {
+                    isDying = true;
+                    if (dieSprite != null) {
+                        this.spriteSheet = dieSprite;
+                        this.numFrames = 6;
+                        this.frameWidth = dieSprite.getWidth() / 6.0;
+                        this.frameHeight = dieSprite.getHeight();
+                    }
+                    this.frameIndex = 0;
+                    this.animationTimer = 0;
+                }
+                
+                // Chạy animation chết đến frame cuối
+                if (this.frameIndex < 5) {
+                    this.animationTimer++;
+                    if (this.animationTimer >= 9) { // 54 / 6 = 9 frames game mỗi ảnh
+                        this.animationTimer = 0;
+                        this.frameIndex++;
+                    }
+                } else {
+                    // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                    if (this.flashTimer > 0) {
+                        this.flashTimer--;
+                    }
                 }
             }
             return;
