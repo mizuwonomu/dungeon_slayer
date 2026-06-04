@@ -43,8 +43,8 @@ public class SettingsScreen {
     private static final double TAB_ARROW_SCALE = 0.24;
     private static final double HOTKEY_LIST_WIDTH = 760;
     private static final double HOTKEY_SCROLL_HEIGHT = 500;
-    private static final double CUSTOM_SCROLL_TRACK_WIDTH = 18;
-    private static final double CUSTOM_SCROLL_THUMB_WIDTH = 10;
+    private static final double CUSTOM_SCROLL_TRACK_WIDTH = 13;
+    private static final double CUSTOM_SCROLL_THUMB_WIDTH = 16;
     private static final double CUSTOM_SCROLL_THUMB_HEIGHT = 188;
 
     // Độ mờ cố định của background (0.0 = đen hoàn toàn, 1.0 = rõ hoàn toàn)
