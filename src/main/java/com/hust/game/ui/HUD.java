@@ -6,8 +6,11 @@ import com.hust.game.enemy.FinalBoss;
 import com.hust.game.entities.ally.AllyManager;
 import com.hust.game.entities.player.Player;
 import java.util.List;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.scene.paint.Color;
+import javafx.scene.text.Text;
 
 public class HUD {
 
@@ -36,6 +39,7 @@ public class HUD {
 
     private javafx.scene.text.Font pixelFont;
     private javafx.scene.text.Font bossFont;
+    private javafx.scene.text.Font tooltipFont;
 
     private static final double FRAME_WIDTH = 720.0;
     private static final double FRAME_HEIGHT = 120.0;
@@ -43,12 +47,36 @@ public class HUD {
 
     private static final double RENDER_WIDTH = FRAME_WIDTH * SCALE;
     private static final double RENDER_HEIGHT = FRAME_HEIGHT * SCALE;
-    
+
+    private static final int POTION_FRAMES = 8;
+    private static final double POTION_PANEL_X = 6.0;
+    private static final double POTION_PANEL_Y_OFFSET = 78.0;
+    private static final double POTION_PANEL_WIDTH = 58.0;
+    private static final double POTION_PANEL_HEIGHT = 116.0;
+    private static final double POTION_SLOT_HEIGHT = POTION_PANEL_HEIGHT / 2.0;
+    private static final double POTION_ICON_SIZE = 30.0;
+    private static final double HEALTH_MANA_BOX_WIDTH = 148.0;
+    private static final double HEALTH_MANA_BOX_HEIGHT = 44.0;
+    private static final double SKILL_BOX_SIZE = 50.0;
+    private static final double SKILL_BOX_HEIGHT = 53.0;
+    private static final double BOX_GAP = 4.0;
+    private static final double TOOLTIP_OFFSET = 18.0;
+    private static final double TOOLTIP_WIDTH = 480.0;
+    private static final double TOOLTIP_PADDING_X = 18.0;
+    private static final double TOOLTIP_PADDING_Y = 14.0;
+    private static final double TOOLTIP_LINE_HEIGHT = 23.0;
+    private static final double TOOLTIP_BORDER_WIDTH = 3.5;
+
+    private record TooltipSegment(String text, Color color) {}
+    private record TooltipLine(TooltipSegment... segments) {}
 
     private final Player player;
     private final CombatManager combatManager;
     private final List<Enemy> enemies;
     private final AllyManager allyManager;
+    private boolean mouseInsideCanvas = false;
+    private double mouseX = 0;
+    private double mouseY = 0;
 
     // ONE constructor that takes BOTH
     public HUD(Player player, CombatManager combatManager, List<Enemy> enemies, AllyManager allyManager) {
@@ -57,6 +85,12 @@ public class HUD {
         this.enemies = enemies;
         this.allyManager = allyManager;
         loadAssets();
+    }
+
+    public void setMousePosition(double mouseX, double mouseY, boolean insideCanvas) {
+        this.mouseX = mouseX;
+        this.mouseY = mouseY;
+        this.mouseInsideCanvas = insideCanvas;
     }
 
     private void loadAssets() {
@@ -92,6 +126,11 @@ public class HUD {
         bossFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 20);
         if (bossFont == null) {
             bossFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 20);
+        }
+
+        tooltipFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 18);
+        if (tooltipFont == null) {
+            tooltipFont = javafx.scene.text.Font.font("Arial", javafx.scene.text.FontWeight.BOLD, 18);
         }
     }
 
@@ -161,17 +200,19 @@ public class HUD {
         // ============================================
         // 3-BOX CLUSTER (Health/Mana, Berserk, Nhaphon)
         // ============================================
-        double clusterW = 148.0 + 4.0 + 50.0 + 4.0 + 50.0; // 256
+        double clusterW = HEALTH_MANA_BOX_WIDTH + BOX_GAP + SKILL_BOX_SIZE + BOX_GAP + SKILL_BOX_SIZE; // 256
         double clusterX = (screenWidth - clusterW) / 2.0;
-        double clusterMaxH = 53.0;
+        double clusterMaxH = SKILL_BOX_HEIGHT;
         double clusterY = screenHeight - 20.0 - clusterMaxH;
         double equatorY = clusterY + clusterMaxH / 2.0;
 
         // 1. Health/Mana Box
-        double hmBoxW = 148.0;
-        double hmBoxH = 44.0;
+        double hmBoxW = HEALTH_MANA_BOX_WIDTH;
+        double hmBoxH = HEALTH_MANA_BOX_HEIGHT;
         double hmBoxX = clusterX;
         double hmBoxY = equatorY - hmBoxH / 2.0;
+        Rectangle2D healthPotionHover = new Rectangle2D(hmBoxX, hmBoxY, hmBoxW / 2.0, hmBoxH);
+        Rectangle2D manaPotionHover = new Rectangle2D(hmBoxX + hmBoxW / 2.0, hmBoxY, hmBoxW / 2.0, hmBoxH);
         gc.drawImage(healthManaBoxImg, hmBoxX, hmBoxY);
 
         gc.setFont(pixelFont);
@@ -198,8 +239,9 @@ public class HUD {
         gc.setTextBaseline(javafx.geometry.VPos.CENTER);
 
         // 2. Berserk Skill Box
-        double berserkBoxX = hmBoxX + hmBoxW + 4.0;
-        double berserkBoxY = equatorY - 53.0 / 2.0;
+        double berserkBoxX = hmBoxX + hmBoxW + BOX_GAP;
+        double berserkBoxY = equatorY - SKILL_BOX_HEIGHT / 2.0;
+        Rectangle2D berserkHover = new Rectangle2D(berserkBoxX, berserkBoxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
 
         gc.setGlobalAlpha(1.0);
         gc.drawImage(skillBerserkBoxImg, berserkBoxX, berserkBoxY);
@@ -210,13 +252,14 @@ public class HUD {
 
             if (onCooldown) {
                 double ratio = combatManager.getSkillCooldownRemaining() / 1800.0;
-                double yOffset = (1.0 - ratio) * 53.0;
+                double yOffset = (1.0 - ratio) * SKILL_BOX_HEIGHT;
 
                 if (cooldownBoxImg != null) {
-                    gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset, berserkBoxX, berserkBoxY + yOffset, 50.0, 53.0 - yOffset);
+                    gc.drawImage(cooldownBoxImg, 0, yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset,
+                            berserkBoxX, berserkBoxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
                 } else {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
-                    gc.fillRect(berserkBoxX, berserkBoxY + yOffset, 50.0, 53.0 - yOffset);
+                    gc.fillRect(berserkBoxX, berserkBoxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
                 }
 
                 gc.setFill(javafx.scene.paint.Color.WHITE);
@@ -238,8 +281,9 @@ public class HUD {
         }
 
         // 3. Nhaphon (Merge) Skill Box
-        double nhaphonBoxX = berserkBoxX + 50.0 + 4.0;
-        double nhaphonBoxY = equatorY - 53.0 / 2.0;
+        double nhaphonBoxX = berserkBoxX + SKILL_BOX_SIZE + BOX_GAP;
+        double nhaphonBoxY = equatorY - SKILL_BOX_HEIGHT / 2.0;
+        Rectangle2D kSkillHover = new Rectangle2D(nhaphonBoxX, nhaphonBoxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
 
         gc.setGlobalAlpha(1.0);
         gc.drawImage(skillNhaphonBoxImg, nhaphonBoxX, nhaphonBoxY);
@@ -251,13 +295,14 @@ public class HUD {
 
             if (mergeCooldown) {
                 double ratio = player.getMergeCooldownRemaining() / 360.0;
-                double yOffset = (1.0 - ratio) * 53.0;
+                double yOffset = (1.0 - ratio) * SKILL_BOX_HEIGHT;
 
                 if (cooldownBoxImg != null) {
-                    gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset, nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
+                    gc.drawImage(cooldownBoxImg, 0, yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset,
+                            nhaphonBoxX, nhaphonBoxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
                 } else {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
-                    gc.fillRect(nhaphonBoxX, nhaphonBoxY + yOffset, 50.0, 53.0 - yOffset);
+                    gc.fillRect(nhaphonBoxX, nhaphonBoxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
                 }
 
                 gc.setFill(javafx.scene.paint.Color.WHITE);
@@ -284,10 +329,11 @@ public class HUD {
                 gc.fillText("K", nhaphonBoxX + 25.0, nhaphonBoxY + 26.5);
             } else {
                 if (cooldownBoxImg != null) {
-                    gc.drawImage(cooldownBoxImg, 0, 0, 50.0, 53.0, nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
+                    gc.drawImage(cooldownBoxImg, 0, 0, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT,
+                            nhaphonBoxX, nhaphonBoxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
                 } else {
                     gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.5));
-                    gc.fillRect(nhaphonBoxX, nhaphonBoxY, 50.0, 53.0);
+                    gc.fillRect(nhaphonBoxX, nhaphonBoxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
                 }
             }
         }
@@ -314,6 +360,12 @@ public class HUD {
             whiteBossHp = -1;
             whiteHpDelayTimer = 0;
             whiteHpDropRate = 0;
+        }
+
+        TooltipLine[] tooltipLines = getHoveredTooltipLines(
+                healthPotionHover, manaPotionHover, berserkHover, kSkillHover);
+        if (tooltipLines != null) {
+            renderTooltip(gc, tooltipLines, screenWidth, screenHeight);
         }
     }
 
@@ -342,14 +394,14 @@ public class HUD {
         int cooldown = allyManager.getSummonCooldownRemaining();
         if (cooldown > 0) {
             double ratio = cooldown / 1800.0;
-            double yOffset = (1.0 - ratio) * 53.0;
+            double yOffset = (1.0 - ratio) * SKILL_BOX_HEIGHT;
 
             if (cooldownBoxImg != null) {
-                gc.drawImage(cooldownBoxImg, 0, yOffset, 50.0, 53.0 - yOffset,
-                        boxX, boxY + yOffset, 50.0, 53.0 - yOffset);
+                gc.drawImage(cooldownBoxImg, 0, yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset,
+                        boxX, boxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
             } else {
                 gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.75));
-                gc.fillRect(boxX, boxY + yOffset, 50.0, 53.0 - yOffset);
+                gc.fillRect(boxX, boxY + yOffset, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT - yOffset);
             }
 
             drawSkillBoxText(gc, (int) Math.ceil(cooldown / 60.0) + "s", boxX, boxY);
@@ -359,10 +411,11 @@ public class HUD {
             drawSkillBoxText(gc, "ON", boxX, boxY);
         } else {
             if (cooldownBoxImg != null) {
-                gc.drawImage(cooldownBoxImg, 0, 0, 50.0, 53.0, boxX, boxY, 50.0, 53.0);
+                gc.drawImage(cooldownBoxImg, 0, 0, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT,
+                        boxX, boxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
             } else {
                 gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.5));
-                gc.fillRect(boxX, boxY, 50.0, 53.0);
+                gc.fillRect(boxX, boxY, SKILL_BOX_SIZE, SKILL_BOX_HEIGHT);
             }
         }
 
@@ -376,6 +429,145 @@ public class HUD {
         gc.setTextAlign(javafx.scene.text.TextAlignment.CENTER);
         gc.strokeText(text, boxX + 25.0, boxY + 26.5);
         gc.fillText(text, boxX + 25.0, boxY + 26.5);
+    }
+
+    private TooltipLine[] getHoveredTooltipLines(Rectangle2D healthPotionHover, Rectangle2D manaPotionHover,
+            Rectangle2D berserkHover, Rectangle2D kSkillHover) {
+        if (!mouseInsideCanvas) {
+            return null;
+        }
+
+        if (containsMouse(healthPotionHover)) {
+            return new TooltipLine[]{
+                    tooltipLine("Vật phẩm: Bình máu (Bấm E)"),
+                    tooltipLine(
+                            tooltipSegment("Hồi ", Color.WHITE),
+                            tooltipSegment("20 HP", Color.RED),
+                            tooltipSegment(".", Color.WHITE)),
+                    tooltipLine("Số lượng hiện có: " + player.getHealthPotionCount())
+            };
+        }
+
+        if (containsMouse(manaPotionHover)) {
+            return new TooltipLine[]{
+                    tooltipLine("Vật phẩm: Bình mana (Bấm Q)"),
+                    tooltipLine(
+                            tooltipSegment("Hồi ", Color.WHITE),
+                            tooltipSegment("10 mana", Color.DODGERBLUE),
+                            tooltipSegment(".", Color.WHITE)),
+                    tooltipLine("Số lượng hiện có: " + player.getManaPotionCount())
+            };
+        }
+
+        if (containsMouse(berserkHover)) {
+            return new TooltipLine[]{
+                    tooltipLine("Skill: Cuồng nộ (Bấm L)"),
+                    tooltipLine("Tăng sát thương đòn đánh thường"),
+                    tooltipLine("trong thời gian ngắn."),
+                    tooltipLine("Thời gian hiệu lực: 10s"),
+                    tooltipLine("Hồi chiêu: 30s"),
+                    tooltipLine("Mana: 10")
+            };
+        }
+
+        if (containsMouse(kSkillHover)) {
+            if (allyManager != null && (allyManager.hasLiveBoss()
+                    || allyManager.hasActiveMinion()
+                    || allyManager.getSummonCooldownRemaining() > 0)) {
+                return new TooltipLine[]{
+                        tooltipLine("Skill: Companion (Bấm K)"),
+                        tooltipLine("Triệu hồi đồng minh hỗ trợ"),
+                        tooltipLine("tấn công boss."),
+                        tooltipLine("Chỉ dùng được trong boss level."),
+                        tooltipLine("Hồi chiêu: 30s"),
+                        tooltipLine("Mana: 20")
+                };
+            }
+
+            return new TooltipLine[]{
+                    tooltipLine("Skill: Nhập hồn (Bấm K)"),
+                    tooltipLine("Khi hạ gục quái vật, bạn có thể"),
+                    tooltipLine("nhập hồn để trở thành quái đó"),
+                    tooltipLine("trong 1 khoảng thời gian."),
+                    tooltipLine("Đặc tính:"),
+                    tooltipLine("- Tree: giảm tốc đánh nhưng tăng mạnh phòng thủ"),
+                    tooltipLine("Thời gian hiệu lực: 5s"),
+                    tooltipLine("Hồi chiêu: 6s"),
+                    tooltipLine("Mana: 20")
+            };
+        }
+
+        return null;
+    }
+
+    private TooltipLine tooltipLine(String text) {
+        return new TooltipLine(tooltipSegment(text, Color.WHITE));
+    }
+
+    private TooltipLine tooltipLine(TooltipSegment... segments) {
+        return new TooltipLine(segments);
+    }
+
+    private TooltipSegment tooltipSegment(String text, Color color) {
+        return new TooltipSegment(text, color);
+    }
+
+    private boolean containsMouse(Rectangle2D area) {
+        return area.contains(mouseX, mouseY);
+    }
+
+    private void renderTooltip(GraphicsContext gc, TooltipLine[] lines, double screenWidth, double screenHeight) {
+        gc.save();
+        gc.setFont(tooltipFont);
+
+        double width = TOOLTIP_WIDTH;
+        double height = lines.length * TOOLTIP_LINE_HEIGHT + TOOLTIP_PADDING_Y * 2;
+        double x = mouseX + TOOLTIP_OFFSET;
+        double y = mouseY + TOOLTIP_OFFSET;
+
+        if (x + width > screenWidth - 8.0) {
+            x = mouseX - width - TOOLTIP_OFFSET;
+        }
+        if (y + height > screenHeight - 8.0) {
+            y = mouseY - height - TOOLTIP_OFFSET;
+        }
+        x = Math.max(8.0, Math.min(x, screenWidth - width - 8.0));
+        y = Math.max(8.0, Math.min(y, screenHeight - height - 8.0));
+
+        gc.setFill(javafx.scene.paint.Color.rgb(0, 0, 0, 0.78));
+        gc.fillRoundRect(x, y, width, height, 12, 12);
+        gc.setStroke(javafx.scene.paint.Color.WHITE);
+        gc.setLineWidth(TOOLTIP_BORDER_WIDTH);
+        gc.strokeRoundRect(x, y, width, height, 12, 12);
+
+        gc.setTextAlign(javafx.scene.text.TextAlignment.LEFT);
+        gc.setTextBaseline(javafx.geometry.VPos.TOP);
+        double textX = x + TOOLTIP_PADDING_X;
+        double textY = y + TOOLTIP_PADDING_Y;
+        for (TooltipLine line : lines) {
+            drawTooltipText(gc, line, textX, textY);
+            textY += TOOLTIP_LINE_HEIGHT;
+        }
+        gc.restore();
+    }
+
+    private void drawTooltipText(GraphicsContext gc, TooltipLine line, double x, double y) {
+        double currentX = x;
+        gc.setStroke(Color.BLACK);
+        gc.setLineWidth(2.0);
+
+        for (TooltipSegment segment : line.segments()) {
+            gc.setFill(segment.color());
+            gc.strokeText(segment.text(), currentX, y);
+            gc.fillText(segment.text(), currentX, y);
+            currentX += measureTooltipText(segment.text());
+        }
+    }
+
+    private double measureTooltipText(String text) {
+        Text helper = new Text(text);
+        helper.setFont(tooltipFont);
+        return helper.getLayoutBounds().getWidth();
     }
 
     private void renderBossUI(GraphicsContext gc, double screenWidth, double screenHeight, FinalBoss boss) {

@@ -50,6 +50,11 @@ public class MapManager {
         try {
             int index = tileType.getId();
             Tile tile = new Tile();
+            tile.collision = tileType.isSolid();
+            if (tileType.getImageName() == null) {
+                tiles.put(index, tile);
+                return;
+            }
             // Sử dụng chữ thường 'tiles' để tránh lỗi case-sensitive khi build bằng Maven
             java.io.InputStream is = getClass().getResourceAsStream("/assets/tiles/" + tileType.getImageName());
             if (is != null) {
@@ -57,7 +62,6 @@ public class MapManager {
             } else {
                 System.err.println("Cảnh báo: Không tìm thấy ảnh " + tileType.getImageName());
             }
-            tile.collision = tileType.isSolid();
             tiles.put(index, tile);
         } catch (Exception e) {
             System.err.println("Lỗi load ảnh tile: " + tileType.getImageName());
@@ -113,7 +117,9 @@ public class MapManager {
                 }
             }
 
-            spawnPotions();
+            if (level != 3) {
+                spawnPotions();
+            }
         } catch (Exception e) { e.printStackTrace(); }
     }
 

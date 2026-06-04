@@ -9,6 +9,7 @@ public class Knight extends Enemy {
 
     private int dashCooldownTimer = 120;
     private final int MAX_DASH_COOLDOWN = 180;
+    private static final int DASH_DAMAGE_COOLDOWN_FRAMES = 30;
     private int MAX_DASH_DURATION = 30;
     private Image normalSprite;
     private Image skillSprite;
@@ -92,6 +93,8 @@ public class Knight extends Enemy {
 
     @Override
     public void update() {
+        updatePlayerDamageCooldown();
+
         if (this.hp > 0) {
             if (this.flashTimer > 0) {
                 this.flashTimer--;
@@ -152,6 +155,24 @@ public class Knight extends Enemy {
             return; // Còn sống nhưng đang bị knockback hoặc choáng thì ngắt AI lướt/đi bộ
         }
         // ----------------------------------------------------
+
+        if (!isDashing && !this.isImmobile && !isPlayerWithinDetectionRange()) {
+            this.moveX = 0;
+            this.moveY = 0;
+            if (normalSprite != null && this.spriteSheet != normalSprite) {
+                this.spriteSheet = normalSprite;
+                this.numFrames = 8;
+                this.frameWidth = normalSprite.getWidth() / this.numFrames;
+                this.frameHeight = normalSprite.getHeight();
+                this.frameIndex = 0;
+            }
+            this.animationTimer++;
+            if (this.animationTimer >= this.animationDelay) {
+                this.animationTimer = 0;
+                this.frameIndex = (this.frameIndex + 1) % this.numFrames;
+            }
+            return;
+        }
 
         if (dashCooldownTimer > 0) {
             dashCooldownTimer--;
@@ -289,7 +310,7 @@ public class Knight extends Enemy {
             // thay vì phụ thuộc vào Hitbox vật lý nhỏ dưới chân
             if (this.isDealingDamage()) {
                 if (this.getBoundary().intersects(targetPlayer.getBoundary())) {
-                    targetPlayer.takeDamage(this.damage, this);
+                    tryDamagePlayer(targetPlayer, this.damage, DASH_DAMAGE_COOLDOWN_FRAMES);
                 }
             }
 

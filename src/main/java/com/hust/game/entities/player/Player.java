@@ -120,7 +120,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // -------------------------------------------------------
     private int attackCooldown = 0; 
     private static final int ATTACK_COOLDOWN_MAX = (8 * 2); // Giảm thời gian chờ xuống còn một nửa (16 frames)
-    private final int attackDamage = 20; // sát thương mỗi đòn
+    private final int attackDamage = 50; // sát thương mỗi đòn
     private final PlayerMergeController mergeController = new PlayerMergeController();
 
     // -------------------------------------------------------
@@ -675,6 +675,18 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         currentMana = Math.max(0, currentMana - amount);
     }
 
+    public boolean canSpendMana(int amount) {
+        return amount >= 0 && currentMana >= amount;
+    }
+
+    public boolean spendMana(int amount) {
+        if (!canSpendMana(amount)) {
+            return false;
+        }
+        currentMana -= amount;
+        return true;
+    }
+
     @Override
     public int getCurrentHp() {
         return currentHp;
@@ -814,12 +826,32 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         resetAttackCooldown();
     }
 
+    public void moveToLevelStart(double startX, double startY) {
+        this.x = startX;
+        this.y = startY;
+        mergeController.clearAll();
+        resetAttackCooldown();
+    }
+
     public void grantMergeForm(MergeFormType formType) {
         mergeController.grantForm(formType);
     }
 
     public boolean activateStoredMergeForm() {
         return mergeController.activateStoredForm();
+    }
+
+    public boolean activateStoredMergeForm(int manaCost) {
+        if (!mergeController.hasStoredForm() || !canSpendMana(manaCost)) {
+            return false;
+        }
+
+        if (!mergeController.activateStoredForm()) {
+            return false;
+        }
+
+        spendMana(manaCost);
+        return true;
     }
 
     public boolean hasStoredMergeForm() {
