@@ -15,7 +15,8 @@ public class SoundManager {
     public static AudioClip dragonRoar, explosion, playerIdle, swordSwing, swordSwing1, swordSwing2, tele, ultiReady, whoosh;
     public static AudioClip dashSound, coinSound;
     public static AudioClip interactSound, buySuc1, buySuc2, cantBuy, noMoney;
-    public static AudioClip line1Sound;
+    public static AudioClip line1Sound, chestHit, chestOpen;
+    public static AudioClip drinkSound;
     private static double sfxVolume = 0.8; // Âm lượng hiệu ứng
     private static double bgmVolume = 0.8; // Âm lượng nhạc nền
 
@@ -84,6 +85,9 @@ public class SoundManager {
         applyVolume(cantBuy, 1.0);
         applyVolume(noMoney, 1.0);
         applyVolume(line1Sound, 1.0);
+        applyVolume(chestHit, 1.0);
+        applyVolume(chestOpen, 1.0);
+        applyVolume(drinkSound, 1.0);
     }
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
@@ -145,6 +149,9 @@ public class SoundManager {
         cantBuy = loadSound("cant_buy.wav", 1.0);
         noMoney = loadSound("no_money.wav", 1.0);
         line1Sound = loadSound("line_1.wav", 1.0);
+        chestHit = loadSound("chest_hit.wav", 1.0);
+        chestOpen = loadSound("chest_open.wav", 1.0);
+        drinkSound = loadSound("drink.wav", 1.0);
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -342,6 +349,18 @@ public class SoundManager {
         if (line1Sound != null) { line1Sound.stop(); line1Sound.play(); }
     }
 
+    public static void playChestHitSound() {
+        if (chestHit != null) { chestHit.stop(); chestHit.play(); }
+    }
+
+    public static void playChestOpenSound() {
+        if (chestOpen != null) { chestOpen.stop(); chestOpen.play(); }
+    }
+
+    public static void playDrinkSound() {
+        if (drinkSound != null) { drinkSound.stop(); drinkSound.play(); }
+    }
+
     public static void stopEnemySounds() {
         if (slimeMove != null) { slimeMove.stop(); }
         if (knightAtk != null) { knightAtk.stop(); }
@@ -399,5 +418,8 @@ public class SoundManager {
         if (cantBuy != null) { cantBuy.stop(); }
         if (noMoney != null) { noMoney.stop(); }
         if (line1Sound != null) { line1Sound.stop(); }
+        if (chestHit != null) { chestHit.stop(); }
+        if (chestOpen != null) { chestOpen.stop(); }
+        if (drinkSound != null) { drinkSound.stop(); }
     }
 }

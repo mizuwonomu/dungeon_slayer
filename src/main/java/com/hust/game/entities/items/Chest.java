@@ -25,6 +25,8 @@ public class Chest extends StaticEntity {
             return false;
         }
 
+        com.hust.game.audio.SoundManager.playChestHitSound(); // Phát âm thanh va đập/phá rương
+        com.hust.game.audio.SoundManager.playNsMissSound(); // Phát thêm tiếng chém "miss" khi chém trúng rương
         opening = true;
         frameIndex = 0;
         animTimer = 0;
@@ -64,6 +66,9 @@ public class Chest extends StaticEntity {
         frameIndex++;
         if (frameIndex >= FRAME_COUNT - 1) {
             frameIndex = FRAME_COUNT - 1;
+            if (!opened) {
+                com.hust.game.audio.SoundManager.playChestOpenSound(); // Phát âm thanh nắp rương mở tung
+            }
             opening = false;
             opened = true;
             fading = true;

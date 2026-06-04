@@ -130,6 +130,7 @@ public class App extends Application {
     private int loadedFrames = 0;
     private javafx.scene.media.Media tutorialMedia;
     private javafx.scene.media.Media level1Media;
+    private javafx.scene.media.Media level2Media;
     private javafx.scene.media.Media bossMedia;
     private javafx.scene.text.Font finishFont;
 
@@ -1340,6 +1341,7 @@ public class App extends Application {
             try {
                 tutorialMedia = new javafx.scene.media.Media(getClass().getResource("/sounds/tutorial.mp3").toExternalForm());
                 level1Media = new javafx.scene.media.Media(getClass().getResource("/sounds/Music_lvl_1.mp3").toExternalForm());
+                level2Media = new javafx.scene.media.Media(getClass().getResource("/sounds/Music_lvl_2.mp3").toExternalForm());
                 bossMedia = new javafx.scene.media.Media(getClass().getResource("/sounds/boss_fight_music.mp3").toExternalForm());
             } catch (Exception e) { System.err.println("Lỗi load Media nhạc nền: " + e.getMessage()); }
             
@@ -1387,6 +1389,13 @@ public class App extends Application {
             Image powerUpImg = loadImg("/assets/player/player_power_up.png");
             Image thunderImg = loadImg("/assets/player/lightning.png");
 
+            Image healEffectImg = null;
+            Image manaEffectImg = null;
+            try {
+                healEffectImg = loadImg("/assets/player/healing.png");
+                manaEffectImg = loadImg("/assets/player/manaing.png");
+            } catch (Exception e) { System.err.println("Không tìm thấy ảnh healing.png hoặc manaing.png"); }
+
             healthPotionImg = loadImg("/assets/items/health_potion.png");
             manaPotionImg = loadImg("/assets/items/mana_potion.png");
 
@@ -1408,7 +1417,7 @@ public class App extends Application {
                     iDown, iUp, iLeft, iRight, rDown, rUp, rLeft, rRight,
                     cDown, cUp, cLeft, cRight, 
                     dDown, dUp, dLeft, dRight, 
-                    swordHit, rageHit, powerUpImg, thunderImg);
+                    swordHit, rageHit, powerUpImg, thunderImg, healEffectImg, manaEffectImg);
             player.configureTreeMerge(treeImg, treeSkillImg, transformImg);
 
             // Sinh quái vật để test di chuyển
@@ -1617,7 +1626,7 @@ public class App extends Application {
         }
 
         int currentLevel = gameManager.getCurrentLevelIndex();
-        if (currentLevel != 1 && currentLevel != 3) {
+        if (currentLevel < 1 || currentLevel > 3) {
             return null;
         }
         return gameManager.getNpc();
@@ -1944,8 +1953,11 @@ public class App extends Application {
         if (level == 0) {
             selectedMedia = tutorialMedia;
             volMultiplier = 0.5;
-        } else if (level == 1 || level == 2) {
+        } else if (level == 1) {
             selectedMedia = level1Media;
+            volMultiplier = 0.7;
+        } else if (level == 2) {
+            selectedMedia = level2Media;
             volMultiplier = 0.7;
         } else if (level == 3) {
             selectedMedia = bossMedia;

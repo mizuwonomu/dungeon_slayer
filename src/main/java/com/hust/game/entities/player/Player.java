@@ -45,6 +45,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     private final Image powerUpImg;
     private final Image thunderImg;
 
+    // Hiệu ứng potion
+    private final Image healEffectImg;
+    private final Image manaEffectImg;
+    private boolean isHealingActive = false;
+    private boolean isManaingActive = false;
+    private int potionEffectTimer = 0;
+
     private boolean isRageActive = false;
     private int rageTimer = 0;
     private int powerUpFrameIndex = 0;
@@ -133,7 +140,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
             Image dashDown, Image dashUp, Image dashLeft, Image dashRight,
-            Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg) {
+            Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg,
+            Image healEffectImg, Image manaEffectImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
@@ -170,6 +178,8 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.rageHitImg = rageHitImg;
         this.powerUpImg = powerUpImg;
         this.thunderImg = thunderImg;
+        this.healEffectImg = healEffectImg;
+        this.manaEffectImg = manaEffectImg;
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
     }
 
@@ -377,6 +387,14 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
 
         mergeController.update();
+        
+        if (potionEffectTimer > 0) {
+            potionEffectTimer--;
+            if (potionEffectTimer <= 0) {
+                isHealingActive = false;
+                isManaingActive = false;
+            }
+        }
     }
 
     // Thêm method — CombatManager gọi khi bật/tắt skill
@@ -474,6 +492,37 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
 
         if ((isAttacking || isThrusting) && attackEffect != null) {
             attackEffect.render(gc); // Vẽ hiệu ứng kiếm đè lên
+        }
+        
+        // Vẽ hiệu ứng Potion (Hồi máu / Hồi mana)
+        if ((isHealingActive || isManaingActive) && potionEffectTimer > 0) {
+            Image currentEffect = isHealingActive ? healEffectImg : manaEffectImg;
+            if (currentEffect != null) {
+                gc.save();
+                int elapsed = 48 - potionEffectTimer; // Chạy từ 0 đến 48
+                
+                // Tính toán Alpha (Fade in 0.2s = 12 frames đầu, Fade out 0.2s = 12 frames cuối)
+                double alpha = 1.0;
+                if (elapsed < 12) {
+                    alpha = (double) elapsed / 12.0;
+                } else if (potionEffectTimer < 12) {
+                    alpha = (double) potionEffectTimer / 12.0;
+                }
+                gc.setGlobalAlpha(Math.max(0.0, Math.min(1.0, alpha)));
+                
+                // Xác định khung hình: 4 khung hình chia đều cho 48 frames -> 12 frames mỗi hình
+                int pFrame = Math.min(3, elapsed / 12);
+                double fw = 96.0;
+                double fh = 96.0;
+                double sx = pFrame * fw;
+                
+                // Căn giữa hiệu ứng 96x96 lên trên người Player 48x48
+                double drawX = x + (renderWidth / 2.0) - (fw / 2.0);
+                double drawY = y + (renderHeight / 2.0) - (fh / 2.0);
+                
+                gc.drawImage(currentEffect, sx, 0, fw, fh, drawX, drawY, fw, fh);
+                gc.restore();
+            }
         }
     }
 
@@ -763,6 +812,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
         healthPotionCount--;
         healHp(GameConstants.POTION_HEAL_AMOUNT);
+        com.hust.game.audio.SoundManager.playDrinkSound();
+        this.isHealingActive = true;
+        this.isManaingActive = false;
+        this.potionEffectTimer = 48; // 0.8s * 60fps
         return true;
     }
 
@@ -772,6 +825,10 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
         manaPotionCount--;
         restoreMana(GameConstants.POTION_MANA_AMOUNT);
+        com.hust.game.audio.SoundManager.playDrinkSound();
+        this.isManaingActive = true;
+        this.isHealingActive = false;
+        this.potionEffectTimer = 48; // 0.8s * 60fps
         return true;
     }
 

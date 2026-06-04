@@ -13,10 +13,10 @@ import java.util.List;
 
 public class MapManager {
     private static final int[][] LEVEL_1_CHEST_TILES = {
-            {8, 16}, {20, 22}, {42, 17}, {62, 28}, {92, 22}
+            {8, 16}, {87, 29}, {44, 18}, {126, 4}, {126, 19}
     };
     private static final int[][] LEVEL_2_CHEST_TILES = {
-            {7, 22}, {22, 16}, {42, 21}, {62, 18}, {96, 24}
+            {12, 20}, {63, 19}, {113, 52}, {71, 63}, {29, 49}
     };
     public Map<Integer, Tile> tiles;
     public int[][] mapTileNum;

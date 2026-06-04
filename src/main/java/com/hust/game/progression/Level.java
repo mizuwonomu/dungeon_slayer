@@ -223,96 +223,13 @@ public class Level {
             }
         } else if(lvlID == 1){
             spawnSmartLevel1Enemies();
-
-            // --- THUẬT TOÁN SINH QUÁI THÔNG MINH CHO LEVEL 1 ---
-            
-            // 1. Flood Fill (BFS) để tìm tất cả các ô có thể đi tới được từ vị trí spawn của Player
-            // Giúp tự động bỏ qua các phòng bị đóng kín hoàn toàn bởi tường (-1)
-            boolean[][] reachable = new boolean[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
-            java.util.Queue<int[]> queue = new java.util.LinkedList<>();
-            
-            int startCol = 4;
-            int startRow = 16;
-            queue.add(new int[]{startCol, startRow});
-            reachable[startRow][startCol] = true;
-            
-            int[][] dirs = {{1,0}, {-1,0}, {0,1}, {0,-1}};
-            while (!queue.isEmpty()) {
-                int[] curr = queue.poll();
-                int cx = curr[0];
-                int cy = curr[1];
-                
-                for (int[] d : dirs) {
-                    int nx = cx + d[0];
-                    int ny = cy + d[1];
-                    if (nx >= 0 && nx < GameConstants.MAX_WORLD_COL && ny >= 0 && ny < GameConstants.MAX_WORLD_ROW) {
-                        if (!reachable[ny][nx]) {
-                            int tileId = map.mapTileNum[ny][nx];
-                            com.hust.game.map.Tile t = map.tiles.get(tileId);
-                            if (t != null && !t.collision) {
-                                reachable[ny][nx] = true;
-                                queue.add(new int[]{nx, ny});
-                            }
-                        }
-                    }
-                }
-            }
-            
-            int spawnedForTest = LEVEL1_TEST_ENEMY_LIMIT;
-
-            // 2. Quét map theo các vùng 7x7 để phát hiện "Phòng" và bỏ qua "Hành lang"
-            for (int r = 0; r < GameConstants.MAX_WORLD_ROW && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; r += 7) {
-                for (int c = 15; c < GameConstants.MAX_WORLD_COL && spawnedForTest < LEVEL1_TEST_ENEMY_LIMIT; c += 7) { // c >= 15 để chừa trống phòng spawn đầu tiên
-                    int reachableCount = 0;
-                    List<int[]> roomTiles = new ArrayList<>();
-                    for (int i = 0; i < 7; i++) {
-                        for (int j = 0; j < 7; j++) {
-                            if (r + i < GameConstants.MAX_WORLD_ROW && c + j < GameConstants.MAX_WORLD_COL) {
-                                if (reachable[r + i][c + j]) {
-                                    reachableCount++;
-                                    roomTiles.add(new int[]{c + j, r + i});
-                                }
-                            }
-                        }
-                    }
-                    
-                    // Nếu vùng 7x7 có >= 28 ô đi được -> Đủ rộng để coi là Phòng (Hành lang 3 ô chỉ có tối đa ~21 ô)
-                    if (reachableCount >= SMART_ROOM_MIN_WALKABLE_TILES) {
-                        int numEnemies = Math.min(SMART_ENEMIES_PER_ROOM, LEVEL1_TEST_ENEMY_LIMIT - spawnedForTest);
-                        for (int k = 0; k < numEnemies && !roomTiles.isEmpty(); k++) {
-                            int randIdx = (int)(Math.random() * roomTiles.size());
-                            int[] pos = roomTiles.get(randIdx);
-                            roomTiles.remove(randIdx); // Xóa khỏi danh sách để tránh sinh 2 con quái đè lên cùng 1 ô
-                            
-                            double spawnX = pos[0] * TILE_SIZE;
-                            double spawnY = pos[1] * TILE_SIZE;
-                            
-                            // Tỉ lệ 50% ra Cây, 50% ra Slime
-                            if (Math.random() > 0.5) {
-                                // Ảnh Tree cao 96px (2 ô), mà điểm xét tường là dưới chân. 
-                                // Phải lùi Y lên 1 ô (-48) để chân Tree đáp đúng vào ô trống đã quét được
-                                double[] safeTree = findSafeEnemySpawn(spawnX, spawnY - 48, 96, 96);
-                                if (isSafeEnemySpawn(safeTree[0], safeTree[1], 96, 96)) {
-                                    enemyManager.spawnEnemy("Tree", safeTree[0], safeTree[1], treeImg, 8, 96, 96, player, treeSkillImg);
-                                }
-                            } else {
-                                double[] safeSlime = findSafeEnemySpawn(spawnX, spawnY, 51, 31.5);
-                                if (isSafeEnemySpawn(safeSlime[0], safeSlime[1], 51, 31.5)) {
-                                    enemyManager.spawnEnemy("Slime", safeSlime[0], safeSlime[1], slimeImg, 8, 51, 31.5, player);
-                                }
-                            }
-                            spawnedForTest++;
-                        }
-                    }
-                }
-            }
         }
         else if(lvlID == 2){
             spawnLevel2Enemies();
         }
         else if (lvlID == 3) {
             // Spawn boss ở ô (31, 20)
-            enemyManager.spawnEnemy("FinalBoss", 30 * TILE_SIZE, 19 * TILE_SIZE, bossImg, 5, TILE_SIZE * 3, TILE_SIZE * 3, player);
+            enemyManager.spawnEnemy("FinalBoss", 30 * TILE_SIZE, 17 * TILE_SIZE, bossImg, 5, TILE_SIZE * 3, TILE_SIZE * 3, player);
         }
     }
 
@@ -970,6 +887,9 @@ public class Level {
                 if (Math.abs(col - playerCol) + Math.abs(row - playerRow) < minPlayerDistance) {
                     continue;
                 }
+                if (isNpcZone(col, row)) {
+                    continue;
+                }
                 int walkableCount = countReachableAround(reachable, col, row, ROOM_SCAN_RADIUS);
                 if (walkableCount < SMART_ROOM_MIN_WALKABLE_TILES) {
                     continue;
@@ -1356,15 +1276,33 @@ public class Level {
                         || reachable[nextRow][nextCol] || !isWalkableSpawnTile(nextCol, nextRow)) {
                     continue;
                 }
-
                 reachable[nextRow][nextCol] = true;
                 queue.add(new int[]{nextCol, nextRow});
+            }
+        } 
+
+        // Sau khi thuật toán loang xong, ta đục lỗ khu vực NPC thành tường (false)
+        // Để tất cả các logic sinh quái phía sau đều tự động tránh xa khu vực này
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                if (isNpcZone(c, r)) {
+                    reachable[r][c] = false;
+                }
             }
         }
 
         return reachable;
     }
 
+    private boolean isNpcZone(int col, int row) {
+        if (lvlID == 1 && col >= 61 && col <= 68 && row >= 6 && row <= 30) {
+            return true;
+        }
+        if (lvlID == 2 && col >= 112 && col <= 119 && row >= 14 && row <= 19) {
+            return true;
+        }
+        return false;
+    }
     private List<List<int[]>> findReachableRooms(boolean[][] reachable, int minCol, int roomLimit, int minPlayerDistance) {
         List<List<int[]>> rooms = new ArrayList<>();
         int rows = Math.max(1, map.getLoadedRowCount());
@@ -1562,6 +1500,12 @@ public class Level {
             }
         }
 
+        int col = centerX / TILE_SIZE;
+        int row = centerY / TILE_SIZE;
+        if (isNpcZone(col, row)) {
+            return false;
+        }
+
         return true;
     }
 
@@ -1621,7 +1565,7 @@ public class Level {
     }
 
     private void spawnNpc() {
-        if (lvlID != 1 && lvlID != 3) {
+        if (lvlID < 1 || lvlID > 3) {
             npc = null;
             return;
         }
@@ -1640,69 +1584,20 @@ public class Level {
             return;
         }
 
-        int[] tile = lvlID == 3 ? chooseBossNpcTile() : chooseNpcTile();
+        int[] tile = new int[]{0, 0};
+        if (lvlID == 1) {
+            tile = new int[]{66, 19};
+        } else if (lvlID == 2) {
+            tile = new int[]{115, 19};
+        } else if (lvlID == 3) {
+            tile = new int[]{8, 16};
+        }
+
+
         double x = tile[0] * TILE_SIZE;
         double y = tile[1] * TILE_SIZE;
         String tipText = lvlID == 3 ? BOSS_NPC_TIP : LEVEL1_NPC_TIP;
         npc = new Npc(x, y, idle1, idle2, idle3, dialogue, approval, manaPotion, healthPotion, tipText);
-    }
-
-    private int[] chooseBossNpcTile() {
-        int[][] preferredTiles = {
-                {4, 18},
-                {4, 19},
-                {3, 19},
-                {5, 18}
-        };
-
-        for (int[] tile : preferredTiles) {
-            if (isWalkableTile(tile[0], tile[1])) {
-                return tile;
-            }
-        }
-
-        return new int[]{4, 19};
-    }
-
-    private int[] chooseNpcTile() {
-        List<int[]> candidates = new ArrayList<>();
-        int rows = Math.max(1, map.getLoadedRowCount());
-        int cols = Math.max(1, map.getLoadedColCount());
-        int playerSpawnCol = 4;
-        int playerSpawnRow = 16;
-        int minDistance = 8;
-
-        for (int row = 0; row < rows; row++) {
-            for (int col = 0; col < cols; col++) {
-                int tileId = map.mapTileNum[row][col];
-                com.hust.game.map.Tile tile = map.tiles.get(tileId);
-                if (tile == null || tile.collision) {
-                    continue;
-                }
-                int distance = Math.abs(col - playerSpawnCol) + Math.abs(row - playerSpawnRow);
-                if (distance < minDistance) {
-                    continue;
-                }
-                candidates.add(new int[]{col, row});
-            }
-        }
-
-        if (candidates.isEmpty()) {
-            return new int[]{playerSpawnCol + 4, playerSpawnRow};
-        }
-
-        Random random = new Random(LEVEL1_NPC_SEED);
-        return candidates.get(random.nextInt(candidates.size()));
-    }
-
-    private boolean isWalkableTile(int col, int row) {
-        if (row < 0 || row >= map.getLoadedRowCount() || col < 0 || col >= map.getLoadedColCount()) {
-            return false;
-        }
-
-        int tileId = map.mapTileNum[row][col];
-        com.hust.game.map.Tile tile = map.tiles.get(tileId);
-        return tile != null && !tile.collision;
     }
 
     private Image loadOptionalImage(String path) {
