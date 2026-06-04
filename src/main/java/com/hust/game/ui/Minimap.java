@@ -26,6 +26,8 @@ public class Minimap {
 
     private double panX = 0;
     private double panY = 0;
+    private double lastMouseX;
+    private double lastMouseY;
 
     private void applyTransform() {
 
@@ -214,6 +216,25 @@ public class Minimap {
 
     public void moveRight() {
         panX -= 30;
+        applyTransform();
+    }
+
+    public void startDrag(double mouseX, double mouseY) {
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+    }
+
+    public void drag(double mouseX, double mouseY) {
+
+        double dx = mouseX - lastMouseX;
+        double dy = mouseY - lastMouseY;
+
+        panX += dx;
+        panY += dy;
+
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+
         applyTransform();
     }
 
