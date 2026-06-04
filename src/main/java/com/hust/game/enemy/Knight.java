@@ -156,6 +156,24 @@ public class Knight extends Enemy {
         }
         // ----------------------------------------------------
 
+        if (!isDashing && !this.isImmobile && !isPlayerWithinDetectionRange()) {
+            this.moveX = 0;
+            this.moveY = 0;
+            if (normalSprite != null && this.spriteSheet != normalSprite) {
+                this.spriteSheet = normalSprite;
+                this.numFrames = 8;
+                this.frameWidth = normalSprite.getWidth() / this.numFrames;
+                this.frameHeight = normalSprite.getHeight();
+                this.frameIndex = 0;
+            }
+            this.animationTimer++;
+            if (this.animationTimer >= this.animationDelay) {
+                this.animationTimer = 0;
+                this.frameIndex = (this.frameIndex + 1) % this.numFrames;
+            }
+            return;
+        }
+
         if (dashCooldownTimer > 0) {
             dashCooldownTimer--;
         }
