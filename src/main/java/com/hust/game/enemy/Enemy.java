@@ -35,7 +35,9 @@ public abstract class Enemy extends MovingEntity {
     protected boolean isActive = true; // Trạng thái hoạt động (trong màn hình)
     protected boolean isImmobile = false; // Khóa di chuyển (Tutorial)
     protected boolean isHarmless = false; // Khóa sát thương (Tutorial)
-    protected double detectionRangePixels = com.hust.game.constants.GameConstants.TILE_SIZE * 7.0;
+    // Nới tầm phát hiện để quái còn bám player khi người chơi lùi ra xa một chút
+    // nhưng vẫn không quá rộng đến mức chase cả phòng lớn.
+    protected double detectionRangePixels = com.hust.game.constants.GameConstants.TILE_SIZE * 10.0;
     private int playerDamageCooldownTimer = 0;
 
     protected com.hust.game.collision.CollisionChecker collisionChecker;
