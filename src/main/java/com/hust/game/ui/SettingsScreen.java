@@ -9,6 +9,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
@@ -41,6 +42,10 @@ public class SettingsScreen {
     private static final int    BG_ANIM_DELAY = 64;
     private static final double TAB_ARROW_SCALE = 0.24;
     private static final double HOTKEY_LIST_WIDTH = 760;
+    private static final double HOTKEY_SCROLL_HEIGHT = 500;
+    private static final double CUSTOM_SCROLL_TRACK_WIDTH = 18;
+    private static final double CUSTOM_SCROLL_THUMB_WIDTH = 10;
+    private static final double CUSTOM_SCROLL_THUMB_HEIGHT = 188;
 
     // Độ mờ cố định của background (0.0 = đen hoàn toàn, 1.0 = rõ hoàn toàn)
     private static final double BG_DIM_ALPHA  = 0.3;
@@ -336,7 +341,7 @@ public class SettingsScreen {
                 "SPACE / Chuột trái: Bỏ qua thoại NPC"
         );
 
-        ScrollPane hotkeyScroll = createHotkeyScrollPane(hotkeyList);
+        StackPane hotkeyScroll = createHotkeyScrollPane(hotkeyList);
         StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.7, () -> onBack.accept(null));
         VBox uiBox = new VBox(22, title, hotkeyScroll, menuBtn);
         uiBox.setAlignment(Pos.CENTER);
@@ -353,22 +358,75 @@ public class SettingsScreen {
         return page;
     }
 
-    private ScrollPane createHotkeyScrollPane(VBox hotkeyList) {
+    private StackPane createHotkeyScrollPane(VBox hotkeyList) {
         ScrollPane scrollPane = new ScrollPane(hotkeyList);
         scrollPane.setFitToWidth(true);
         scrollPane.setPannable(true);
         scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
-        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.AS_NEEDED);
-        scrollPane.setPrefViewportWidth(HOTKEY_LIST_WIDTH + 40);
-        scrollPane.setPrefViewportHeight(500);
-        scrollPane.setMaxWidth(HOTKEY_LIST_WIDTH + 60);
-        scrollPane.setMaxHeight(500);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setPrefViewportWidth(HOTKEY_LIST_WIDTH);
+        scrollPane.setPrefViewportHeight(HOTKEY_SCROLL_HEIGHT);
+        scrollPane.setMaxWidth(HOTKEY_LIST_WIDTH);
+        scrollPane.setMaxHeight(HOTKEY_SCROLL_HEIGHT);
         scrollPane.setStyle(
                 "-fx-background: transparent;" +
                 "-fx-background-color: transparent;" +
                 "-fx-control-inner-background: transparent;"
         );
-        return scrollPane;
+
+        ImageView trackView = new ImageView(loadImg("/assets/ui/scrollbar/scroll_track.png"));
+        trackView.setFitWidth(CUSTOM_SCROLL_TRACK_WIDTH);
+        trackView.setFitHeight(HOTKEY_SCROLL_HEIGHT);
+        trackView.setPreserveRatio(false);
+        trackView.setSmooth(false);
+
+        ImageView thumbView = new ImageView(loadImg("/assets/ui/scrollbar/scroll_thumb.png"));
+        thumbView.setFitWidth(CUSTOM_SCROLL_THUMB_WIDTH);
+        thumbView.setFitHeight(CUSTOM_SCROLL_THUMB_HEIGHT);
+        thumbView.setPreserveRatio(false);
+        thumbView.setSmooth(false);
+
+        StackPane scrollbar = new StackPane(trackView, thumbView);
+        scrollbar.setAlignment(Pos.TOP_CENTER);
+        scrollbar.setPrefSize(CUSTOM_SCROLL_TRACK_WIDTH, HOTKEY_SCROLL_HEIGHT);
+        scrollbar.setMaxSize(CUSTOM_SCROLL_TRACK_WIDTH, HOTKEY_SCROLL_HEIGHT);
+
+        Runnable updateThumb = () -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            thumbView.setTranslateY(scrollPane.getVvalue() * maxThumbY);
+        };
+        scrollPane.vvalueProperty().addListener((obs, oldValue, newValue) -> updateThumb.run());
+        javafx.application.Platform.runLater(updateThumb);
+
+        final double[] dragStartY = {0};
+        final double[] dragStartValue = {0};
+        thumbView.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            dragStartY[0] = e.getSceneY();
+            dragStartValue[0] = scrollPane.getVvalue();
+            e.consume();
+        });
+        thumbView.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            double nextValue = dragStartValue[0] + (e.getSceneY() - dragStartY[0]) / maxThumbY;
+            scrollPane.setVvalue(clamp(nextValue, 0, 1));
+            e.consume();
+        });
+        scrollbar.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            double nextValue = (e.getY() - CUSTOM_SCROLL_THUMB_HEIGHT / 2.0) / maxThumbY;
+            scrollPane.setVvalue(clamp(nextValue, 0, 1));
+        });
+
+        HBox scrollContent = new HBox(18, scrollPane, scrollbar);
+        scrollContent.setAlignment(Pos.CENTER);
+
+        StackPane wrapper = new StackPane(scrollContent);
+        wrapper.setMaxSize(HOTKEY_LIST_WIDTH + CUSTOM_SCROLL_TRACK_WIDTH + 18, HOTKEY_SCROLL_HEIGHT);
+        return wrapper;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     private VBox createHotkeyList(Font font, String... hotkeyLines) {

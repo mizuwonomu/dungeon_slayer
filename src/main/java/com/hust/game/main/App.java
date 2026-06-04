@@ -248,6 +248,7 @@ public class App extends Application {
             mainScene.setOnMousePressed(scene.getOnMousePressed());
             mainScene.setOnMouseReleased(scene.getOnMouseReleased());
             mainScene.setOnMouseClicked(scene.getOnMouseClicked());
+            mainScene.getStylesheets().setAll(scene.getStylesheets());
             
             // Lấy root từ scene mới và gỡ nó ra khỏi scene mới trước khi gán vào mainScene
             // để tránh lỗi "is already set as root of another scene"
