@@ -18,7 +18,6 @@ import javafx.geometry.Pos;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.geometry.Rectangle2D;
-import javafx.scene.Cursor;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -443,7 +442,6 @@ public class SettingsScreen {
             pane.setScaleY(1.0);
         });
         pane.setOnMouseClicked(e -> action.run());
-        pane.setCursor(Cursor.HAND);
         return pane;
     }
 
@@ -555,7 +553,6 @@ public class SettingsScreen {
         });
         
         pane.setOnMouseClicked(e -> action.run());
-        pane.setCursor(Cursor.HAND);
         
         return pane;
     }
