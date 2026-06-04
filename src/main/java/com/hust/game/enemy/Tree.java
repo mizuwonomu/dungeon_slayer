@@ -19,6 +19,18 @@ public class Tree extends Enemy {
     private boolean hasDealtSkillDamage = false;
     private Image dieSprite;
     private boolean isDying = false;
+    private static Image cachedDieSprite;
+
+    public static void preloadAssets() {
+        if (cachedDieSprite == null) {
+            try {
+                cachedDieSprite = new Image(Tree.class.getResourceAsStream("/assets/enemy/tree_die.png"));
+                preBakeWhiteSprite(cachedDieSprite);
+            } catch (Exception e) {
+                System.err.println("Không tìm thấy ảnh die của Tree!");
+            }
+        }
+    }
 
     public Tree(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer, Image skillSprite) {
@@ -32,11 +44,11 @@ public class Tree extends Enemy {
         this.normalSprite = sprSheet;
         this.skillSprite = skillSprite;
         
-        try {
-            this.dieSprite = new Image(getClass().getResourceAsStream("/assets/enemy/tree_die.png"));
-        } catch (Exception e) {
-            System.err.println("Không tìm thấy ảnh die của Tree!");
-        }
+        this.dieSprite = cachedDieSprite;
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.normalSprite);
+        preBakeWhiteSprite(this.skillSprite);
     }
 
     public Tree(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
@@ -52,34 +64,33 @@ public class Tree extends Enemy {
             this.hitStunTimer = 0; 
             this.isCastingSkill = false;
             
-            if (!isDying) {
-                isDying = true;
-                if (dieSprite != null) {
-                    this.spriteSheet = dieSprite;
-                    this.numFrames = 8; 
-                    this.frameWidth = dieSprite.getWidth() / 8.0;
-                    this.frameHeight = dieSprite.getHeight();
-                }
-                this.frameIndex = 0;
-                this.animationTimer = 0;
-            }
-
-            // Chớp trắng 6 frame đầu tiên
             if (this.flashTimer > 54) {
-                this.flashTimer--;
-            }
-
-            // Chạy animation chết đến frame cuối
-            if (this.frameIndex < 7) {
-                this.animationTimer++;
-                if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
-                    this.animationTimer = 0;
-                    this.frameIndex++;
-                }
+                this.flashTimer--; // Chớp trắng 6 frame đầu tiên với ảnh cũ
             } else {
-                // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
-                if (this.flashTimer > 0 && this.flashTimer <= 54) {
-                    this.flashTimer--;
+                if (!isDying) {
+                    isDying = true;
+                    if (dieSprite != null) {
+                        this.spriteSheet = dieSprite;
+                        this.numFrames = 8; 
+                        this.frameWidth = dieSprite.getWidth() / 8.0;
+                        this.frameHeight = dieSprite.getHeight();
+                    }
+                    this.frameIndex = 0;
+                    this.animationTimer = 0;
+                }
+
+                // Chạy animation chết đến frame cuối
+                if (this.frameIndex < 7) {
+                    this.animationTimer++;
+                    if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
+                        this.animationTimer = 0;
+                        this.frameIndex++;
+                    }
+                } else {
+                    // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                    if (this.flashTimer > 0) {
+                        this.flashTimer--;
+                    }
                 }
             }
             return;

@@ -43,6 +43,27 @@ public class Witch extends Enemy {
     private double circleX, circleY;
     private int circleTimer = 0;
 
+    private static Image cachedDieSprite;
+    private static Image cachedCircleSprite;
+    private static Image cachedCircleAtkSprite;
+    private static Image cachedKnightIdle;
+    private static Image cachedKnightAtk;
+
+    public static void preloadAssets() {
+        if (cachedDieSprite == null) {
+            try {
+                cachedDieSprite = new javafx.scene.image.Image(Witch.class.getResourceAsStream("/assets/enemy/witch_die.png"));
+                cachedCircleSprite = new javafx.scene.image.Image(Witch.class.getResourceAsStream("/assets/enemy/witch_circle.png"));
+                cachedCircleAtkSprite = new javafx.scene.image.Image(Witch.class.getResourceAsStream("/assets/enemy/witch_circle_atk.png"));
+                cachedKnightIdle = new javafx.scene.image.Image(Witch.class.getResourceAsStream("/assets/enemy/knight_idle.png"));
+                cachedKnightAtk = new javafx.scene.image.Image(Witch.class.getResourceAsStream("/assets/enemy/knight_attack.png"));
+                preBakeWhiteSprite(cachedDieSprite);
+            } catch (Exception e) {
+                System.err.println("Lỗi nạp ảnh phụ của Phù thủy!");
+            }
+        }
+    }
+
     public Witch(double x, double y, Image idleImg, int numFrames, double renderWidth, double renderHeight,
             Player player, Image skillImg, EnemyManager manager) {
         super(x, y, idleImg, numFrames, renderWidth, renderHeight, player);
@@ -55,23 +76,18 @@ public class Witch extends Enemy {
         this.castSprite = skillImg; // witch_atk.png
         this.summonSprite = idleImg; // witch_summon.png
         
-        try {
-            this.dieSprite = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/assets/enemy/witch_die.png"));
-            this.circleSprite = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/assets/enemy/witch_circle.png"));
-            this.circleAtkSprite = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/assets/enemy/witch_circle_atk.png"));
-            this.knightIdle = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/assets/enemy/knight_idle.png"));
-            this.knightAtk = new javafx.scene.image.Image(
-                    getClass().getResourceAsStream("/assets/enemy/knight_attack.png"));
-        } catch (Exception e) {
-            System.err.println("Lỗi nạp ảnh vòng lửa Phù thủy!");
-        }
+        this.dieSprite = cachedDieSprite;
+        this.circleSprite = cachedCircleSprite;
+        this.circleAtkSprite = cachedCircleAtkSprite;
+        this.knightIdle = cachedKnightIdle;
+        this.knightAtk = cachedKnightAtk;
         
         // Thiết lập trạng thái mặc định (Idle)
         resetToIdle();
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.castSprite);
+        preBakeWhiteSprite(this.summonSprite);
     }
 
     // Hàm trợ giúp để cập nhật Frame và Tỷ lệ khi chuyển đổi kỹ năng
@@ -465,7 +481,7 @@ public class Witch extends Enemy {
         }
 
         Queue<int[]> queue = new ArrayDeque<>();
-        queue.add(new int[]{startCol, startRow});
+        queue.add(new int[]{startCol, startRow, 0});
         reachable[startRow][startCol] = true;
 
         int[][] directions = {
@@ -477,6 +493,10 @@ public class Witch extends Enemy {
 
         while (!queue.isEmpty()) {
             int[] current = queue.poll();
+            int depth = current[2];
+            
+            if (depth >= 15) continue; // Tối ưu BFS: Giới hạn bán kính loang 15 ô
+            
             for (int[] direction : directions) {
                 int nextCol = current[0] + direction[0];
                 int nextRow = current[1] + direction[1];
@@ -487,7 +507,7 @@ public class Witch extends Enemy {
                 }
 
                 reachable[nextRow][nextCol] = true;
-                queue.add(new int[]{nextCol, nextRow});
+                queue.add(new int[]{nextCol, nextRow, depth + 1});
             }
         }
 
@@ -583,37 +603,37 @@ public class Witch extends Enemy {
             this.isCastingCircle = false;
             this.isSummoning = false;
 
-            if (!isDying) {
-                isDying = true;
-                if (dieSprite != null) {
-                    this.spriteSheet = dieSprite;
-                    this.numFrames = 11;
-                    this.frameWidth = dieSprite.getWidth() / 11.0;
-                    this.frameHeight = dieSprite.getHeight();
-                    
-                    // Cập nhật lại tỷ lệ kích thước cho ảnh chết, giữ tâm đứng yên
-                    double oldCenterX = this.x + this.renderWidth / 2.0;
-                    this.renderHeight = 150;
-                    this.renderWidth = this.renderHeight * (this.frameWidth / this.frameHeight);
-                    this.x = oldCenterX - this.renderWidth / 2.0;
-                }
-                this.frameIndex = 0;
-                this.animationTimer = 0;
-            }
-
             if (this.flashTimer > 54) {
-                this.flashTimer--;
-            }
-
-            if (this.frameIndex < 10) {
-                this.animationTimer++;
-                if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
-                    this.animationTimer = 0;
-                    this.frameIndex++;
-                }
+                this.flashTimer--; // Chớp trắng 6 frame đầu tiên với ảnh cũ
             } else {
-                if (this.flashTimer > 0 && this.flashTimer <= 54) {
-                    this.flashTimer--;
+                if (!isDying) {
+                    isDying = true;
+                    if (dieSprite != null) {
+                        this.spriteSheet = dieSprite;
+                        this.numFrames = 11;
+                        this.frameWidth = dieSprite.getWidth() / 11.0;
+                        this.frameHeight = dieSprite.getHeight();
+                        
+                        // Cập nhật lại tỷ lệ kích thước cho ảnh chết, giữ tâm đứng yên
+                        double oldCenterX = this.x + this.renderWidth / 2.0;
+                        this.renderHeight = 150;
+                        this.renderWidth = this.renderHeight * (this.frameWidth / this.frameHeight);
+                        this.x = oldCenterX - this.renderWidth / 2.0;
+                    }
+                    this.frameIndex = 0;
+                    this.animationTimer = 0;
+                }
+
+                if (this.frameIndex < 10) {
+                    this.animationTimer++;
+                    if (this.animationTimer >= 6) { // Chạy 6 frame game mỗi ảnh
+                        this.animationTimer = 0;
+                        this.frameIndex++;
+                    }
+                } else {
+                    if (this.flashTimer > 0) {
+                        this.flashTimer--;
+                    }
                 }
             }
             return;
