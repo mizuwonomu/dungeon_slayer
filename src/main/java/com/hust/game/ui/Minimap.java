@@ -21,6 +21,8 @@ public class Minimap {
     private ImageView mapView;
     private ImageView playerDot;
     private Group mapContainer;
+    private double miniX;
+    private double miniY;
 
     private double zoom = 1.0;
 
@@ -124,13 +126,13 @@ public class Minimap {
         mapView.setLayoutY(-minimapHeight / 2.0);
 
         // ===== PLAYER POSITION =====
-        double miniX =
+        this.miniX =
                 (player.getX() / worldWidth)
                         * minimapWidth
                         * miniXMultiplier
                         - offsetX;
 
-        double miniY =
+        this.miniY =
                 (player.getY() / worldHeight)
                         * minimapHeight
                         * miniYMultiplier
@@ -170,7 +172,27 @@ public class Minimap {
         );
 
         root = new Group(overlay);
+
+        overlay.setOnMousePressed(e -> {
+            startDrag(e.getSceneX(), e.getSceneY());
+        });
+
+        overlay.setOnMouseDragged(e -> {
+            drag(e.getSceneX(), e.getSceneY());
+        });
+
+        overlay.setOnScroll(e -> {
+
+            if (e.getDeltaY() > 0) {
+                zoomIn();
+            } else {
+                zoomOut();
+            }
+
+            e.consume();
+        });
     }
+
 
     public double getZoom() {
         return zoom;
@@ -184,19 +206,25 @@ public class Minimap {
         return panY;
     }
 
-    public void zoomIn() {
-        zoom *= 1.1;
+    private void zoomAtPlayer(double factor) {
+
+        double screenX = miniX * zoom + panX;
+        double screenY = miniY * zoom + panY;
+
+        zoom *= factor;
+
+        panX = screenX - miniX * zoom;
+        panY = screenY - miniY * zoom;
+
         applyTransform();
     }
 
+    public void zoomIn() {
+        zoomAtPlayer(1.1);
+    }
+
     public void zoomOut() {
-        zoom /= 1.1;
-
-        if (zoom < 0.5) {
-            zoom = 0.5;
-        }
-
-        applyTransform();
+        zoomAtPlayer(1.0 / 1.1);
     }
 
     public void moveUp() {
@@ -237,6 +265,7 @@ public class Minimap {
 
         applyTransform();
     }
+
 
     public Group getRoot() {
         return root;
