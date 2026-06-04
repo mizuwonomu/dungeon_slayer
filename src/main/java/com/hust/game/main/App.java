@@ -127,6 +127,10 @@ public class App extends Application {
     private int nextLevelToLoadMusic = -1;
     private Image backScreenImg;
     private int loadedFrames = 0;
+
+    private double minimapZoom = 1.0;
+    private double minimapPanX = 0;
+    private double minimapPanY = 0;
     
     private void startLoadingPhase(int level) {
         if (DevSettings.shouldSkipLoadingScreens()) {
@@ -1166,7 +1170,8 @@ public class App extends Application {
                     () -> toggleMinimap(root),
                     this::loadImg,
                     player,
-                    gameManager.getMap()
+                    gameManager.getMap(),
+                    2.0
             );
 
             root.getChildren().add(minimapUI.getRoot());
@@ -1176,6 +1181,11 @@ public class App extends Application {
             }
         } else {
             if (minimapUI != null) {
+
+                minimapZoom = minimapUI.getZoom();
+                minimapPanX = minimapUI.getPanX();
+                minimapPanY = minimapUI.getPanY();
+
                 root.getChildren().remove(minimapUI.getRoot());
             }
             if (gameLoop != null) {
