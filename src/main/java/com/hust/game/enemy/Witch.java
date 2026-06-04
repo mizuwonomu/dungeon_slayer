@@ -1,11 +1,14 @@
 package com.hust.game.enemy;
 
+import com.hust.game.constants.GameConstants;
 import com.hust.game.entities.player.Player;
 import com.hust.game.main.App;
 
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.geometry.Rectangle2D;
+import java.util.ArrayDeque;
+import java.util.Queue;
 
 public class Witch extends Enemy {
 
@@ -131,24 +134,31 @@ public class Witch extends Enemy {
 
         if (knightCount == 0) {
             spawn = findSafeKnightSpawn(this.x - SUMMON_KNIGHT_RENDER_WIDTH, this.y);
-            enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
-                    SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
+            if (spawn != null) {
+                enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
+                        SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
+            }
         } else if (knightCount == 1) {
             spawn = findSafeKnightSpawn(this.x + this.renderWidth, this.y);
-            enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
-                    SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
+            if (spawn != null) {
+                enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
+                        SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
+            }
         }
     }
 
     private double[] findSafeKnightSpawn(double preferredX, double preferredY) {
-        if (isSafeKnightSpawn(preferredX, preferredY)) {
+        boolean[][] reachable = buildReachableTilesFromPlayer();
+        if (isSafeKnightSpawn(preferredX, preferredY, reachable)) {
             return new double[]{preferredX, preferredY};
         }
 
-        int startCol = (int) Math.round(knightCollisionCenterX(preferredX) / com.hust.game.constants.GameConstants.TILE_SIZE);
-        int startRow = (int) Math.round(knightCollisionCenterY(preferredY) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        int startCol = (int) Math.round(knightCollisionCenterX(preferredX) / GameConstants.TILE_SIZE);
+        int startRow = (int) Math.round(knightCollisionCenterY(preferredY) / GameConstants.TILE_SIZE);
+        int maxRadius = Math.max(SUMMON_SEARCH_RADIUS_TILES,
+                Math.max(GameConstants.MAX_WORLD_ROW, GameConstants.MAX_WORLD_COL));
 
-        for (int radius = 0; radius <= SUMMON_SEARCH_RADIUS_TILES; radius++) {
+        for (int radius = 0; radius <= maxRadius; radius++) {
             double[] best = null;
             double bestDistance = Double.MAX_VALUE;
 
@@ -158,15 +168,17 @@ public class Witch extends Enemy {
                         continue;
                     }
 
-                    double centerX = col * com.hust.game.constants.GameConstants.TILE_SIZE
-                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
-                    double centerY = row * com.hust.game.constants.GameConstants.TILE_SIZE
-                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    if (!isReachableTile(col, row, reachable)) {
+                        continue;
+                    }
+
+                    double centerX = col * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2.0;
+                    double centerY = row * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2.0;
                     double candidateX = centerX - SUMMON_KNIGHT_RENDER_WIDTH / 2.0;
                     double candidateY = centerY - SUMMON_KNIGHT_RENDER_HEIGHT
                             + (SUMMON_KNIGHT_RENDER_HEIGHT * SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO) / 2.0;
 
-                    if (!isSafeKnightSpawn(candidateX, candidateY)) {
+                    if (!isSafeKnightSpawn(candidateX, candidateY, reachable)) {
                         continue;
                     }
 
@@ -186,11 +198,19 @@ public class Witch extends Enemy {
         }
 
         System.err.println("Witch khong tim thay vi tri summon Knight an toan.");
-        return new double[]{preferredX, preferredY};
+        return null;
     }
 
     private boolean isSafeKnightSpawn(double x, double y) {
+        return isSafeKnightSpawn(x, y, null);
+    }
+
+    private boolean isSafeKnightSpawn(double x, double y, boolean[][] reachable) {
         Rectangle2D collisionBox = knightSpawnCollisionBox(x, y);
+        if (!isCollisionBoxReachable(collisionBox, reachable)) {
+            return false;
+        }
+
         int left = (int) Math.floor(collisionBox.getMinX());
         int right = (int) Math.floor(collisionBox.getMaxX() - 1);
         int top = (int) Math.floor(collisionBox.getMinY());
@@ -261,16 +281,59 @@ public class Witch extends Enemy {
                 - (SUMMON_KNIGHT_RENDER_HEIGHT * SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO) / 2.0;
     }
 
+    private double[] findSafeWitchTeleportPosition() {
+        if (targetPlayer == null) {
+            return new double[]{this.x, this.y};
+        }
+
+        Rectangle2D witchBox = getCollisionBoundary();
+        Rectangle2D playerBox = targetPlayer.getCollisionBoundary();
+        double witchCenterX = witchBox.getMinX() + witchBox.getWidth() / 2.0;
+        double witchCenterY = witchBox.getMinY() + witchBox.getHeight() / 2.0;
+        double playerCenterX = playerBox.getMinX() + playerBox.getWidth() / 2.0;
+        double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
+
+        double awayX = witchCenterX - playerCenterX;
+        double awayY = witchCenterY - playerCenterY;
+        double distance = Math.sqrt(awayX * awayX + awayY * awayY);
+        if (distance < 1.0) {
+            double angle = ((int) ((witchCenterX + witchCenterY) / GameConstants.TILE_SIZE) % 8)
+                    * Math.PI / 4.0;
+            awayX = Math.cos(angle);
+            awayY = Math.sin(angle);
+            distance = 1.0;
+        }
+
+        awayX /= distance;
+        awayY /= distance;
+
+        double side = ((int) Math.floor((witchCenterX + witchCenterY) / GameConstants.TILE_SIZE) % 2 == 0)
+                ? 1.0 : -1.0;
+        double preferredCenterX = witchCenterX
+                + awayX * GameConstants.TILE_SIZE * 7.0
+                + (-awayY) * side * GameConstants.TILE_SIZE * 4.0;
+        double preferredCenterY = witchCenterY
+                + awayY * GameConstants.TILE_SIZE * 7.0
+                + awayX * side * GameConstants.TILE_SIZE * 4.0;
+
+        double preferredX = preferredCenterX - renderWidth / 2.0;
+        double preferredY = preferredCenterY - renderHeight + (renderHeight * 0.2) / 2.0;
+        return findSafeWitchPosition(preferredX, preferredY);
+    }
+
     private double[] findSafeWitchPosition(double preferredX, double preferredY) {
-        if (isSafeWitchPosition(preferredX, preferredY)) {
+        boolean[][] reachable = buildReachableTilesFromPlayer();
+        if (isSafeWitchPosition(preferredX, preferredY, reachable)) {
             return new double[]{preferredX, preferredY};
         }
 
-        int startCol = (int) Math.round((preferredX + renderWidth / 2.0) / com.hust.game.constants.GameConstants.TILE_SIZE);
+        int startCol = (int) Math.round((preferredX + renderWidth / 2.0) / GameConstants.TILE_SIZE);
         int startRow = (int) Math.round((preferredY + renderHeight - (renderHeight * 0.2) / 2.0)
-                / com.hust.game.constants.GameConstants.TILE_SIZE);
+                / GameConstants.TILE_SIZE);
+        int maxRadius = Math.max(SUMMON_SEARCH_RADIUS_TILES,
+                Math.max(GameConstants.MAX_WORLD_ROW, GameConstants.MAX_WORLD_COL));
 
-        for (int radius = 0; radius <= SUMMON_SEARCH_RADIUS_TILES; radius++) {
+        for (int radius = 0; radius <= maxRadius; radius++) {
             double[] best = null;
             double bestDistance = Double.MAX_VALUE;
 
@@ -280,14 +343,18 @@ public class Witch extends Enemy {
                         continue;
                     }
 
-                    double centerX = col * com.hust.game.constants.GameConstants.TILE_SIZE
-                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
-                    double centerY = row * com.hust.game.constants.GameConstants.TILE_SIZE
-                            + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                    if (!isReachableTile(col, row, reachable)) {
+                        continue;
+                    }
+
+                    double centerX = col * GameConstants.TILE_SIZE
+                            + GameConstants.TILE_SIZE / 2.0;
+                    double centerY = row * GameConstants.TILE_SIZE
+                            + GameConstants.TILE_SIZE / 2.0;
                     double candidateX = centerX - renderWidth / 2.0;
                     double candidateY = centerY - renderHeight + (renderHeight * 0.2) / 2.0;
 
-                    if (!isSafeWitchPosition(candidateX, candidateY)) {
+                    if (!isSafeWitchPosition(candidateX, candidateY, reachable)) {
                         continue;
                     }
 
@@ -311,12 +378,20 @@ public class Witch extends Enemy {
     }
 
     private boolean isSafeWitchPosition(double x, double y) {
+        return isSafeWitchPosition(x, y, null);
+    }
+
+    private boolean isSafeWitchPosition(double x, double y, boolean[][] reachable) {
         Rectangle2D collisionBox = new Rectangle2D(
                 x + renderWidth * 0.3,
                 y + renderHeight * 0.8,
                 renderWidth * 0.4,
                 renderHeight * 0.2
         );
+        if (!isCollisionBoxReachable(collisionBox, reachable)) {
+            return false;
+        }
+
         int left = (int) Math.floor(collisionBox.getMinX());
         int right = (int) Math.floor(collisionBox.getMaxX() - 1);
         int top = (int) Math.floor(collisionBox.getMinY());
@@ -329,7 +404,125 @@ public class Witch extends Enemy {
                 && !isBlockedByCollisionChecker(left, bottom)
                 && !isBlockedByCollisionChecker(right, bottom)
                 && !isBlockedByCollisionChecker(centerX, centerY)
-                && (targetPlayer == null || !targetPlayer.getCollisionBoundary().intersects(collisionBox));
+                && (targetPlayer == null || !targetPlayer.getCollisionBoundary().intersects(collisionBox))
+                && !intersectsOtherEnemy(collisionBox);
+    }
+
+    private boolean[][] buildReachableTilesFromPlayer() {
+        if (collisionChecker == null) {
+            return null;
+        }
+
+        boolean[][] reachable = new boolean[GameConstants.MAX_WORLD_ROW][GameConstants.MAX_WORLD_COL];
+        Rectangle2D sourceBox = targetPlayer != null ? targetPlayer.getCollisionBoundary() : getCollisionBoundary();
+        int startCol = pixelToTile(sourceBox.getMinX() + sourceBox.getWidth() / 2.0);
+        int startRow = pixelToTile(sourceBox.getMinY() + sourceBox.getHeight() / 2.0);
+
+        if (!isTileWalkable(startCol, startRow)) {
+            int[] nearestWalkable = findNearestWalkableTile(startCol, startRow);
+            if (nearestWalkable == null) {
+                return reachable;
+            }
+            startCol = nearestWalkable[0];
+            startRow = nearestWalkable[1];
+        }
+
+        Queue<int[]> queue = new ArrayDeque<>();
+        queue.add(new int[]{startCol, startRow});
+        reachable[startRow][startCol] = true;
+
+        int[][] directions = {
+                {1, 0},
+                {-1, 0},
+                {0, 1},
+                {0, -1}
+        };
+
+        while (!queue.isEmpty()) {
+            int[] current = queue.poll();
+            for (int[] direction : directions) {
+                int nextCol = current[0] + direction[0];
+                int nextRow = current[1] + direction[1];
+
+                if (!isTileInMap(nextCol, nextRow) || reachable[nextRow][nextCol]
+                        || !isTileWalkable(nextCol, nextRow)) {
+                    continue;
+                }
+
+                reachable[nextRow][nextCol] = true;
+                queue.add(new int[]{nextCol, nextRow});
+            }
+        }
+
+        return reachable;
+    }
+
+    private int[] findNearestWalkableTile(int startCol, int startRow) {
+        int maxRadius = Math.max(GameConstants.MAX_WORLD_ROW, GameConstants.MAX_WORLD_COL);
+        for (int radius = 0; radius <= maxRadius; radius++) {
+            for (int row = startRow - radius; row <= startRow + radius; row++) {
+                for (int col = startCol - radius; col <= startCol + radius; col++) {
+                    if (Math.abs(row - startRow) != radius && Math.abs(col - startCol) != radius) {
+                        continue;
+                    }
+
+                    if (isTileWalkable(col, row)) {
+                        return new int[]{col, row};
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean isCollisionBoxReachable(Rectangle2D collisionBox, boolean[][] reachable) {
+        if (reachable == null) {
+            return true;
+        }
+
+        int col = pixelToTile(collisionBox.getMinX() + collisionBox.getWidth() / 2.0);
+        int row = pixelToTile(collisionBox.getMinY() + collisionBox.getHeight() / 2.0);
+        return isReachableTile(col, row, reachable);
+    }
+
+    private boolean isReachableTile(int col, int row, boolean[][] reachable) {
+        if (reachable == null) {
+            return true;
+        }
+
+        return isTileInMap(col, row) && reachable[row][col];
+    }
+
+    private boolean isTileWalkable(int col, int row) {
+        if (!isTileInMap(col, row)) {
+            return false;
+        }
+
+        int pixelX = col * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2;
+        int pixelY = row * GameConstants.TILE_SIZE + GameConstants.TILE_SIZE / 2;
+        return !isBlockedByCollisionChecker(pixelX, pixelY);
+    }
+
+    private boolean isTileInMap(int col, int row) {
+        return col >= 0 && col < GameConstants.MAX_WORLD_COL
+                && row >= 0 && row < GameConstants.MAX_WORLD_ROW;
+    }
+
+    private int pixelToTile(double pixel) {
+        return (int) Math.floor(pixel / GameConstants.TILE_SIZE);
+    }
+
+    private boolean intersectsOtherEnemy(Rectangle2D collisionBox) {
+        for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
+            if (e == this || e.getHp() <= 0) {
+                continue;
+            }
+            if (e.getCollisionBoundary().intersects(collisionBox)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -404,9 +597,7 @@ public class Witch extends Enemy {
             // Kích thước phòng Level 2 là 816x480. Dịch chuyển trong vùng an toàn (x: 100->650, y: 200)
             // Dịch chuyển Witch đến vị trí an toàn hơn, tránh bị kẹt vào tường ở rìa màn hình.
             // Các giá trị đã được điều chỉnh để đảm bảo có khoảng trống xung quanh.
-            double preferredX = targetPlayer.getX() < 400 ? 600 : 200;
-            double preferredY = 250;
-            double[] safePos = findSafeWitchPosition(preferredX, preferredY);
+            double[] safePos = findSafeWitchTeleportPosition();
             this.x = safePos[0];
             this.y = safePos[1];
             
