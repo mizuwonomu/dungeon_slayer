@@ -16,8 +16,8 @@ public class SoundManager {
     public static AudioClip dashSound, coinSound;
     public static AudioClip interactSound, buySuc1, buySuc2, cantBuy, noMoney;
     public static AudioClip line1Sound;
-    private static double sfxVolume = 1; // Âm lượng hiệu ứng
-    private static double bgmVolume = 1; // Âm lượng nhạc nền
+    private static double sfxVolume = 0; // Âm lượng hiệu ứng
+    private static double bgmVolume = 0; // Âm lượng nhạc nền
 
     public static double getSfxVolume() {
         return sfxVolume;

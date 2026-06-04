@@ -18,6 +18,8 @@ public class Witch extends Enemy {
     private static final double SUMMON_KNIGHT_COLLISION_WIDTH_RATIO = 0.4;
     private static final double SUMMON_KNIGHT_COLLISION_HEIGHT_RATIO = 0.2;
     private static final int SUMMON_SEARCH_RADIUS_TILES = 18;
+    private static final int LOCAL_GUARD_TARGET_COUNT = 2;
+    private static final double LOCAL_GUARD_RANGE_TILES = 7.0;
     private int skillCooldownTimer = 0;
     private int circleCountSinceLastSummon = 3;
     private EnemyManager enemyManager;
@@ -102,12 +104,8 @@ public class Witch extends Enemy {
     }
 
     private void decideNextSkill() {
-        int knightCount = 0;
-        for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
-            if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0) knightCount++;
-        }
-
-        if (knightCount < 2 && circleCountSinceLastSummon >= 2) {
+        int nearbyKnightCount = countNearbyKnights();
+        if (nearbyKnightCount < LOCAL_GUARD_TARGET_COUNT && circleCountSinceLastSummon >= 2) {
             isSummoning = true;
             circleCountSinceLastSummon = 0;
             
@@ -124,27 +122,66 @@ public class Witch extends Enemy {
     }
 
     private void spawnKnightsSafely() {
-        int knightCount = 0;
-        for (com.hust.game.enemy.Enemy e : enemyManager.getEnemyList()) {
-            if (e instanceof com.hust.game.enemy.Knight && e.getHp() > 0) knightCount++;
+        int knightsToSummon = LOCAL_GUARD_TARGET_COUNT - countNearbyKnights();
+        if (knightsToSummon <= 0) {
+            return;
         }
 
-        // Tim vi tri summon gan Witch nhung khong de Knight vao tuong hoac ngoai map.
-        double[] spawn;
+        double[][] preferredPositions = {
+                {this.x - SUMMON_KNIGHT_RENDER_WIDTH, this.y},
+                {this.x + this.renderWidth, this.y},
+                {this.x, this.y - SUMMON_KNIGHT_RENDER_HEIGHT * 0.5},
+                {this.x, this.y + SUMMON_KNIGHT_RENDER_HEIGHT * 0.5}
+        };
 
-        if (knightCount == 0) {
-            spawn = findSafeKnightSpawn(this.x - SUMMON_KNIGHT_RENDER_WIDTH, this.y);
+        int summoned = 0;
+        for (double[] preferred : preferredPositions) {
+            if (summoned >= knightsToSummon) {
+                break;
+            }
+
+            double[] spawn = findSafeKnightSpawn(preferred[0], preferred[1]);
             if (spawn != null) {
                 enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
                         SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
-            }
-        } else if (knightCount == 1) {
-            spawn = findSafeKnightSpawn(this.x + this.renderWidth, this.y);
-            if (spawn != null) {
-                enemyManager.spawnEnemy("Knight", spawn[0], spawn[1], knightIdle, 8,
-                        SUMMON_KNIGHT_RENDER_WIDTH, SUMMON_KNIGHT_RENDER_HEIGHT, targetPlayer, knightAtk);
+                summoned++;
             }
         }
+
+        if (summoned < knightsToSummon) {
+            System.err.println("Witch chi summon duoc " + summoned + "/" + knightsToSummon
+                    + " Knight bao ve gan no.");
+        }
+    }
+
+    private int countNearbyKnights() {
+        if (enemyManager == null) {
+            return 0;
+        }
+
+        Rectangle2D witchBox = getCollisionBoundary();
+        double witchCenterX = witchBox.getMinX() + witchBox.getWidth() / 2.0;
+        double witchCenterY = witchBox.getMinY() + witchBox.getHeight() / 2.0;
+        double maxDistance = LOCAL_GUARD_RANGE_TILES * GameConstants.TILE_SIZE;
+        double maxDistanceSq = maxDistance * maxDistance;
+        int count = 0;
+
+        for (Enemy enemy : enemyManager.getEnemyList()) {
+            if (!(enemy instanceof Knight) || enemy.getHp() <= 0) {
+                continue;
+            }
+
+            Rectangle2D knightBox = enemy.getCollisionBoundary();
+            double knightCenterX = knightBox.getMinX() + knightBox.getWidth() / 2.0;
+            double knightCenterY = knightBox.getMinY() + knightBox.getHeight() / 2.0;
+            double dx = knightCenterX - witchCenterX;
+            double dy = knightCenterY - witchCenterY;
+            if (dx * dx + dy * dy <= maxDistanceSq) {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private double[] findSafeKnightSpawn(double preferredX, double preferredY) {
@@ -591,6 +628,20 @@ public class Witch extends Enemy {
         }
 
         // 1. CƠ CHẾ DỊCH CHUYỂN (Chỉ kích hoạt 1 lần khi HP <= 50%)
+        if (!isCastingCircle && !isSummoning && !this.isImmobile && !isPlayerWithinDetectionRange()) {
+            this.moveX = 0;
+            this.moveY = 0;
+            this.animationTimer++;
+            if (this.animationTimer >= this.animationDelay) {
+                this.animationTimer = 0;
+                this.frameIndex++;
+                if (this.frameIndex >= 7) {
+                    this.frameIndex = 0;
+                }
+            }
+            return;
+        }
+
         if (this.hp <= this.maxHp / 2 && !hasTeleported) {
             hasTeleported = true;
             
