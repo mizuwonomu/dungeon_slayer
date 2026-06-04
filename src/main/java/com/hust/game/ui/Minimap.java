@@ -66,7 +66,7 @@ public class Minimap {
 
         // ===== PLAYER ICON =====
         playerDot = new ImageView(
-                imageLoader.apply("/assets/skill_berserk_box.png")
+                imageLoader.apply("/assets/player_icon.png")
         );
 
         playerDot.setFitWidth(20);
