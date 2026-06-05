@@ -9,11 +9,30 @@ public class Knight extends Enemy {
 
     private int dashCooldownTimer = 120;
     private final int MAX_DASH_COOLDOWN = 180;
+    private static final int DASH_DAMAGE_COOLDOWN_FRAMES = 30;
     private int MAX_DASH_DURATION = 30;
     private Image normalSprite;
     private Image skillSprite;
+    private Image walkSprite;
     private boolean isDashing = false;
+    private Image dieSprite;
+    private boolean isDying = false;
     private double dashVectorX, dashVectorY;
+    private static Image cachedDieSprite;
+    private static Image cachedWalkSprite;
+
+    public static void preloadAssets() {
+        if (cachedDieSprite == null) {
+            try {
+                cachedDieSprite = new Image(Knight.class.getResourceAsStream("/assets/enemy/knight_die.png"));
+                cachedWalkSprite = new Image(Knight.class.getResourceAsStream("/assets/enemy/knight_walk.png"));
+                preBakeWhiteSprite(cachedDieSprite);
+                preBakeWhiteSprite(cachedWalkSprite);
+            } catch (Exception e) {
+                System.err.println("Không tìm thấy ảnh die/walk của Knight!");
+            }
+        }
+    }
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
             Player targetPlayer, Image skillSprite) {
@@ -26,6 +45,13 @@ public class Knight extends Enemy {
 
         this.normalSprite = sprSheet;
         this.skillSprite = skillSprite;
+        
+        this.dieSprite = cachedDieSprite;
+        this.walkSprite = cachedWalkSprite;
+        
+        // Pre-bake: Tạo sẵn ảnh chớp trắng khi nhận đòn
+        preBakeWhiteSprite(this.normalSprite);
+        preBakeWhiteSprite(this.skillSprite);
     }
 
     public Knight(double x, double y, Image sprSheet, int numFrames, double renderWidth, double renderHeight,
@@ -33,80 +59,260 @@ public class Knight extends Enemy {
         this(x, y, sprSheet, numFrames, renderWidth, renderHeight, targetPlayer, null);
     }
 
+    // Hàm kiểm tra vùng lướt (hình bình hành) không có tường cản giữa Knight và Player
+    private boolean hasClearDashPath(double startX, double startY, double startH, double endX, double endY, double endH) {
+        if (collisionChecker == null) return true;
+        
+        // Quét viền thay vì quét khối: Chỉ bắn 2 tia Raycast ở mép trên và mép dưới
+        boolean topClear = checkLineBresenham(startX, startY, endX, endY);
+        boolean bottomClear = checkLineBresenham(startX, startY + startH, endX, endY + endH);
+        
+        return topClear && bottomClear;
+    }
+
+    // Thuật toán Bresenham quét theo ô lưới (Grid) thay vì tính toán số thực (Lượng giác)
+    private boolean checkLineBresenham(double x0, double y0, double x1, double y1) {
+        int tileSize = com.hust.game.constants.GameConstants.TILE_SIZE;
+        int x0Grid = (int) (x0 / tileSize);
+        int y0Grid = (int) (y0 / tileSize);
+        int x1Grid = (int) (x1 / tileSize);
+        int y1Grid = (int) (y1 / tileSize);
+
+        int dx = Math.abs(x1Grid - x0Grid);
+        int dy = Math.abs(y1Grid - y0Grid);
+        
+        int sx = x0Grid < x1Grid ? 1 : -1;
+        int sy = y0Grid < y1Grid ? 1 : -1;
+        
+        int err = dx - dy;
+        
+        while (true) {
+            // collisionChecker.checkTile nhận tọa độ pixel, nên ta lấy tâm của ô lưới hiện tại để check
+            if (collisionChecker.checkTile(x0Grid * tileSize + tileSize / 2, y0Grid * tileSize + tileSize / 2)) {
+                return false;
+            }
+            
+            if (x0Grid == x1Grid && y0Grid == y1Grid) break;
+            
+            int e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0Grid += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0Grid += sy;
+            }
+        }
+        return true;
+    }
+
+    // Hàm tính toán trước khoảng cách dịch chuyển để xem có chạm được Player hay không
+    private boolean canDashHitPlayer(double distance) {
+        // Yêu cầu Player phải ở gần hơn một chút so với quãng đường lướt thực tế (300)
+        // Điều này giúp Knight khi lướt sẽ bay xuyên qua người Player thay vì dừng lại ngay trước mặt
+        double CHECK_DISTANCE = this.speed * 220; 
+        // Nới rộng vòng tròn tính khoảng cách vì hitbox gây damage giờ là toàn bộ hình ảnh
+        double hitRange = this.renderWidth * 1.5; 
+        return distance <= (CHECK_DISTANCE + hitRange);
+    }
+
     @Override
     public void update() {
-        if (this.flashTimer > 0) {
-            this.flashTimer--;
-        }
-        if (this.hitStunTimer > 0) {
-            this.hitStunTimer--;
+        updatePlayerDamageCooldown();
+
+        if (this.hp > 0) {
+            if (this.flashTimer > 0) {
+                this.flashTimer--;
+            }
+            if (this.hitStunTimer > 0) {
+                this.hitStunTimer--;
+            }
         }
 
         // --- BỔ SUNG LOGIC KNOCKBACK MÀ TRƯỚC ĐÓ BỊ THIẾU ---
         this.lastX = this.x;
         this.lastY = this.y;
-        if (this.kbTimer > 0) {
-            this.kbTimer--;
-            this.x += kbVectorX;
-            this.y += kbVectorY;
-        }
 
-        // Nếu đã chết, giữ nguyên frame animation cuối và ngắt toàn bộ logic AI
         if (this.hp <= 0) {
+            this.hitStunTimer = 0;
+            this.isDashing = false;
+            
+            if (this.flashTimer > 54) {
+                this.flashTimer--; // Chớp trắng 6 frame đầu tiên với ảnh cũ
+            } else {
+                if (!isDying) {
+                    isDying = true;
+                    if (dieSprite != null) {
+                        this.spriteSheet = dieSprite;
+                        this.numFrames = 6;
+                        this.frameWidth = dieSprite.getWidth() / 6.0;
+                        this.frameHeight = dieSprite.getHeight();
+                    }
+                    this.frameIndex = 0;
+                    this.animationTimer = 0;
+                }
+                
+                // Chạy animation chết đến frame cuối
+                if (this.frameIndex < 5) {
+                    this.animationTimer++;
+                    if (this.animationTimer >= 9) { // 54 / 6 = 9 frames game mỗi ảnh
+                        this.animationTimer = 0;
+                        this.frameIndex++;
+                    }
+                } else {
+                    // Đã đến frame cuối cùng, bắt đầu mờ dần (~1s)
+                    if (this.flashTimer > 0) {
+                        this.flashTimer--;
+                    }
+                }
+            }
             return;
         }
         
+        if (this.kbTimer > 0) {
+            double multiplier = this.kbTimer / 3.5;
+            this.kbTimer--;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
+        }
         if (this.kbTimer > 0 || this.hitStunTimer > 0) {
             return; // Còn sống nhưng đang bị knockback hoặc choáng thì ngắt AI lướt/đi bộ
         }
         // ----------------------------------------------------
 
+        if (!isDashing && !this.isImmobile && !isPlayerWithinDetectionRange()) {
+            this.moveX = 0;
+            this.moveY = 0;
+            if (normalSprite != null && this.spriteSheet != normalSprite) {
+                this.spriteSheet = normalSprite;
+                this.numFrames = 8;
+                this.frameWidth = normalSprite.getWidth() / this.numFrames;
+                this.frameHeight = normalSprite.getHeight();
+                this.frameIndex = 0;
+            }
+            this.animationTimer++;
+            if (this.animationTimer >= this.animationDelay) {
+                this.animationTimer = 0;
+                this.frameIndex = (this.frameIndex + 1) % this.numFrames;
+            }
+            return;
+        }
+
         if (dashCooldownTimer > 0) {
             dashCooldownTimer--;
         }
         if (!isDashing) {
-            this.animationTimer++;
-            if (this.animationTimer >= this.animationDelay) {
-                this.animationTimer = 0;
-                this.frameIndex++;
-                if (this.frameIndex >= this.numFrames) {
-                    this.frameIndex = 0;
-                }
+            // Lấy tọa độ Tâm của quái vật và tâm của người chơi để ngắm chuẩn xác
+            double kVisCenterX = this.x + this.renderWidth / 2.0;
+            double kVisCenterY = this.y + this.renderHeight / 2.0;
+            double pVisCenterX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0;
+            double pVisCenterY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0;
+
+            double diffX = pVisCenterX - kVisCenterX;
+            double diffY = pVisCenterY - kVisCenterY;
+            double distance = Math.sqrt(diffX * diffX + diffY * diffY);
+            
+            boolean canSeePlayer = false;
+            boolean canHitPlayer = false;
+            if (distance > 0 && distance < 600) { // Knight có thể phóng ở một khoảng cách hợp lý
+                canSeePlayer = hasClearDashPath(kVisCenterX, this.y, this.renderHeight, pVisCenterX, targetPlayer.getY(), targetPlayer.getRenderHeight());
+                canHitPlayer = canDashHitPlayer(distance);
             }
 
-            double currentDiffX = targetPlayer.getX() - this.x;
-            if (currentDiffX < 0) {
-                this.isFlipped = true;
-            } else {
-                this.isFlipped = false;
-            }
-
-            if (dashCooldownTimer == 0) {
-                double diffX = targetPlayer.getX() - this.x;
-                double diffY = targetPlayer.getY() - this.y;
-
-                double distance = Math.sqrt(diffX * diffX + diffY * diffY);
-
+            // NẾU CÓ THỂ PHÓNG TRÚNG VÀ KHÔNG BỊ CẢN -> LƯỚT
+            if (dashCooldownTimer == 0 && canSeePlayer && canHitPlayer && !this.isImmobile) {
                 if (distance > 0) {
-                    dashVectorX = (diffX / distance) * (this.speed * 40); // Tăng mạnh tốc độ lướt
-                    dashVectorY = (diffY / distance) * (this.speed * 40);
+                    double TOTAL_DASH_DISTANCE = this.speed * 300; // Quãng đường lướt thực tế dài hơn để đâm xuyên qua
+                    // Chia cho animationDelay vì hành động lướt lặp lại trong 10 frame game
+                    dashVectorX = (diffX / distance) * (TOTAL_DASH_DISTANCE / this.animationDelay);
+                    dashVectorY = (diffY / distance) * (TOTAL_DASH_DISTANCE / this.animationDelay);
                 }
-
-                if (diffX < 0) {
-                    this.isFlipped = true; // Player ở bên trái -> Quay trái
-                } else {
-                    this.isFlipped = false; // Player ở bên phải -> Quay phải
-                }
-
+                this.isFlipped = diffX < 0;
                 isDashing = true;
-
                 com.hust.game.audio.SoundManager.playKnightReadySound();
-
                 this.spriteSheet = skillSprite;
                 this.numFrames = 14;
                 this.frameWidth = skillSprite.getWidth() / this.numFrames;
                 this.frameHeight = skillSprite.getHeight();
                 this.frameIndex = 0;
+                this.animationTimer = 0;
+            } else {
+                // NẾU TRONG TẦM LƯỚT VÀ KHÔNG BỊ TƯỜNG CẢN NHƯNG CHƯA HỒI CHIÊU -> ĐỨNG IM CHỜ ĐỢI
+                if (canSeePlayer && canHitPlayer) {
+                    this.moveX = 0;
+                    this.moveY = 0;
+                    if (diffX < 0) this.isFlipped = true;
+                    else if (diffX > 0) this.isFlipped = false;
+                } 
+                // NẾU NGOÀI TẦM LƯỚT HOẶC BỊ TƯỜNG CẢN -> ĐI BỘ LẠI GẦN THEO PATHFINDER
+                else if (!this.isImmobile) {
+                    javafx.geometry.Rectangle2D pCol = targetPlayer.getCollisionBoundary();
+                    double pCenterX = pCol.getMinX() + pCol.getWidth() / 2.0;
+                    double pCenterY = pCol.getMinY() + pCol.getHeight() / 2.0;
+                    javafx.geometry.Rectangle2D bounds = this.getCollisionBoundary();
+                    double currentCenterX = bounds.getMinX() + bounds.getWidth() / 2.0;
+                    double currentCenterY = bounds.getMinY() + bounds.getHeight() / 2.0;
+
+                    pathUpdateTimer++;
+                    if (pathUpdateTimer >= 30) {
+                        pathUpdateTimer = 0;
+                        int goalCol = (int) (pCenterX / com.hust.game.constants.GameConstants.TILE_SIZE);
+                        int goalRow = (int) (pCenterY / com.hust.game.constants.GameConstants.TILE_SIZE);
+                        searchPath(goalCol, goalRow);
+                    }
+
+                    this.moveX = 0;
+                    this.moveY = 0;
+                    if (distance > 0) {
+                        if (dodgeTimer > 0) {
+                            dodgeTimer--;
+                            this.moveX = dodgeDirX * speed;
+                            this.moveY = dodgeDirY * speed;
+                            if (dodgeDirX < 0) this.isFlipped = true;
+                            else if (dodgeDirX > 0) this.isFlipped = false;
+                        } else if (onPath && pathFinder != null && pathFinder.pathList.size() > 0) {
+                            int nextCol = pathFinder.pathList.get(0).col;
+                            int nextRow = pathFinder.pathList.get(0).row;
+                            double tileCenterX = nextCol * com.hust.game.constants.GameConstants.TILE_SIZE + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                            double tileCenterY = nextRow * com.hust.game.constants.GameConstants.TILE_SIZE + com.hust.game.constants.GameConstants.TILE_SIZE / 2.0;
+                            double dx = tileCenterX - currentCenterX;
+                            double dy = tileCenterY - currentCenterY;
+                            double distToNext = Math.sqrt(dx * dx + dy * dy);
+                            if (distToNext > speed) {
+                                this.moveX = (dx / distToNext) * speed;
+                                this.moveY = (dy / distToNext) * speed;
+                            } else {
+                                pathFinder.pathList.remove(0);
+                            }
+                            if (this.moveX < 0) this.isFlipped = true;
+                            else if (this.moveX > 0) this.isFlipped = false;
+                        } else {
+                            this.moveX = (diffX / distance) * speed;
+                            this.moveY = (diffY / distance) * speed;
+                            if (diffX < 0) this.isFlipped = true;
+                            else if (diffX > 0) this.isFlipped = false;
+                        }
+                    }
+                    this.x += this.moveX;
+                    this.y += this.moveY;
+                }
+
+                // Cập nhật Animation Đi bộ hoặc Đứng im
+                Image targetSprite = (this.moveX != 0 || this.moveY != 0) && walkSprite != null ? walkSprite : normalSprite;
+                if (this.spriteSheet != targetSprite) {
+                    this.spriteSheet = targetSprite;
+                    this.numFrames = 8;
+                    this.frameWidth = targetSprite.getWidth() / this.numFrames;
+                    this.frameHeight = targetSprite.getHeight();
+                    this.frameIndex = 0;
+                }
+
+                this.animationTimer++;
+                if (this.animationTimer >= this.animationDelay) {
+                    this.animationTimer = 0;
+                    this.frameIndex = (this.frameIndex + 1) % this.numFrames;
+                }
             }
         } else {
             this.animationTimer++;
@@ -117,13 +323,22 @@ public class Knight extends Enemy {
                     com.hust.game.audio.SoundManager.playKnightAtkSound();
                 }
             }
-            if (this.frameIndex == 8) { // Chỉ lướt trong 1 frame duy nhất để quãng đường ngắn lại
+            if (this.frameIndex == 8) { // Lướt diễn ra liên tục trong animationDelay (10) frame game
                 this.lastX = this.x;
                 this.lastY = this.y;
 
                 this.x += dashVectorX;
                 this.y += dashVectorY;
             }
+            
+            // Tự động kiểm tra sát thương bằng Hitbox toàn thân (getBoundary) 
+            // thay vì phụ thuộc vào Hitbox vật lý nhỏ dưới chân
+            if (this.isDealingDamage()) {
+                if (this.getBoundary().intersects(targetPlayer.getBoundary())) {
+                    tryDamagePlayer(targetPlayer, this.damage, DASH_DAMAGE_COOLDOWN_FRAMES);
+                }
+            }
+
             if (this.frameIndex >= this.numFrames) {
                 isDashing = false;
                 this.spriteSheet = normalSprite;
@@ -141,16 +356,42 @@ public class Knight extends Enemy {
     }
 
     public boolean isDealingDamage() {
-        // Chỉ gây sát thương đúng vào khoảnh khắc lướt (frame 8 và 9)
-        return this.isDashing && this.frameIndex >= 8 && this.frameIndex <= 9;
+        // Gây sát thương ở các frame 7, 8 và 9 (Nới rộng hitbox ra xung quanh thời điểm lướt)
+        return this.isDashing && this.frameIndex >= 7 && this.frameIndex <= 9;
+    }
+
+    @Override
+    public void render(GraphicsContext gc) {
+        if (this.hp <= 0) {
+            gc.save();
+            // Tính toán alpha để mờ dần (từ 54 về 0)
+            double alpha = this.flashTimer / 54.0;
+            if (alpha < 0) alpha = 0;
+            if (alpha > 1) alpha = 1;
+            gc.setGlobalAlpha(alpha);
+
+            double renderX = this.x;
+            double renderY = this.y;
+            if (this.isFlipped) renderX += this.renderWidth;
+            double renderW = this.isFlipped ? -this.renderWidth : this.renderWidth;
+
+            gc.drawImage(this.spriteSheet,
+                this.frameIndex * this.frameWidth, 0, this.frameWidth, this.frameHeight,
+                renderX, renderY, renderW, this.renderHeight);
+            gc.restore();
+
+            // Chớp trắng lúc vừa nhận đòn kết liễu
+            if (this.flashTimer > 54) {
+                applyWhiteFlash(gc, 0.9);
+            }
+        } else {
+            super.render(gc);
+        }
     }
 
     @Override
     public Rectangle2D getBoundary() {
-        // Thu nhỏ hitbox của Knight: Cắt bớt 25% diện tích viền ngoài mỗi bên
-        double paddingX = this.renderWidth * 0.25;
-        double paddingY = this.renderHeight * 0.25;
-        return new Rectangle2D(x + paddingX, y + paddingY, renderWidth - 2 * paddingX, renderHeight - 2 * paddingY);
+        return new Rectangle2D(x, y, renderWidth, renderHeight);
     }
 
     @Override
@@ -162,4 +403,22 @@ public class Knight extends Enemy {
         super.applyKnockback(dir);
     }
 
+    @Override
+    public Rectangle2D getCollisionBoundary() {
+        double w = renderWidth * 0.4;
+        double h = renderHeight * 0.2;
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
+    }
+
+    @Override
+    public void onCollision(com.hust.game.entities.base.BaseEntity other) {
+        super.onCollision(other);
+        // Nếu đập mặt vào tường khi đang lướt -> Dừng lướt ngay lập tức
+        if (this.isDashing && other == null) {
+            this.dashVectorX = 0;
+            this.dashVectorY = 0;
+        }
+    }
 }

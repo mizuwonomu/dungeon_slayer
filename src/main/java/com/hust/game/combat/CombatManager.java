@@ -1,11 +1,16 @@
 package com.hust.game.combat;
 
 import com.hust.game.enemy.Enemy;
+import com.hust.game.entities.base.BaseEntity;
+import com.hust.game.entities.items.Chest;
 import com.hust.game.entities.player.Player;
 import com.hust.game.entities.player.PlayerCombat;
+import com.hust.game.entities.player.merge.MergeFormType;
+import com.hust.game.map.MapManager;
 import javafx.geometry.Rectangle2D;
 
 import java.util.List;
+import java.util.ArrayList;
 
 /**
  * CombatManager - trung gian xử lý combat giữa Player và Enemy.
@@ -48,9 +53,48 @@ public class CombatManager {
     private int comboTimer = 0;
     private static final int COMBO_WINDOW_FRAMES = 60; // 1 giây (60 fps)
 
+    // -------------------------------------------------------
+    // CRIT TEXT SYSTEM (Hiệu ứng sát thương chí mạng)
+    // -------------------------------------------------------
+    private class CritText {
+        double x, y;
+        String text;
+        javafx.scene.paint.Color color;
+        double sizeMultiplier;
+        int timer = 60; // Tồn tại 1 giây
+
+        public CritText(double x, double y, String text, javafx.scene.paint.Color color, double sizeMultiplier) {
+            this.x = x; this.y = y; this.text = text; this.color = color; this.sizeMultiplier = sizeMultiplier;
+        }
+    }
+    private List<CritText> critTexts = new ArrayList<>();
+
+    private ParticleManager particleManager = new ParticleManager();
+    private CoinRewardEffectManager coinRewardEffectManager = new CoinRewardEffectManager();
+    private int hitStopFrames = 0;
+    private int shakeTimer = 0;
+    private double shakeAmplitude = 0;
+    private boolean hasDealtDamageThisAttack = true;
+    private boolean hasIncreasedComboThisAttack = false;
+    private com.hust.game.collision.CollisionChecker collisionChecker;
+    private MapManager mapManager;
+    private int currentLevelIndex = 1;
+
     public CombatManager(Player player, List<Enemy> enemyList) {
         this.player    = player;
         this.enemyList = enemyList;
+    }
+
+    public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
+        this.collisionChecker = checker;
+    }
+
+    public void setMapManager(MapManager mapManager) {
+        this.mapManager = mapManager;
+    }
+
+    public void setCurrentLevelIndex(int currentLevelIndex) {
+        this.currentLevelIndex = currentLevelIndex;
     }
 
     /**
@@ -82,6 +126,31 @@ public class CombatManager {
                 comboCount = 0; // Hết 1 giây không chém trúng ai -> Reset Combo
             }
         }
+        
+        particleManager.update();
+        coinRewardEffectManager.update();
+
+        // Kiểm tra xem Player có đang trong frame chém hiệu quả không
+        // Mở rộng cửa sổ gây sát thương ra 2 frame animation (3 và 4) để tăng độ ổn định, tránh lỗi timing hiếm gặp
+        if (player.isTreeMergeAttacking()
+                && player.getTreeMergeFrameIndex() == player.getTreeMergeDamageFrame()
+                && !hasDealtDamageThisAttack) {
+            processAttackHits(player.getTreeMergeDamage(), false, true);
+            hasDealtDamageThisAttack = true;
+        }
+
+        if (player.isAttacking() && (player.getFrameIndex() == 3 || player.getFrameIndex() == 4) && !hasDealtDamageThisAttack) {
+            processAttackHits(player.getAttackDamage(), false, true);
+            hasDealtDamageThisAttack = true;
+        }
+        
+        if (player.isThrusting()) {
+            int t = player.getThrustTimer();
+            // Tung 3 phát chọc ở các frame 15, 9, 3 (ngay khoảnh khắc lưỡi kiếm đâm ra xa nhất)
+            if (t == 15 || t == 9 || t == 3) {
+                processAttackHits(10, true, t == 3); // Mỗi nhát chọc cơ bản 10 sát thương, chỉ knockback ở đòn cuối
+            }
+        }
     }
 
     /**
@@ -94,68 +163,152 @@ public class CombatManager {
      *   4. Reset cooldown của player
      * @return Số đòn Combo hiện tại (0 nếu chém trượt)
      */
-    public int playerAttack() {
+    public void playerAttack() {
         // Kiểm tra cooldown tấn công — nếu chưa hết thì bỏ qua
-        if (!player.canAttack()) return 0;
+        if (!player.canAttack()) return;
 
-        // Tính damage thực tế — nhân đôi nếu skill đang bật
-        int actualDamage = player.getAttackDamage();
-        if (skillActive) {
-            actualDamage *= SKILL_DAMAGE_MULTIPLIER;
+        if (player.isTreeMergeActive()) {
+            player.triggerAttackVisuals(false);
+            player.resetAttackCooldown(player.getTreeMergeAttackCooldown());
+            hasDealtDamageThisAttack = false;
+            hasIncreasedComboThisAttack = false;
+            return;
         }
+
+        // Nếu đánh đến đòn thứ 3 -> Bật chế độ Chọc (Thrust)
+        boolean isThrust = (comboCount > 0 && comboCount % 3 == 2);
 
         // Kích hoạt Animation chém và vẽ hiệu ứng
-        player.triggerAttackVisuals();
+        player.triggerAttackVisuals(isThrust);
 
-        // Tính toán hitbox tấn công trực tiếp để tránh lỗi thiếu class PlayerCombat
-        double attackRange = 30.0; // Tầm chém (khoảng cách hitbox mở rộng ra phía trước)
-        double px = player.getX();
-        double py = player.getY();
-        double pw = player.getRenderWidth();
-        double ph = player.getRenderHeight();
+        // Reset cooldown tấn công của player ngay lúc vung kiếm
+        player.resetAttackCooldown(isThrust ? 18 : 16);
         
-        Rectangle2D attackBox;
-        switch (player.getDirection()) {
-            case UP:
-                attackBox = new Rectangle2D(px, py - attackRange, pw, attackRange); break;
-            case DOWN:
-                attackBox = new Rectangle2D(px, py + ph, pw, attackRange); break;
-            case LEFT:
-                attackBox = new Rectangle2D(px - attackRange, py, attackRange, ph); break;
-            case RIGHT:
-                attackBox = new Rectangle2D(px + pw, py, attackRange, ph); break;
-            default:
-                attackBox = new Rectangle2D(px, py, pw, ph); break;
+        hasDealtDamageThisAttack = false; // Đánh dấu là chưa gây sát thương cho nhát chém này
+        hasIncreasedComboThisAttack = false; // Reset cờ cộng dồn combo
+    }
+
+    private void processAttackHits(int baseDamage, boolean isThrust, boolean applyKnockback) {
+        // Tính tỷ lệ Crit dựa trên Combo
+        int currentChance = 1;
+        if (comboCount == 4) currentChance = 5;
+        else if (comboCount == 5) currentChance = 10;
+        else if (comboCount == 6) currentChance = 20;
+        else if (comboCount >= 7) currentChance = 30;
+        
+        boolean isCrit = (Math.random() * 100) < currentChance;
+
+        // Tính damage thực tế — nhân đôi nếu skill đang bật
+        int actualDamage = baseDamage;
+        if (skillActive && !player.isTreeMergeActive()) {
+            actualDamage *= SKILL_DAMAGE_MULTIPLIER;
         }
+        if (isCrit) {
+            actualDamage *= 2; // Chí mạng x2 sát thương tổng
+        }
+
+        // Tái sử dụng hàm lấy Hitbox vũ khí trực tiếp từ Player
+        Rectangle2D attackBox = player.getAttackBox();
 
         boolean hitAny = false;
         boolean hitSlime = false;
         boolean hitKnight = false;
         boolean hitTree = false;
+        boolean hitWitch = false;
+        boolean isWitchDead = false;
+        boolean hitBoss = false;
         boolean isFinalHit = false;
+        boolean isBossDefeated = false;
+
+        if (openHitChests(attackBox)) {
+            hitAny = true;
+        }
 
         // Duyệt tất cả enemy, kiểm tra hitbox chém có dính vào không
         for (Enemy enemy : enemyList) {
-            // Bỏ qua nếu quái vật đã chết (đang trong trạng thái mờ dần)
-            if (enemy.getHp() <= 0) continue;
+            // Bỏ qua nếu quái vật đã chết hoặc nằm ngoài vùng camera (Culling)
+            if (enemy.getHp() <= 0 || !enemy.isActive()) continue;
 
             // Lấy boundary của enemy (Rectangle2D)
             Rectangle2D enemyBox = enemy.getBoundary();
 
             // Nếu hitbox chém intersects với boundary của enemy → gây damage
             if (attackBox.intersects(enemyBox)) {
+                if (!hasAttackLineOfSight(enemy)) {
+                    continue;
+                }
+
                 enemy.takeDamage(actualDamage);
 
-                // Bật hiệu ứng knockback
-                enemy.applyKnockback(player.getDirection());
+                // Bật hiệu ứng knockback (với đòn chọc thì chỉ đẩy lùi ở phát cuối cùng)
+                if (applyKnockback) {
+                    enemy.applyKnockback(player.getDirection());
+                }
                 hitAny = true; // Xác nhận đã chém trúng
+                
+                // Bắn hạt máu văng ra
+                double bloodX = enemy.getX() + enemy.getRenderWidth() / 2;
+                double bloodY = enemy.getY() + enemy.getRenderHeight() / 2;
+                particleManager.spawnBlood(bloodX, bloodY, player.getDirection());
 
                 // Phân loại quái vật và xác định đòn kết liễu
                 if (enemy instanceof com.hust.game.enemy.Slime) hitSlime = true;
                 if (enemy instanceof com.hust.game.enemy.Knight) hitKnight = true;
                 if (enemy instanceof com.hust.game.enemy.Tree) hitTree = true;
+                if (enemy instanceof com.hust.game.enemy.Witch) hitWitch = true;
+                if (enemy instanceof com.hust.game.enemy.FinalBoss) hitBoss = true;
                 
-                if (enemy.getHp() <= 0) isFinalHit = true;
+                if (enemy.getHp() <= 0) {
+                    isFinalHit = true;
+                    rewardCoinsIfEligible(enemy);
+                    if (enemy instanceof com.hust.game.enemy.Tree) {
+                        player.grantMergeForm(MergeFormType.TREE);
+                    }
+                    if (enemy instanceof com.hust.game.enemy.Witch) isWitchDead = true;
+                if (enemy instanceof com.hust.game.enemy.FinalBoss) isBossDefeated = true;
+                }
+
+                // Tính toạ độ hiển thị text ngay trên đầu quái vật
+                double textX = enemy.getX() + enemy.getRenderWidth() / 2 - 15;
+                double textY = enemy.getY();
+                // Thêm Text CRIT nếu chém chí mạng, hoặc phủ màu Cyan nếu đang cuồng nộ
+                if (isCrit) {
+                    javafx.scene.paint.Color critColor = skillActive ? javafx.scene.paint.Color.CYAN : javafx.scene.paint.Color.RED;
+                    double sizeMult = skillActive ? 2.0 : 1.5;
+                    String text = "CRIT DAMAGE!\n-" + actualDamage;
+                    critTexts.add(new CritText(textX - 20, textY - 20, text, critColor, sizeMult));
+                    
+                    // Xóa số sát thương trắng mặc định sinh ra từ hàm takeDamage
+                    com.hust.game.ui.DamageTextManager.removeLastText(enemy);
+                } else if (skillActive) {
+                    String text = "-" + actualDamage;
+                    critTexts.add(new CritText(textX, textY, text, javafx.scene.paint.Color.CYAN, 1.0));
+                    
+                    // Xóa số sát thương trắng mặc định sinh ra từ hàm takeDamage
+                    com.hust.game.ui.DamageTextManager.removeLastText(enemy);
+                }
+            }
+        }
+        
+        if (isBossDefeated) {
+            hitStopFrames = 30; // Khựng lại 0.5s (30 frame) khi kết liễu Final Boss
+        } else if (hitAny && !isThrust) { // Đòn chọc diễn ra quá nhanh nên tắt hit-stop để tránh màn hình bị giật cục
+            hitStopFrames = 6;  // Khựng lại 0.1s (6 frame) cho mọi đòn chém trúng thông thường
+        }
+        
+        if (hitAny) {
+            // Đẩy lùi Player lại một khoảng nhỏ khi chém trúng quái (Recoil)
+            if (applyKnockback) {
+                player.applyRecoil(15.0);
+            }
+
+            // Rung màn hình khi chém trúng
+            if (isCrit) {
+                shakeTimer = 5;
+                shakeAmplitude = isThrust ? 0.4 : 0.8; // Chọc liên tiếp nên giảm độ rung lại để không nhức mắt
+            } else {
+                shakeTimer = 4;
+                shakeAmplitude = isThrust ? 0.2 : 0.4; // Rung nhẹ mọi nhát chém thường
             }
         }
 
@@ -165,13 +318,20 @@ public class CombatManager {
                 com.hust.game.audio.SoundManager.playSwordPowerUpSound(0.5); // Chém trượt
             } else {
                 com.hust.game.audio.SoundManager.playSwordPowerUpSound(1.0); // Chém trúng
-                if (isFinalHit) {
+                if (isWitchDead) {
+                    com.hust.game.audio.SoundManager.playWitchDiedSound(); // Phát âm kết liễu phù thủy
+                } else if (isFinalHit) {
                     com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Phát thêm âm kết liễu
+                }
+                if (hitWitch && !isWitchDead) {
+                    com.hust.game.audio.SoundManager.playWitchDmgTakenSound(); // Âm thanh phù thủy nhận dmg
                 }
             }
         } else {
             if (!hitAny) {
                 com.hust.game.audio.SoundManager.playNsMissSound(); // Chém trượt
+            } else if (isWitchDead) {
+                com.hust.game.audio.SoundManager.playWitchDiedSound(); // Đòn kết liễu phù thủy thay âm mặc định
             } else if (isFinalHit) {
                 com.hust.game.audio.SoundManager.playNsFinalHitSound(); // Đòn kết liễu
             } else {
@@ -182,13 +342,20 @@ public class CombatManager {
                     com.hust.game.audio.SoundManager.playNsHitTreeSound();
                     com.hust.game.audio.SoundManager.playNsMissSound();
                 } // Cây dùng chung âm thanh với Knight
+                if (hitWitch) {
+                    com.hust.game.audio.SoundManager.playWitchDmgTakenSound();
+                }
+                if (hitBoss) com.hust.game.audio.SoundManager.playNsHitKnightSound();
             }
         }
 
         // Xử lý tăng Combo nếu chém trúng
         if (hitAny) {
-            if (comboTimer > 0) comboCount++; // Đang trong thời gian Combo -> Cộng dồn
-            else comboCount = 1; // Khởi đầu Combo mới
+            if (!hasIncreasedComboThisAttack) { // Cả 3 phát chọc chỉ tăng 1 combo tổng
+                if (comboTimer > 0) comboCount++; 
+                else comboCount = 1; 
+                hasIncreasedComboThisAttack = true;
+            }
             comboTimer = COMBO_WINDOW_FRAMES; // Reset lại đồng hồ 1 giây
             
             // Hiển thị chữ Combo bay lên (Tận dụng luôn DamageTextManager)
@@ -205,11 +372,6 @@ public class CombatManager {
                 com.hust.game.ui.DamageTextManager.addText(this, player.getX() - 10, player.getY() - 15, "Combo x" + comboCount, comboColor);
             }
         }
-
-        // Reset cooldown tấn công của player
-        player.resetAttackCooldown();
-
-        return hitAny ? comboCount : 0;
     }
 
     /**
@@ -241,6 +403,33 @@ public class CombatManager {
         System.out.println("Skill CUỒNG NỘ kích hoạt! Damage x2 trong 10 giây");
     }
 
+    /**
+     * Vẽ các số Crit và hiệu ứng Cuồng nộ đè lên giao diện
+     */
+    public void renderCrits(javafx.scene.canvas.GraphicsContext gc) {
+        javafx.scene.text.Font baseFont = javafx.scene.text.Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 16);
+        if (baseFont == null) baseFont = new javafx.scene.text.Font("Arial", 16);
+        
+        for (int i = critTexts.size() - 1; i >= 0; i--) {
+            CritText ct = critTexts.get(i);
+            gc.setFont(javafx.scene.text.Font.font(baseFont.getFamily(), javafx.scene.text.FontWeight.BOLD, 16 * ct.sizeMultiplier));
+            gc.setFill(ct.color);
+            gc.setStroke(javafx.scene.paint.Color.WHITE);
+            gc.setLineWidth(1.5);
+            
+            String[] lines = ct.text.split("\n");
+            double currentY = ct.y;
+            for (String line : lines) {
+                gc.strokeText(line, ct.x, currentY);
+                gc.fillText(line, ct.x, currentY);
+                currentY += 18 * ct.sizeMultiplier; // Giãn dòng theo kích thước
+            }
+            
+            ct.y -= 0.5; // Chữ bay lên từ từ
+            ct.timer--;
+            if (ct.timer <= 0) critTexts.remove(i);
+        }
+    }
     // -------------------------------------------------------
     // GETTER cho HUD — Member C dùng để hiển thị trạng thái skill
     // -------------------------------------------------------
@@ -263,5 +452,149 @@ public class CombatManager {
     public void resetSkill(){
         this.skillCooldown = 0;
         this.skillDuration = 0;
+    }
+    
+    public ParticleManager getParticleManager() {
+        return particleManager;
+    }
+
+    public CoinRewardEffectManager getCoinRewardEffectManager() {
+        return coinRewardEffectManager;
+    }
+    
+    public int consumeHitStopFrames() {
+        int frames = hitStopFrames;
+        hitStopFrames = 0;
+        return frames;
+    }
+    
+    public int consumeShakeTimer() {
+        int timer = shakeTimer;
+        shakeTimer = 0;
+        return timer;
+    }
+    
+    public double consumeShakeAmplitude() {
+        double amp = shakeAmplitude;
+        shakeAmplitude = 0;
+        return amp;
+    }
+
+    private void rewardCoinsIfEligible(Enemy enemy) {
+        if (!isCoinRewardLevel() || enemy.hasCoinRewarded()) {
+            return;
+        }
+
+        enemy.markCoinRewarded();
+        player.addCoins(1);
+
+        double rewardX = enemy.getX() + enemy.getRenderWidth() / 2.0;
+        double rewardY = enemy.getY();
+        coinRewardEffectManager.spawn(rewardX, rewardY);
+        com.hust.game.ui.DamageTextManager.addText(
+                enemy,
+                rewardX - 20,
+                rewardY - 20,
+                "+1 coin",
+                javafx.scene.paint.Color.GOLD
+        );
+    }
+
+    private boolean isCoinRewardLevel() {
+        return currentLevelIndex == 1 || currentLevelIndex == 2;
+    }
+
+    private boolean hasAttackLineOfSight(Enemy enemy) {
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        Rectangle2D playerBox = player.getBoundary();
+        Rectangle2D targetBox = enemy.getCollisionBoundary();
+        double playerCenterX = playerBox.getMinX() + playerBox.getWidth() / 2.0;
+        double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
+
+        return collisionChecker.hasUnblockedAttackLine(playerCenterX, playerCenterY, targetBox);
+    }
+
+    private boolean openHitChests(Rectangle2D attackBox) {
+        if (mapManager == null || mapManager.mapEntities == null || attackBox == null) {
+            return false;
+        }
+
+        boolean openedAny = false;
+        for (BaseEntity entity : mapManager.mapEntities) {
+            if (!(entity instanceof Chest chest) || chest.isOpened()) {
+                continue;
+            }
+            if (!attackBox.intersects(chest.getBoundary()) || !hasAttackLineOfSight(chest.getBoundary())) {
+                continue;
+            }
+            if (chest.open()) {
+                grantChestReward(chest);
+                openedAny = true;
+            }
+        }
+        return openedAny;
+    }
+
+    private void grantChestReward(Chest chest) {
+        ChestReward reward = resolveChestReward();
+        switch (reward) {
+            case HEALTH_POTION -> player.addHealthPotion();
+            case MANA_POTION -> player.addManaPotion();
+            case COINS -> player.addCoins(2);
+        }
+
+        double rewardX = chest.getX() + chest.getRenderWidth() / 2.0;
+        double rewardY = chest.getY();
+        coinRewardEffectManager.spawn(rewardX, rewardY, reward.icon);
+        com.hust.game.ui.DamageTextManager.addText(
+                chest,
+                rewardX - 32,
+                rewardY - 18,
+                reward.text,
+                reward.color
+        );
+    }
+
+    private ChestReward resolveChestReward() {
+        List<ChestReward> rewards = new ArrayList<>();
+        rewards.add(ChestReward.COINS);
+        if (player.getHealthPotionCount() < com.hust.game.constants.GameConstants.MAX_POTIONS_PER_TYPE) {
+            rewards.add(ChestReward.HEALTH_POTION);
+        }
+        if (player.getManaPotionCount() < com.hust.game.constants.GameConstants.MAX_POTIONS_PER_TYPE) {
+            rewards.add(ChestReward.MANA_POTION);
+        }
+        return rewards.get((int) (Math.random() * rewards.size()));
+    }
+
+    private boolean hasAttackLineOfSight(Rectangle2D targetBox) {
+        if (collisionChecker == null) {
+            return true;
+        }
+
+        Rectangle2D playerBox = player.getBoundary();
+        double playerCenterX = playerBox.getMinX() + playerBox.getWidth() / 2.0;
+        double playerCenterY = playerBox.getMinY() + playerBox.getHeight() / 2.0;
+
+        return collisionChecker.hasUnblockedAttackLine(playerCenterX, playerCenterY, targetBox);
+    }
+
+    private enum ChestReward {
+        COINS("+2 coins", javafx.scene.paint.Color.GOLD, CoinRewardEffectManager.RewardIcon.COIN),
+        HEALTH_POTION("+1 Health Potion", javafx.scene.paint.Color.LIGHTGREEN, CoinRewardEffectManager.RewardIcon.HEALTH_POTION),
+        MANA_POTION("+1 Mana Potion", javafx.scene.paint.Color.CORNFLOWERBLUE, CoinRewardEffectManager.RewardIcon.MANA_POTION);
+
+        final String text;
+        final javafx.scene.paint.Color color;
+        final CoinRewardEffectManager.RewardIcon icon;
+
+        ChestReward(String text, javafx.scene.paint.Color color, CoinRewardEffectManager.RewardIcon icon) {
+            this.text = text;
+            this.color = color;
+            this.icon = icon;
+        }
     }
 }

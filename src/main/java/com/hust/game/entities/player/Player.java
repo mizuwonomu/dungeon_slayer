@@ -8,8 +8,11 @@ import com.hust.game.entities.base.MovingEntity;
 import com.hust.game.entities.interfaces.Attackable;
 import com.hust.game.entities.interfaces.Collidable;
 import com.hust.game.entities.interfaces.Damageable;
+import com.hust.game.entities.player.merge.MergeFormType;
+import com.hust.game.entities.player.merge.PlayerMergeController;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
+import javafx.geometry.Rectangle2D;
 import lombok.Getter;
 
 /**
@@ -34,10 +37,20 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // Ảnh combat (đang chém)
     private final Image combatUp, combatDown, combatLeft, combatRight;
 
+    // Ảnh lướt (Dash)
+    private final Image dashUp, dashDown, dashLeft, dashRight;
+
     // Thêm field bật skill
     private final Image rageHitImg;
     private final Image powerUpImg;
     private final Image thunderImg;
+
+    // Hiệu ứng potion
+    private final Image healEffectImg;
+    private final Image manaEffectImg;
+    private boolean isHealingActive = false;
+    private boolean isManaingActive = false;
+    private int potionEffectTimer = 0;
 
     private boolean isRageActive = false;
     private int rageTimer = 0;
@@ -51,6 +64,28 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // Trạng thái tấn công
     private boolean isAttacking = false;
     private AttackEffect attackEffect;
+
+    // Trạng thái đâm/chọc
+    private boolean isThrusting = false;
+    private int thrustTimer = 0;
+
+    // Trạng thái lướt (Dash)
+    private boolean isDashing = false;
+    private int dashCooldown = 0;
+    private int dashComboTimer = 0; // Bộ đếm thời gian cho phép lướt đúp
+    private static final int DASH_COOLDOWN_MAX = 90; // Hồi chiêu 1.5s
+    private double dashVectorX = 0;
+    private double dashVectorY = 0;
+
+    // Trạng thái giật lùi khi chém (Recoil)
+    private int recoilTimer = 0;
+    private double recoilVectorX = 0;
+    private double recoilVectorY = 0;
+
+    // Trạng thái bị knockback khi nhận sát thương
+    private int kbTimer = 0;
+    private double kbVectorX = 0;
+    private double kbVectorY = 0;
 
     // -------------------------------------------------------
     // COLLISION ROLLBACK
@@ -77,11 +112,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // HP — máu nhân vật
     // -------------------------------------------------------
     private int currentHp; // máu hiện tại
-    // private final int maxHp = GameConstants.PLAYER_MAX_HP;// máu tối đa lấy từ
-    // constants
-    private final int maxHp = 100;
+    private final int maxHp = GameConstants.PLAYER_MAX_HP; // máu tối đa lấy từ constants
     private int currentMana;
     private final int maxMana = GameConstants.PLAYER_MAX_MANA; // máu tối đa lấy từ constants
+
+    private int healthPotionCount = 0;
+    private int manaPotionCount = 0;
+    private int coins = 0;
 
     // -------------------------------------------------------
     // ATTACK COOLDOWN
@@ -89,8 +126,9 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // mới được tấn công lại → tránh spam attack.
     // -------------------------------------------------------
     private int attackCooldown = 0; 
-    private static final int ATTACK_COOLDOWN_MAX = (8 * 4); // 8 frames attack delay giữa các lần đánh
+    private static final int ATTACK_COOLDOWN_MAX = (8 * 2); // Giảm thời gian chờ xuống còn một nửa (16 frames)
     private final int attackDamage = 20; // sát thương mỗi đòn
+    private final PlayerMergeController mergeController = new PlayerMergeController();
 
     // -------------------------------------------------------
     // CONSTRUCTOR
@@ -101,14 +139,16 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             Image idleDown, Image idleUp, Image idleLeft, Image idleRight,
             Image runDown, Image runUp, Image runLeft, Image runRight,
             Image combatDown, Image combatUp, Image combatLeft, Image combatRight,
-            Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg) {
+            Image dashDown, Image dashUp, Image dashLeft, Image dashRight,
+            Image swordHitImg, Image rageHitImg, Image powerUpImg, Image thunderImg,
+            Image healEffectImg, Image manaEffectImg) {
 
         // Gọi constructor MovingEntity: truyền vị trí, spriteSheet mặc định,
         // số frame, kích thước render, và tốc độ di chuyển
         super(x, y,
                 idleDown,
                 GameConstants.PLAYER_NUM_FRAMES,
-                GameConstants.TILE_SIZE, GameConstants.TILE_SIZE,
+                48, 48,
                 GameConstants.PLAYER_SPEED);
 
         // Lưu tất cả 8 sprite sheet vào field
@@ -126,6 +166,11 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.combatLeft = combatLeft;
         this.combatRight = combatRight;
 
+        this.dashDown = dashDown;
+        this.dashUp = dashUp;
+        this.dashLeft = dashLeft;
+        this.dashRight = dashRight;
+
         // Khởi tạo máu đầy
         this.currentHp = maxHp;
         this.currentMana = maxMana;
@@ -133,7 +178,13 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         this.rageHitImg = rageHitImg;
         this.powerUpImg = powerUpImg;
         this.thunderImg = thunderImg;
+        this.healEffectImg = healEffectImg;
+        this.manaEffectImg = manaEffectImg;
         this.attackEffect = new AttackEffect(swordHitImg, rageHitImg, this);
+    }
+
+    public void configureTreeMerge(Image treeImg, Image treeSkillImg, Image transformImg) {
+        mergeController.configureTreeSprites(treeImg, treeSkillImg, transformImg);
     }
 
     // -------------------------------------------------------
@@ -144,7 +195,19 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // tránh hiện tượng nhảy frame giữa chừng khi đổi hướng.
     // -------------------------------------------------------
     private void updateSpriteSheet() {
-        if (isAttacking) {
+        if (isDashing) {
+            this.spriteSheet = switch (direction) {
+                case UP -> dashUp;
+                case DOWN -> dashDown;
+                case LEFT -> dashLeft;
+                case RIGHT -> dashRight;
+            };
+            this.frameWidth = spriteSheet.getWidth() / 3.0; // Dash có 3 frames
+            this.frameHeight = spriteSheet.getHeight();
+            return;
+        }
+
+        if (isAttacking || isThrusting) {
             this.spriteSheet = switch (direction) {
                 case UP -> combatUp;
                 case DOWN -> combatDown;
@@ -227,10 +290,19 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         if (flashTimer > 0)
             flashTimer--; // Giảm dần thời gian nháy đỏ
 
-        if (isAttacking) {
+        if (isThrusting) {
+            thrustTimer--;
+            if (thrustTimer <= 0) {
+                isThrusting = false;
+                frameIndex = 0;
+                if (attackEffect != null) attackEffect.setActive(false);
+                updateSpriteSheet(); 
+            }
+            if (attackEffect != null) attackEffect.update();
+        } else if (isAttacking) {
             animationTimer++;
-            // Animation chém diễn ra nhanh hơn đi bộ
-            if (animationTimer >= 4) {
+            // Tăng tốc độ chém lên gấp đôi: chỉ mất 2 frame game để chuyển 1 frame ảnh
+            if (animationTimer >= 2) {
                 animationTimer = 0;
                 frameIndex++;
                 if (frameIndex >= 8) { // Kết thúc 8 frame chém
@@ -243,6 +315,22 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             }
             if (attackEffect != null)
                 attackEffect.update();
+        } else if (isDashing) {
+            // Làm mượt Dash: Giảm tốc độ dần đều (Ease-out) bằng ma sát
+            dashVectorX *= 0.85;
+            dashVectorY *= 0.85;
+
+            animationTimer++;
+            // Chạy 3 frame animation trong 12 frame game (0.2s) -> mỗi frame tồn tại 4 frame game
+            if (animationTimer >= 4) {
+                animationTimer = 0;
+                frameIndex++;
+                if (frameIndex >= 3) {
+                    isDashing = false;
+                    frameIndex = 0;
+                    updateSpriteSheet(); // Lướt xong thì quay về dáng đứng hoặc chạy
+                }
+            }
         } else {
             // Đếm frame game đã trôi qua cho trạng thái đi bộ/đứng
             animationTimer++;
@@ -256,6 +344,25 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         if (attackCooldown > 0)
             attackCooldown--;
             
+        // Cập nhật trạng thái lướt
+        if (dashCooldown > 0) dashCooldown--;
+
+        // Cập nhật giật lùi (Recoil)
+        if (recoilTimer > 0) {
+            double multiplier = recoilTimer / 3.0; // Từ 5 đến 1, tổng multiplier = 5.0 (Quãng đường không đổi)
+            recoilTimer--;
+            this.x += recoilVectorX * multiplier;
+            this.y += recoilVectorY * multiplier;
+        }
+            
+        // Cập nhật Knockback khi bị thương
+        if (kbTimer > 0) {
+            double multiplier = kbTimer / 3.5; // Từ 6 đến 1, tổng multiplier = 6.0 (Quãng đường không đổi)
+            kbTimer--;
+            this.x += kbVectorX * multiplier;
+            this.y += kbVectorY * multiplier;
+        }
+
         // Cập nhật hiệu ứng hào quang cuồng nộ
         if (isRageActive) {
             if (rageTimer > 0) rageTimer--;
@@ -278,6 +385,16 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
                 }
             }
         }
+
+        mergeController.update();
+        
+        if (potionEffectTimer > 0) {
+            potionEffectTimer--;
+            if (potionEffectTimer <= 0) {
+                isHealingActive = false;
+                isManaingActive = false;
+            }
+        }
     }
 
     // Thêm method — CombatManager gọi khi bật/tắt skill
@@ -296,23 +413,49 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
     }
 
-    // Tạo sẵn hiệu ứng tĩnh (static) để GPU không bị quá tải khi load lại mỗi frame
-    private static final javafx.scene.effect.ColorAdjust RED_EFFECT = new javafx.scene.effect.ColorAdjust(-0.15, 0.8,
-            0.1, 0);
-
     @Override
     public void render(GraphicsContext gc) {
-        gc.save();
-        // Hiệu ứng đỏ khi bị thương đồng bộ với quái vật
-        if (flashTimer > 0) {
-            gc.setEffect(RED_EFFECT);
+        // Hiệu ứng đỏ khi bị thương đã được loại bỏ theo yêu cầu.
+
+        if (mergeController.shouldRenderTree()) {
+            mergeController.render(gc, x, y, renderWidth, renderHeight, direction);
         }
 
-        super.render(gc);
-        gc.restore();
+        if (mergeController.shouldRenderPlayer()) {
+            if (isDashing) {
+                // Tính toán khung hình lướt sao cho ôm trọn tâm Player.
+                // Ảnh dash được thiết kế gốc cho 64x64, nay Player thu nhỏ còn 48x48 nên ta lấy tỷ lệ / 64.0
+                double drawW = this.frameWidth * (this.renderWidth / 64.0);
+                double drawH = this.frameHeight * (this.renderHeight / 64.0);
+                
+                double centerX = this.x + this.renderWidth / 2.0;
+                double centerY = this.y + this.renderHeight / 2.0;
+                
+                double drawX = centerX - drawW / 2.0;
+                double drawY = centerY - drawH / 2.0;
+                
+                double sx = this.frameIndex * this.frameWidth;
+                
+                if (this.isFlipped) {
+                    gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX + drawW, drawY, -drawW, drawH);
+                } else {
+                    gc.drawImage(this.spriteSheet, sx, 0, this.frameWidth, this.frameHeight, drawX, drawY, drawW, drawH);
+                }
+            } else {
+                super.render(gc);
+            }
+        }
+
+        if (mergeController.isTransforming()) {
+            double effectSize = 288.0;
+            double effectX = x + (renderWidth / 2.0) - (effectSize / 2.0);
+            double effectY = y + (renderHeight / 2.0) - (effectSize / 2.0);
+
+            mergeController.renderTransform(gc, effectX, effectY, effectSize, effectSize);
+        }
 
         // Vẽ hiệu ứng Power Up đè lên Player
-        if (isRageActive && powerUpImg != null) {
+        if (isRageActive && !mergeController.isActive() && powerUpImg != null) {
             gc.save();
             // Ở 60 frame (1 giây) cuối cùng -> giảm dần Alpha để tạo hiệu ứng mờ dần
             double alpha = 1.0;
@@ -331,7 +474,7 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         }
         
         // Vẽ hiệu ứng Thunder sấm sét đè lên tất cả
-        if (isThunderActive && thunderImg != null) {
+        if (isThunderActive && !mergeController.isActive() && thunderImg != null) {
             double tw = thunderImg.getWidth() / 3;
             double th = thunderImg.getHeight();
             double tx = thunderFrameIndex * tw;
@@ -347,18 +490,147 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
             gc.drawImage(thunderImg, tx, 0, tw, th, thunderX, thunderY, thunderRenderWidth, thunderRenderHeight);
         }
 
-        if (isAttacking && attackEffect != null) {
+        if ((isAttacking || isThrusting) && attackEffect != null) {
             attackEffect.render(gc); // Vẽ hiệu ứng kiếm đè lên
+        }
+        
+        // Vẽ hiệu ứng Potion (Hồi máu / Hồi mana)
+        if ((isHealingActive || isManaingActive) && potionEffectTimer > 0) {
+            Image currentEffect = isHealingActive ? healEffectImg : manaEffectImg;
+            if (currentEffect != null) {
+                gc.save();
+                int elapsed = 48 - potionEffectTimer; // Chạy từ 0 đến 48
+                
+                // Tính toán Alpha (Fade in 0.2s = 12 frames đầu, Fade out 0.2s = 12 frames cuối)
+                double alpha = 1.0;
+                if (elapsed < 12) {
+                    alpha = (double) elapsed / 12.0;
+                } else if (potionEffectTimer < 12) {
+                    alpha = (double) potionEffectTimer / 12.0;
+                }
+                gc.setGlobalAlpha(Math.max(0.0, Math.min(1.0, alpha)));
+                
+                // Xác định khung hình: 4 khung hình chia đều cho 48 frames -> 12 frames mỗi hình
+                int pFrame = Math.min(3, elapsed / 12);
+                double fw = 96.0;
+                double fh = 96.0;
+                double sx = pFrame * fw;
+                
+                // Căn giữa hiệu ứng 96x96 lên trên người Player 48x48
+                double drawX = x + (renderWidth / 2.0) - (fw / 2.0);
+                double drawY = y + (renderHeight / 2.0) - (fh / 2.0);
+                
+                gc.drawImage(currentEffect, sx, 0, fw, fh, drawX, drawY, fw, fh);
+                gc.restore();
+            }
         }
     }
 
-    public void triggerAttackVisuals() {
-        isAttacking = true;
+    public void triggerAttackVisuals(boolean isThrust) {
+        if (mergeController.isTreeActive()) {
+            isAttacking = false;
+            isThrusting = false;
+            if (attackEffect != null) attackEffect.setActive(false);
+            mergeController.startTreeAttack();
+            return;
+        }
+
+        if (isThrust) {
+            this.isAttacking = false;
+            isThrusting = true;
+            thrustTimer = 18; // Kéo dài 0.3s cho đòn chọc
+            frameIndex = 0;
+            updateSpriteSheet();
+            if (attackEffect != null) attackEffect.trigger(true);
+        } else {
+            this.isThrusting = false;
+            isAttacking = true;
+            frameIndex = 0;
+            animationTimer = 0;
+            updateSpriteSheet();
+            if (attackEffect != null) attackEffect.trigger(false);
+        }
+    }
+
+    public boolean canDash() {
+        return dashCooldown <= 0 && !isDashing && !isAttacking;
+    }
+
+    public Rectangle2D getAttackBox() {
+        if (mergeController.isTreeActive()) {
+            return mergeController.getTreeAttackBox(x, y, renderWidth, renderHeight);
+        }
+
+        double attackRange = (isThrusting ? 33.75 : 22.5) * 1.5; // Dài thêm 1/2 hiện tại
+        double px = this.x;
+        double py = this.y;
+        double pw = this.renderWidth;
+        double ph = this.renderHeight;
+        
+        switch (direction) {
+            case UP:    return new Rectangle2D(px, py - attackRange, pw, attackRange);
+            case DOWN:  return new Rectangle2D(px, py + ph, pw, attackRange);
+            case LEFT:  return new Rectangle2D(px - attackRange, py, attackRange, ph);
+            case RIGHT: return new Rectangle2D(px + pw, py, attackRange, ph);
+            default:    return new Rectangle2D(px, py, pw, ph);
+        }
+    }
+
+    public void startDash(double dx, double dy) {
+        isDashing = true;
+        
+        if (dashComboTimer > 0) {
+            dashCooldown = DASH_COOLDOWN_MAX; // Lướt lần 2 -> Phạt hồi chiêu 1.5s
+            dashComboTimer = 0;
+        } else {
+            dashCooldown = 0; // Lướt lần 1 -> Không hồi chiêu ngay
+            dashComboTimer = 30; // Cho phép 0.5s (30 frames) để lướt đúp kể từ lúc lướt xong lần 1
+        }
+        
         frameIndex = 0;
         animationTimer = 0;
         updateSpriteSheet();
-        if (attackEffect != null)
-            attackEffect.trigger();
+        
+        // Nếu không bấm phím hướng nào mà vẫn ấn SHIFT -> lướt theo hướng mặt hiện tại
+        if (dx == 0 && dy == 0) {
+            switch (direction) {
+                case UP: dy = -1; break;
+                case DOWN: dy = 1; break;
+                case LEFT: dx = -1; break;
+                case RIGHT: dx = 1; break;
+            }
+        } else {
+            // Chuẩn hóa vector di chuyển chéo
+            double length = Math.sqrt(dx * dx + dy * dy);
+            dx /= length;
+            dy /= length;
+        }
+        
+        // Tăng mạnh tốc độ ban đầu và giảm dần (Ease-out) trong quá trình update
+        // Vận tốc ban đầu cao (9.5) nhân với hệ số suy giảm 0.85 qua 12 frame sẽ cho tổng quãng đường ~160px
+        double dashSpeedMultiplier = 9.5;
+        dashVectorX = dx * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
+        dashVectorY = dy * GameConstants.PLAYER_SPEED * dashSpeedMultiplier;
+        
+        com.hust.game.audio.SoundManager.playDashSound();
+    }
+
+    public boolean isDashing() { return isDashing; }
+    public double getDashVectorX() { return dashVectorX; }
+    public double getDashVectorY() { return dashVectorY; }
+
+    // Đẩy lùi nhẹ khi chém trúng mục tiêu (Recoil)
+    public void applyRecoil(double distance) {
+        this.recoilTimer = 5; // Dội lùi từ từ trong 5 frames
+        double speed = distance / 5.0;
+        this.recoilVectorX = 0;
+        this.recoilVectorY = 0;
+        switch (direction) {
+            case UP: this.recoilVectorY = speed; break;
+            case DOWN: this.recoilVectorY = -speed; break;
+            case LEFT: this.recoilVectorX = speed; break;
+            case RIGHT: this.recoilVectorX = -speed; break;
+        }
     }
 
     // -------------------------------------------------------
@@ -379,20 +651,89 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     // DAMAGEABLE — nhận sát thương (Member C dùng)
     // -------------------------------------------------------
 
-    /** Trừ máu, không cho xuống dưới 0 */
     @Override
     public void takeDamage(int amount) {
-        if (flashTimer > 0)
-            return; // Nếu đang trong trạng thái nháy đỏ -> Bất tử (Miễn nhiễm sát thương)
+        takeDamage(amount, this.x, this.y); // Nếu không có nguồn, giật lùi tại chỗ
+    }
+
+    public void takeDamage(int amount, BaseEntity source) {
+        if (flashTimer > 0 || isDashing) return;
+        
+        // --- CƠ CHẾ PARRY ---
+        // Chỉ tính Parry đúng vào các frame lưỡi kiếm chạm mục tiêu (Khung hình 3 với chém thường, hoặc các nhịp chọc)
+        boolean isParryWindow = false;
+        if (isAttacking && this.frameIndex == 3) isParryWindow = true;
+        if (isAttacking && this.frameIndex >= 3 && this.frameIndex <= 5) isParryWindow = true;
+        if (isThrusting && (this.thrustTimer == 15 || this.thrustTimer == 9 || this.thrustTimer == 3)) isParryWindow = true;
+        
+        // Nếu quái vật tấn công từ phía trước (nằm trong tầm chém) vào đúng Frame này
+        if (isParryWindow && source != null) {
+            Rectangle2D attackBox = getAttackBox();
+            Rectangle2D sourceBox = source.getBoundary();
+            
+            // Tầm đánh của Tree xa hơn thân hình, nên ta mở rộng hitbox xét Parry để chém trúng "chiêu" của nó
+            if (source instanceof com.hust.game.enemy.Tree) {
+                sourceBox = new Rectangle2D(sourceBox.getMinX() - 45, sourceBox.getMinY() - 45, sourceBox.getWidth() + 90, sourceBox.getHeight() + 90);
+            }
+            
+            if (attackBox.intersects(sourceBox)) {
+                // Đỡ đòn thành công! Không mất máu.
+                applyRecoil(25.0); // Giật lùi Player lại để tạo cảm giác chém vào vật cứng
+                
+                if (source instanceof com.hust.game.enemy.Enemy) {
+                    ((com.hust.game.enemy.Enemy) source).applyKnockback(this.direction);
+                }
+
+                com.hust.game.main.App.triggerScreenShake(6, 0.4);
+                com.hust.game.audio.SoundManager.playNsHitKnightSound(); // Dùng tiếng chém trúng giáp sắt làm tiếng Parry
+                com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 20, this.y - 15, "PARRY!", javafx.scene.paint.Color.CYAN);
+                
+                return; // Thoát hàm, miễn nhiễm sát thương
+            }
+        }
+
+        takeDamage(amount, source.getX() + source.getRenderWidth() / 2.0, source.getY() + source.getRenderHeight() / 2.0);
+    }
+
+    /** Trừ máu, bật tử và tính toán góc giật lùi */
+    public void takeDamage(int amount, double srcX, double srcY) {
+        if (flashTimer > 0 || isDashing)
+            return; // Nháy đỏ hoặc Đang lướt (I-frames) -> Miễn nhiễm sát thương
         currentHp = Math.max(0, currentHp - amount);
         flashTimer = 18; // Kích hoạt thời gian nháy đỏ và bất tử (18 frame ~ 0.3s)
         com.hust.game.ui.DamageTextManager.addText(this, this.x + renderWidth / 2 - 10, this.y, "-" + amount,
                 javafx.scene.paint.Color.RED);
         com.hust.game.audio.SoundManager.playPlayerHitSound(); // Phát âm thanh bị thương
+        com.hust.game.main.App.triggerScreenShake(10, 0.5); // Giảm độ rung màn hình khi nhận sát thương
+
+        // Áp dụng knockback đẩy lùi khỏi nguồn sát thương
+        this.kbTimer = 6; // Bị giật lùi trong 6 frames liên tiếp
+        double pCenterX = this.x + this.renderWidth / 2.0;
+        double pCenterY = this.y + this.renderHeight / 2.0;
+        double diffX = pCenterX - srcX;
+        double diffY = pCenterY - srcY;
+        double dist = Math.sqrt(diffX * diffX + diffY * diffY);
+        if (dist == 0) { diffX = 1; dist = 1; } // Tránh lỗi chia cho 0
+        
+        double kbSpeed = 6.0; // Lực đẩy lùi
+        this.kbVectorX = (diffX / dist) * kbSpeed;
+        this.kbVectorY = (diffY / dist) * kbSpeed;
     }
 
     public void takeMana(int amount) {
         currentMana = Math.max(0, currentMana - amount);
+    }
+
+    public boolean canSpendMana(int amount) {
+        return amount >= 0 && currentMana >= amount;
+    }
+
+    public boolean spendMana(int amount) {
+        if (!canSpendMana(amount)) {
+            return false;
+        }
+        currentMana -= amount;
+        return true;
     }
 
     @Override
@@ -413,6 +754,92 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         return currentMana;
     }
 
+    public int getHealthPotionCount() {
+        return healthPotionCount;
+    }
+
+    public int getManaPotionCount() {
+        return manaPotionCount;
+    }
+
+    public int getTotalPotionCount() {
+        return healthPotionCount + manaPotionCount;
+    }
+
+    public int getCoins() {
+        return coins;
+    }
+
+    public void addCoins(int amount) {
+        coins = Math.max(0, coins + amount);
+    }
+
+    public boolean canAfford(int amount) {
+        return amount >= 0 && coins >= amount;
+    }
+
+    public boolean spendCoins(int amount) {
+        if (!canAfford(amount)) {
+            return false;
+        }
+        coins -= amount;
+        return true;
+    }
+
+    public boolean isPotionInventoryFull() {
+        return getTotalPotionCount() >= GameConstants.MAX_POTIONS_TOTAL;
+    }
+
+    public boolean addHealthPotion() {
+        if (isPotionInventoryFull() || healthPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        healthPotionCount++;
+        return true;
+    }
+
+    public boolean addManaPotion() {
+        if (isPotionInventoryFull() || manaPotionCount >= GameConstants.MAX_POTIONS_PER_TYPE) {
+            return false;
+        }
+        manaPotionCount++;
+        return true;
+    }
+
+    public boolean useHealthPotion() {
+        if (healthPotionCount <= 0 || currentHp >= maxHp) {
+            return false;
+        }
+        healthPotionCount--;
+        healHp(GameConstants.POTION_HEAL_AMOUNT);
+        com.hust.game.audio.SoundManager.playDrinkSound();
+        this.isHealingActive = true;
+        this.isManaingActive = false;
+        this.potionEffectTimer = 48; // 0.8s * 60fps
+        return true;
+    }
+
+    public boolean useManaPotion() {
+        if (manaPotionCount <= 0 || currentMana >= maxMana) {
+            return false;
+        }
+        manaPotionCount--;
+        restoreMana(GameConstants.POTION_MANA_AMOUNT);
+        com.hust.game.audio.SoundManager.playDrinkSound();
+        this.isManaingActive = true;
+        this.isHealingActive = false;
+        this.potionEffectTimer = 48; // 0.8s * 60fps
+        return true;
+    }
+
+    private void healHp(int amount) {
+        currentHp = Math.min(maxHp, currentHp + amount);
+    }
+
+    private void restoreMana(int amount) {
+        currentMana = Math.min(maxMana, currentMana + amount);
+    }
+
     /** Trả về true khi máu = 0 → game over */
     @Override
     public boolean isDead() {
@@ -431,7 +858,11 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
     /** Chỉ cho tấn công khi cooldown đã về 0 */
     @Override
     public boolean canAttack() {
-        return attackCooldown == 0;
+        return attackCooldown == 0 && !isDashing && !isThrusting && !isTreeMergeAttacking() && !mergeController.isTransforming(); // Không được chém khi đang lướt/chọc/biến hình
+    }
+
+    public void resetAttackCooldown(int cooldown) {
+        attackCooldown = cooldown;
     }
 
     /** Gọi sau khi tấn công để bắt đầu đếm cooldown */
@@ -440,12 +871,83 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         attackCooldown = ATTACK_COOLDOWN_MAX;
     }
 
-    public void reset(){
-        this.x = 408;
-        this.y = 200;
+    public void reset(double startX, double startY){
+        this.x = startX;
+        this.y = startY;
 
         this.currentHp = maxHp;
         this.currentMana = maxMana;
+        this.healthPotionCount = 0;
+        this.manaPotionCount = 0;
+        mergeController.clearAll();
         resetAttackCooldown();
+    }
+
+    public void moveToLevelStart(double startX, double startY) {
+        this.x = startX;
+        this.y = startY;
+        mergeController.clearAll();
+        resetAttackCooldown();
+    }
+
+    public void grantMergeForm(MergeFormType formType) {
+        mergeController.grantForm(formType);
+    }
+
+    public boolean activateStoredMergeForm() {
+        return mergeController.activateStoredForm();
+    }
+
+    public boolean activateStoredMergeForm(int manaCost) {
+        if (!mergeController.hasStoredForm() || !canSpendMana(manaCost)) {
+            return false;
+        }
+
+        if (!mergeController.activateStoredForm()) {
+            return false;
+        }
+
+        spendMana(manaCost);
+        return true;
+    }
+
+    public boolean hasStoredMergeForm() {
+        return mergeController.hasStoredForm();
+    }
+
+    public boolean isMergeActive() {
+        return mergeController.isActive();
+    }
+
+    public boolean isTreeMergeActive() {
+        return mergeController.isTreeActive();
+    }
+
+    public boolean isTreeMergeAttacking() {
+        return mergeController.isTreeAttacking();
+    }
+
+    public int getTreeMergeFrameIndex() {
+        return mergeController.getTreeFrameIndex();
+    }
+
+    public int getTreeMergeDamageFrame() {
+        return mergeController.getTreeDamageFrame();
+    }
+
+    public int getTreeMergeDamage() {
+        return mergeController.getTreeDamage();
+    }
+
+    public int getTreeMergeAttackCooldown() {
+        return mergeController.getTreeAttackCooldown();
+    }
+
+    public int getMergeDurationRemaining() {
+        return mergeController.getActiveTimer();
+    }
+
+    public int getMergeCooldownRemaining() {
+        return mergeController.getCooldownTimer();
     }
 }

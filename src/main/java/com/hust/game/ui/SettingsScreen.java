@@ -8,14 +8,17 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.HBox;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.geometry.Rectangle2D;
-import javafx.scene.Cursor;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
@@ -27,14 +30,22 @@ import java.util.function.Consumer;
 public class SettingsScreen {
 
     private final Consumer<Void> onBack;
+    private final Consumer<DisplaySettings.WindowMode> onWindowModeChange;
+    private final SettingsTabState tabState = new SettingsTabState();
 
     // -------------------------------------------------------
     // BACKGROUND — dùng lại sprite sheet của menu
     // -------------------------------------------------------
     private static final int    BG_NUM_FRAMES = 4;
-    private static final double BG_FRAME_W    = 510.0;
-    private static final double BG_FRAME_H    = 300.0;
+    private static final double BG_FRAME_W    = 1838.0;
+    private static final double BG_FRAME_H    = 1079.0;
     private static final int    BG_ANIM_DELAY = 64;
+    private static final double TAB_ARROW_SCALE = 0.24;
+    private static final double HOTKEY_LIST_WIDTH = 760;
+    private static final double HOTKEY_SCROLL_HEIGHT = 500;
+    private static final double CUSTOM_SCROLL_TRACK_WIDTH = 13;
+    private static final double CUSTOM_SCROLL_THUMB_WIDTH = 16;
+    private static final double CUSTOM_SCROLL_THUMB_HEIGHT = 188;
 
     // Độ mờ cố định của background (0.0 = đen hoàn toàn, 1.0 = rõ hoàn toàn)
     private static final double BG_DIM_ALPHA  = 0.3;
@@ -42,12 +53,15 @@ public class SettingsScreen {
     // -------------------------------------------------------
     // SOUND LEVEL — bước nhảy 10, từ 0 đến 100
     // -------------------------------------------------------
-    private int soundLevel;
+    private int bgmLevel;
+    private int sfxLevel;
 
-    public SettingsScreen(Consumer<Void> onBack) {
+    public SettingsScreen(Consumer<Void> onBack, Consumer<DisplaySettings.WindowMode> onWindowModeChange) {
         this.onBack = onBack;
+        this.onWindowModeChange = onWindowModeChange;
         // Đồng bộ mức âm lượng hiện tại khi mở cài đặt
-        this.soundLevel = (int) Math.round(SoundManager.getMasterVolume() * 100);
+        this.bgmLevel = (int) Math.round(SoundManager.getBgmVolume() * 100);
+        this.sfxLevel = (int) Math.round(SoundManager.getSfxVolume() * 100);
     }
 
     public Scene createScene() {
@@ -63,66 +77,136 @@ public class SettingsScreen {
         Image bgSheet    = loadImg("/assets/menu_background.png");
         Image buttonSheet = loadImg("/assets/button.png"); // Dùng sprite sheet mới thay cho menu.png cũ
 
+        Image leftTabButtonSheet = loadImg("/assets/left_arrow.png");
+        Image rightTabButtonSheet = loadImg("/assets/right_arrow.png");
+
         // -------------------------------------------------------
         // TITLE
         // -------------------------------------------------------
-        javafx.scene.text.Text title = new javafx.scene.text.Text("SETTINGS");
-        Font titleFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 80);
-        if (titleFont == null) {
-            titleFont = Font.font("Arial", FontWeight.BOLD, 80);
+        javafx.scene.text.Text title = createTitle("SETTINGS");
+
+        Font labelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/Pixel_VIE.ttf"), 30);
+        if (labelFont == null) {
+            labelFont = Font.font("Arial", FontWeight.BOLD, 30);
         }
-        title.setFont(titleFont);
-        title.setFill(Color.WHITE);
-        title.setStroke(Color.BLACK);
-        title.setStrokeWidth(2.0);
+        Font loadedHotkeyFont = Font.loadFont(getClass().getResourceAsStream("/fonts/SVN-Determination_Sans.ttf"), 39);
+        if (loadedHotkeyFont == null) {
+            loadedHotkeyFont = Font.font("Arial", 32);
+        }
+        final Font hotkeyFont = loadedHotkeyFont;
 
         // -------------------------------------------------------
-        // SOUND BUTTON — Thay thế ảnh thành dạng button hiển thị số
+        // BACKGROUND MUSIC ROW (NHẠC NỀN)
         // -------------------------------------------------------
-        StackPane soundBtn = createSpriteBtn(String.valueOf(soundLevel), buttonSheet, 3, 0.8, () -> {
-            // Nút bấm được, có âm thanh nhưng chưa cần có chức năng đặc biệt
-        });
+        javafx.scene.text.Text bgmLabel = createLabel("Nhạc nền", labelFont);
 
-        // -------------------------------------------------------
-        // NÚT MINUS và PLUS
-        // -------------------------------------------------------
-        StackPane minusBtn = createSpriteBtn("-", buttonSheet, 3, 0.45, () -> {
-            if (soundLevel > 0) {
-                soundLevel -= 10;
-                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
-                SoundManager.setMasterVolume(soundLevel / 100.0);
+        StackPane bgmBtn = createSpriteBtn(String.valueOf(bgmLevel), buttonSheet, 3, 0.55, () -> {});
+
+        StackPane bgmMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.35, () -> {
+            if (bgmLevel > 0) {
+                bgmLevel -= 10;
+                ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
+                SoundManager.setBgmVolume(bgmLevel / 100.0);
+                com.hust.game.main.App.updateBgmVolume(bgmLevel / 100.0);
             }
         });
 
-        StackPane plusBtn = createSpriteBtn("+", buttonSheet, 3, 0.45, () -> {
-            if (soundLevel < 100) {
-                soundLevel += 10;
-                ((Text) soundBtn.getChildren().get(1)).setText(String.valueOf(soundLevel)); // Cập nhật text báo số
-                SoundManager.setMasterVolume(soundLevel / 100.0);
+        StackPane bgmPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.35, () -> {
+            if (bgmLevel < 100) {
+                bgmLevel += 10;
+                ((Text) bgmBtn.getChildren().get(1)).setText(String.valueOf(bgmLevel));
+                SoundManager.setBgmVolume(bgmLevel / 100.0);
+                com.hust.game.main.App.updateBgmVolume(bgmLevel / 100.0);
             }
         });
 
+        HBox bgmRow = new HBox(10, bgmMinusBtn, bgmBtn, bgmPlusBtn);
+        bgmRow.setAlignment(Pos.CENTER);
+        VBox bgmBox = new VBox(5, bgmLabel, bgmRow);
+        bgmBox.setAlignment(Pos.CENTER);
+
         // -------------------------------------------------------
-        // SOUND ROW — minus | ảnh sound | plus nằm ngang
+        // SFX ROW (HIỆU ỨNG)
         // -------------------------------------------------------
-        HBox soundRow = new HBox(10, minusBtn, soundBtn, plusBtn);
-        soundRow.setAlignment(Pos.CENTER);
+        javafx.scene.text.Text sfxLabel = createLabel("Hiệu ứng", labelFont);
+
+        StackPane sfxBtn = createSpriteBtn(String.valueOf(sfxLevel), buttonSheet, 3, 0.55, () -> {});
+
+        StackPane sfxMinusBtn = createSpriteBtn("-", buttonSheet, 3, 0.35, () -> {
+            if (sfxLevel > 0) {
+                sfxLevel -= 10;
+                ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
+                SoundManager.setSfxVolume(sfxLevel / 100.0);
+            }
+        });
+
+        StackPane sfxPlusBtn = createSpriteBtn("+", buttonSheet, 3, 0.35, () -> {
+            if (sfxLevel < 100) {
+                sfxLevel += 10;
+                ((Text) sfxBtn.getChildren().get(1)).setText(String.valueOf(sfxLevel));
+                SoundManager.setSfxVolume(sfxLevel / 100.0);
+            }
+        });
+
+        HBox sfxRow = new HBox(10, sfxMinusBtn, sfxBtn, sfxPlusBtn);
+        sfxRow.setAlignment(Pos.CENTER);
+        VBox sfxBox = new VBox(5, sfxLabel, sfxRow);
+        sfxBox.setAlignment(Pos.CENTER);
+
+        // -------------------------------------------------------
+        // DISPLAY MODE ROW
+        // -------------------------------------------------------
+        javafx.scene.text.Text displayLabel = createLabel("Chế độ màn hình", labelFont);
+
+        StackPane displayModeBtn = createSpriteBtn(DisplaySettings.getWindowModeLabel(), buttonSheet, 3, 0.85, () -> {});
+        Text displayModeText = (Text) displayModeBtn.getChildren().get(1);
+        displayModeBtn.setOnMouseClicked(e -> {
+            DisplaySettings.WindowMode nextMode = DisplaySettings.isFullscreen()
+                    ? DisplaySettings.WindowMode.WINDOWED
+                    : DisplaySettings.WindowMode.FULLSCREEN;
+            DisplaySettings.setWindowMode(nextMode);
+            displayModeText.setText(DisplaySettings.getWindowModeLabel());
+            onWindowModeChange.accept(nextMode);
+        });
+
+        HBox displayRow = new HBox(10, displayModeBtn);
+        displayRow.setAlignment(Pos.CENTER);
+        VBox displayBox = new VBox(5, displayLabel, displayRow);
+        displayBox.setAlignment(Pos.CENTER);
 
         // -------------------------------------------------------
         // NÚT BACK VỀ MENU
         // -------------------------------------------------------
-        StackPane menuBtn = createSpriteBtn("MENU", buttonSheet, 3, 0.8, () -> onBack.accept(null));
+        StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.7, () -> onBack.accept(null));
 
-        // -------------------------------------------------------
-        // LAYOUT TỔNG — Title → Sound Row → Back, canh giữa màn hình
-        // -------------------------------------------------------
-        VBox uiBox = new VBox(30, title, soundRow, menuBtn);
-        uiBox.setAlignment(Pos.CENTER);
+        StackPane pageRoot = new StackPane();
+        Runnable[] renderPage = new Runnable[1];
+        renderPage[0] = () -> {
+            pageRoot.getChildren().clear();
+            switch (tabState.getActiveTab()) {
+                case HOTKEYS -> pageRoot.getChildren().add(createHotkeysPage(
+                        buttonSheet,
+                        leftTabButtonSheet,
+                        hotkeyFont,
+                        renderPage[0]
+                ));
+                case SOUND_DISPLAY -> pageRoot.getChildren().add(createSoundDisplayPage(
+                            title,
+                            bgmBox,
+                            sfxBox,
+                            displayBox,
+                            menuBtn,
+                            rightTabButtonSheet,
+                            renderPage[0]
+                    ));
+            }
+        };
+        renderPage[0].run();
 
         // -------------------------------------------------------
         // STACKPANE — canvas background mờ bên dưới, UI bên trên
         // -------------------------------------------------------
-        StackPane root = new StackPane(canvas, uiBox);
+        StackPane root = new StackPane(canvas, pageRoot);
         root.setStyle("-fx-background-color: black;");
 
         // -------------------------------------------------------
@@ -179,12 +263,244 @@ public class SettingsScreen {
         bgLoop.start();
 
         // Dừng loop khi scene bị thay thế (tránh memory leak)
-        Scene scene = new Scene(root, GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
-        scene.windowProperty().addListener((obs, oldWin, newWin) -> {
-            if (newWin == null) bgLoop.stop();
+        Scene scene = ScaledSceneFactory.createScene(root);
+        root.sceneProperty().addListener((obs, oldScene, newScene) -> {
+            if (newScene == null) {
+                javafx.application.Platform.runLater(() -> {
+                    if (root.getScene() == null) bgLoop.stop();
+                });
+            }
         });
 
         return scene;
+    }
+
+    private Text createTitle(String text) {
+        javafx.scene.text.Text title = new javafx.scene.text.Text(text);
+        Font titleFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 80);
+        if (titleFont == null) {
+            titleFont = Font.font("Arial", FontWeight.BOLD, 80);
+        }
+        title.setFont(titleFont);
+        title.setFill(Color.WHITE);
+        title.setStroke(Color.BLACK);
+        title.setStrokeWidth(2.0);
+        return title;
+    }
+
+    private Text createLabel(String text, Font font) {
+        javafx.scene.text.Text label = new javafx.scene.text.Text(text);
+        label.setFont(font);
+        label.setFill(Color.WHITE);
+        label.setStroke(Color.BLACK);
+        label.setStrokeWidth(1.5);
+        return label;
+    }
+
+    private StackPane createSoundDisplayPage(
+            Text title,
+            VBox bgmBox,
+            VBox sfxBox,
+            VBox displayBox,
+            StackPane menuBtn,
+            Image rightTabButtonSheet,
+            Runnable renderPage
+    ) {
+        VBox uiBox = new VBox(12, title, bgmBox, sfxBox, displayBox, menuBtn);
+        uiBox.setAlignment(Pos.CENTER);
+
+        StackPane rightBtn = createImageBtn(rightTabButtonSheet, TAB_ARROW_SCALE, () -> {
+            tabState.showNextTab();
+            renderPage.run();
+        });
+        StackPane.setAlignment(rightBtn, Pos.CENTER_RIGHT);
+        StackPane.setMargin(rightBtn, new Insets(0, 105, 0, 0));
+
+        StackPane page = new StackPane(uiBox, rightBtn);
+        page.setPrefSize(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        return page;
+    }
+
+    private StackPane createHotkeysPage(Image buttonSheet, Image leftTabButtonSheet, Font hotkeyFont, Runnable renderPage) {
+        Text title = createTitle("HOTKEYS");
+        VBox hotkeyList = createHotkeyList(hotkeyFont,
+                "WASD / Phím mũi tên: Di chuyển player",
+                "J: Tấn công",
+                "SHIFT: Lướt",
+                "K: Nhập hồn / Companion",
+                "L: Cuồng nộ",
+                "Q: Dùng bình mana",
+                "E: Dùng bình máu",
+                "M: Mở / đóng minimap",
+                "WASD: Di chuyển minimap",
+                "+ / -: Thu phóng to / nhỏ map",
+                "ESC: Tạm dừng / đóng minimap",
+                "H: Tương tác NPC",
+                "O: Thoát hội thoại/shop",
+                "1 / 2: Mua vật phẩm NPC",
+                "SPACE / Chuột trái: Bỏ qua thoại NPC"
+        );
+
+        StackPane hotkeyScroll = createHotkeyScrollPane(hotkeyList);
+        StackPane menuBtn = createSpriteBtn("BACK", buttonSheet, 3, 0.7, () -> onBack.accept(null));
+        VBox uiBox = new VBox(22, title, hotkeyScroll, menuBtn);
+        uiBox.setAlignment(Pos.CENTER);
+
+        StackPane leftBtn = createImageBtn(leftTabButtonSheet, TAB_ARROW_SCALE, () -> {
+            tabState.showPreviousTab();
+            renderPage.run();
+        });
+        StackPane.setAlignment(leftBtn, Pos.CENTER_LEFT);
+        StackPane.setMargin(leftBtn, new Insets(0, 0, 0, 105));
+
+        StackPane page = new StackPane(uiBox, leftBtn);
+        page.setPrefSize(GameConstants.WINDOW_WIDTH, GameConstants.WINDOW_HEIGHT);
+        return page;
+    }
+
+    private StackPane createHotkeyScrollPane(VBox hotkeyList) {
+        ScrollPane scrollPane = new ScrollPane(hotkeyList);
+        scrollPane.setFitToWidth(true);
+        scrollPane.setPannable(true);
+        scrollPane.setHbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setVbarPolicy(ScrollPane.ScrollBarPolicy.NEVER);
+        scrollPane.setPrefViewportWidth(HOTKEY_LIST_WIDTH);
+        scrollPane.setPrefViewportHeight(HOTKEY_SCROLL_HEIGHT);
+        scrollPane.setMaxWidth(HOTKEY_LIST_WIDTH);
+        scrollPane.setMaxHeight(HOTKEY_SCROLL_HEIGHT);
+        scrollPane.setStyle(
+                "-fx-background: transparent;" +
+                "-fx-background-color: transparent;" +
+                "-fx-control-inner-background: transparent;"
+        );
+
+        ImageView trackView = new ImageView(loadImg("/assets/ui/scrollbar/scroll_track.png"));
+        trackView.setFitWidth(CUSTOM_SCROLL_TRACK_WIDTH);
+        trackView.setFitHeight(HOTKEY_SCROLL_HEIGHT);
+        trackView.setPreserveRatio(false);
+        trackView.setSmooth(false);
+
+        ImageView thumbView = new ImageView(loadImg("/assets/ui/scrollbar/scroll_thumb.png"));
+        thumbView.setFitWidth(CUSTOM_SCROLL_THUMB_WIDTH);
+        thumbView.setFitHeight(CUSTOM_SCROLL_THUMB_HEIGHT);
+        thumbView.setPreserveRatio(false);
+        thumbView.setSmooth(false);
+
+        StackPane scrollbar = new StackPane(trackView, thumbView);
+        scrollbar.setAlignment(Pos.TOP_CENTER);
+        scrollbar.setPrefSize(CUSTOM_SCROLL_TRACK_WIDTH, HOTKEY_SCROLL_HEIGHT);
+        scrollbar.setMaxSize(CUSTOM_SCROLL_TRACK_WIDTH, HOTKEY_SCROLL_HEIGHT);
+
+        Runnable updateThumb = () -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            thumbView.setTranslateY(scrollPane.getVvalue() * maxThumbY);
+        };
+        scrollPane.vvalueProperty().addListener((obs, oldValue, newValue) -> updateThumb.run());
+        javafx.application.Platform.runLater(updateThumb);
+
+        final double[] dragStartY = {0};
+        final double[] dragStartValue = {0};
+        thumbView.addEventHandler(MouseEvent.MOUSE_PRESSED, e -> {
+            dragStartY[0] = e.getSceneY();
+            dragStartValue[0] = scrollPane.getVvalue();
+            e.consume();
+        });
+        thumbView.addEventHandler(MouseEvent.MOUSE_DRAGGED, e -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            double nextValue = dragStartValue[0] + (e.getSceneY() - dragStartY[0]) / maxThumbY;
+            scrollPane.setVvalue(clamp(nextValue, 0, 1));
+            e.consume();
+        });
+        scrollbar.addEventHandler(MouseEvent.MOUSE_CLICKED, e -> {
+            double maxThumbY = HOTKEY_SCROLL_HEIGHT - CUSTOM_SCROLL_THUMB_HEIGHT;
+            double nextValue = (e.getY() - CUSTOM_SCROLL_THUMB_HEIGHT / 2.0) / maxThumbY;
+            scrollPane.setVvalue(clamp(nextValue, 0, 1));
+        });
+
+        HBox scrollContent = new HBox(18, scrollPane, scrollbar);
+        scrollContent.setAlignment(Pos.CENTER);
+
+        StackPane wrapper = new StackPane(scrollContent);
+        wrapper.setMaxSize(HOTKEY_LIST_WIDTH + CUSTOM_SCROLL_TRACK_WIDTH + 18, HOTKEY_SCROLL_HEIGHT);
+        return wrapper;
+    }
+
+    private double clamp(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private VBox createHotkeyList(Font font, String... hotkeyLines) {
+        VBox hotkeyList = new VBox(5);
+        hotkeyList.setAlignment(Pos.CENTER_LEFT);
+        hotkeyList.setMaxWidth(HOTKEY_LIST_WIDTH);
+
+        for (int i = 0; i < hotkeyLines.length; i++) {
+            hotkeyList.getChildren().add(createHotkeyRow(hotkeyLines[i], font));
+            if (i < hotkeyLines.length - 1) {
+                hotkeyList.getChildren().add(createHotkeySeparator());
+            }
+        }
+
+        return hotkeyList;
+    }
+
+    private Region createHotkeySeparator() {
+        Region separator = new Region();
+        separator.setPrefHeight(2);
+        separator.setMaxHeight(2);
+        separator.setMinHeight(2);
+        separator.setMaxWidth(HOTKEY_LIST_WIDTH);
+        separator.setStyle("-fx-background-color: rgba(255, 255, 255, 0.85);");
+        return separator;
+    }
+
+    private StackPane createHotkeyRow(String text, Font font) {
+        StackPane row = new StackPane(createHotkeyText(text, font));
+        row.setAlignment(Pos.CENTER_LEFT);
+        row.setPadding(new Insets(20.0, 0, 20.0, 0));
+        row.setMaxWidth(HOTKEY_LIST_WIDTH);
+        return row;
+    }
+
+    private Text createHotkeyText(String text, Font font) {
+        Text hotkey = new Text(text);
+        hotkey.setFont(font);
+        hotkey.setFill(Color.WHITE);
+        hotkey.setStroke(Color.BLACK);
+        hotkey.setStrokeWidth(1.3);
+        return hotkey;
+    }
+
+    private StackPane createImageBtn(Image image, double scaleMultiplier, Runnable action) {
+        StackPane pane = new StackPane();
+        ImageView view = new ImageView(image);
+        view.setFitWidth(image.getWidth() * scaleMultiplier);
+        view.setFitHeight(image.getHeight() * scaleMultiplier);
+
+        pane.getChildren().add(view);
+        pane.setPrefSize(image.getWidth() * scaleMultiplier, image.getHeight() * scaleMultiplier);
+        pane.setMaxSize(image.getWidth() * scaleMultiplier, image.getHeight() * scaleMultiplier);
+
+        pane.setOnMouseEntered(e -> {
+            com.hust.game.audio.SoundManager.playButtonHoverSound();
+            pane.setScaleX(1.10);
+            pane.setScaleY(1.10);
+        });
+        pane.setOnMouseExited(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+        });
+        pane.setOnMousePressed(e -> {
+            com.hust.game.audio.SoundManager.playButtonClickSound();
+            pane.setScaleX(0.9);
+            pane.setScaleY(0.9);
+        });
+        pane.setOnMouseReleased(e -> {
+            pane.setScaleX(1.0);
+            pane.setScaleY(1.0);
+        });
+        pane.setOnMouseClicked(e -> action.run());
+        return pane;
     }
 
     // -------------------------------------------------------
@@ -209,14 +525,15 @@ public class SettingsScreen {
         
         if (textNode != null) {
             if ("+".equals(btnText) || "-".equals(btnText)) {
-                textNode.setFont(Font.font("Consolas", FontWeight.BOLD, 60));
+                textNode.setFont(Font.font("Consolas", FontWeight.BOLD, 46));
                 textNode.setFill(Color.BLACK);
                 textNode.setStroke(Color.WHITE);
                 textNode.setStrokeWidth(2.0);
             } else {
-                Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), 46);
+                double fontSize = btnText.length() > 8 ? 30 : 36;
+                Font pixelFont = Font.loadFont(getClass().getResourceAsStream("/fonts/PixelFont.ttf"), fontSize);
                 if (pixelFont == null) {
-                    pixelFont = Font.font("Arial", FontWeight.BOLD, 46);
+                    pixelFont = Font.font("Arial", FontWeight.BOLD, fontSize);
                 }
                 textNode.setFont(pixelFont);
                 textNode.setFill(Color.RED);
@@ -294,7 +611,6 @@ public class SettingsScreen {
         });
         
         pane.setOnMouseClicked(e -> action.run());
-        pane.setCursor(Cursor.HAND);
         
         return pane;
     }

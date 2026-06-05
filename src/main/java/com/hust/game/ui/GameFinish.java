@@ -35,7 +35,7 @@ public class GameFinish {
 
         // Center everything
         root = new StackPane(buttons);
-        root.setPrefSize(816, 480); // match your game window size
+        root.setPrefSize(com.hust.game.constants.GameConstants.WINDOW_WIDTH, com.hust.game.constants.GameConstants.WINDOW_HEIGHT);
     }
 
     private StackPane createSpriteBtn(String btnText, Image spriteSheet, int numFrames, double scaleMultiplier, Runnable action) {

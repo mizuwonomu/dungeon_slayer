@@ -37,8 +37,10 @@ public abstract class BaseEntity {
         this.renderHeight = renderHeight;
 
         // kích thước gốc của 1 khung hình
-        this.frameWidth = spriteSheet.getWidth() / numFrames;
-        this.frameHeight = spriteSheet.getHeight();
+        if (spriteSheet != null) {
+            this.frameWidth = spriteSheet.getWidth() / numFrames;
+            this.frameHeight = spriteSheet.getHeight();
+        }
     }
 
     public abstract void update();
@@ -69,6 +71,15 @@ public abstract class BaseEntity {
 
     public Rectangle2D getBoundary() {
         return new Rectangle2D(x, y, renderWidth, renderHeight);
+    }
+
+    // Hitbox dùng riêng cho va chạm vật lý (đi xuyên/trượt tường)
+    public Rectangle2D getCollisionBoundary() {
+        double w = renderWidth * 0.5; // Thu nhỏ bề ngang
+        double h = renderHeight * 0.3; // Chỉ lấy 30% phần dưới chân
+        double bx = x + (renderWidth - w) / 2.0;
+        double by = y + renderHeight - h;
+        return new Rectangle2D(bx, by, w, h);
     }
 
     public boolean intersects(BaseEntity other) {

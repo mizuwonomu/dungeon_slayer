@@ -9,6 +9,7 @@ import com.hust.game.entities.player.Player;
 public class EnemyManager {
     // Danh sách chứa toàn bộ quái vật đang sống trên bản đồ
     private List<Enemy> enemyList;
+    private com.hust.game.collision.CollisionChecker collisionChecker;
 
     public EnemyManager() {
         this.enemyList = new ArrayList<>();
@@ -18,6 +19,13 @@ public class EnemyManager {
     public void spawnEnemy(String enemyType, double x, double y, Image sprite, int numFrames, double w, double h,
             Player targetPlayer) {
         spawnEnemy(enemyType, x, y, sprite, numFrames, w, h, targetPlayer, null);
+    }
+
+    public void setCollisionChecker(com.hust.game.collision.CollisionChecker checker) {
+        this.collisionChecker = checker;
+        for (Enemy e : enemyList) {
+            e.setCollisionChecker(checker);
+        }
     }
 
     // Hàm sinh thái quái vật (hỗ trợ ảnh skill)
@@ -33,9 +41,12 @@ public class EnemyManager {
             newEnemy = new Knight(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite);
         } else if (enemyType.equals("Witch")) {
             newEnemy = new Witch(x, y, sprite, numFrames, w, h, targetPlayer, skillSprite, this);
+        } else if (enemyType.equals("FinalBoss")) {
+            newEnemy = new FinalBoss(x, y, sprite, numFrames, w, h, targetPlayer);
         }
 
         if (newEnemy != null) {
+            if (this.collisionChecker != null) newEnemy.setCollisionChecker(this.collisionChecker);
             enemyList.add(newEnemy);
         }
     }

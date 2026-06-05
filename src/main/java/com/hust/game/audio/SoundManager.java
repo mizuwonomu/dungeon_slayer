@@ -6,16 +6,34 @@ import java.net.URL;
 public class SoundManager {
     public static AudioClip nsMiss, nsHitSlime, nsHitKnight, nsFinalHit, playerHitS, playerPowerUp, sPowerUp,nsHitTree, thunder;
     public static AudioClip slimeMove, knightAtk, knightReady, treeMoving, treeAtk;
-    public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon;
+    public static AudioClip witchCircleFollow, witchCircleExplode, witchSummon, witchDmgTaken, witchDied;
+    public static AudioClip bossStart, bossTele1, bossTele2, bossSkill2, bossUlti;
     public static AudioClip btnHover, btnClick;
-    private static double masterVolume = 1.0; // 0.0 → 1.0
+    public static AudioClip gateBurn;
+    public static AudioClip pauseSound, unpauseSound;
+    public static AudioClip transformSound;
+    public static AudioClip dragonRoar, explosion, playerIdle, swordSwing, swordSwing1, swordSwing2, tele, ultiReady, whoosh;
+    public static AudioClip dashSound, coinSound;
+    public static AudioClip interactSound, buySuc1, buySuc2, cantBuy, noMoney;
+    public static AudioClip line1Sound, chestHit, chestOpen;
+    public static AudioClip drinkSound;
+    private static double sfxVolume = 0.8; // Âm lượng hiệu ứng
+    private static double bgmVolume = 0.8; // Âm lượng nhạc nền
 
-    public static double getMasterVolume() {
-        return masterVolume;
+    public static double getSfxVolume() {
+        return sfxVolume;
     }
 
-    public static void setMasterVolume(double volume) {
-        masterVolume = volume;
+    public static double getBgmVolume() {
+        return bgmVolume;
+    }
+
+    public static void setBgmVolume(double volume) {
+        bgmVolume = volume;
+    }
+
+    public static void setSfxVolume(double volume) {
+        sfxVolume = volume;
 
         // Apply to all loaded clips
         applyVolume(nsMiss, 1.0);
@@ -37,13 +55,44 @@ public class SoundManager {
         applyVolume(witchCircleFollow, 0.8);
         applyVolume(witchCircleExplode, 1.0);
         applyVolume(witchSummon, 0.8);
+        applyVolume(witchDmgTaken, 1.0);
+        applyVolume(witchDied, 1.0);
+        applyVolume(bossStart, 1.0);
+        applyVolume(bossTele1, 0.9);
+        applyVolume(bossTele2, 0.9);
+        applyVolume(bossSkill2, 1.0);
+        applyVolume(bossUlti, 1.0);
+        applyVolume(gateBurn, 1.0);
         applyVolume(btnHover, 0.8);
         applyVolume(btnClick, 1.0);
+        applyVolume(pauseSound, 1.0);
+        applyVolume(unpauseSound, 1.0);
+        
+        applyVolume(dragonRoar, 1.0);
+        applyVolume(explosion, 1.0);
+        applyVolume(playerIdle, 1.0);
+        applyVolume(swordSwing, 1.0);
+        applyVolume(swordSwing1, 1.0);
+        applyVolume(swordSwing2, 1.0);
+        applyVolume(tele, 1.0);
+        applyVolume(ultiReady, 1.0);
+        applyVolume(whoosh, 1.0);
+        applyVolume(dashSound, 1.0);
+        applyVolume(coinSound, 1.0);
+        applyVolume(interactSound, 1.0);
+        applyVolume(buySuc1, 1.0);
+        applyVolume(buySuc2, 1.0);
+        applyVolume(cantBuy, 1.0);
+        applyVolume(noMoney, 1.0);
+        applyVolume(line1Sound, 1.0);
+        applyVolume(chestHit, 1.0);
+        applyVolume(chestOpen, 1.0);
+        applyVolume(drinkSound, 1.0);
     }
 
     private static void applyVolume(AudioClip clip, double baseVolume) {
         if (clip != null) {
-            clip.setVolume(baseVolume * masterVolume);
+            clip.setVolume(baseVolume * sfxVolume);
         }
     }
 
@@ -68,8 +117,41 @@ public class SoundManager {
         witchCircleFollow = loadSound("witch_circle_folow.wav", 0.8);
         witchCircleExplode = loadSound("witch_circle_explore.wav", 1.0);
         witchSummon = loadSound("summon.wav", 0.8);
+        witchDmgTaken = loadSound("witch_dmg_taken.wav", 1.0);
+        witchDied = loadSound("witch_died.wav", 1.0);
+        bossStart = loadSound("start.wav", 1.0);
+        bossTele1 = loadSound("tele1.wav", 0.9);
+        bossTele2 = loadSound("tele2.wav", 0.9);
+        bossSkill2 = loadSound("skill2.wav", 1.0);
+        bossUlti = loadSound("ulti.wav", 1.0);
+        gateBurn = loadSound("gate_burn.wav", 1.0);
         btnHover = loadSound("button_hold.wav", 0.8);
         btnClick = loadSound("button_click.wav", 1.0);
+        
+        pauseSound = loadSound("pause.wav", 1.0);
+        unpauseSound = loadSound("button_click.wav", 1.0); // Đổi sang dùng chung âm thanh với button click
+        transformSound = loadSound("transform.wav", 1.0);
+        
+        dragonRoar = loadSound("dragon_roar.wav", 1.0);
+        explosion = loadSound("explosion.wav", 1.0);
+        playerIdle = loadSound("player_idle.wav", 1.0);
+        swordSwing = loadSound("sword_swing.wav", 1.0);
+        swordSwing1 = loadSound("sword_swing_1.wav", 1.0);
+        swordSwing2 = loadSound("sword_swing_2.wav", 1.0);
+        tele = loadSound("tele.wav", 1.0);
+        ultiReady = loadSound("ulti_ready.wav", 1.0);
+        whoosh = loadSound("whoosh.wav", 1.0);
+        dashSound = loadSound("dash.wav", 1.0);
+        coinSound = loadSound("coin.wav", 1.0);
+        interactSound = loadSound("interact.wav", 1.0);
+        buySuc1 = loadSound("buy_suc_1.wav", 1.0);
+        buySuc2 = loadSound("buy_suc_2.wav", 1.0);
+        cantBuy = loadSound("cant_buy.wav", 1.0);
+        noMoney = loadSound("no_money.wav", 1.0);
+        line1Sound = loadSound("line_1.wav", 1.0);
+        chestHit = loadSound("chest_hit.wav", 1.0);
+        chestOpen = loadSound("chest_open.wav", 1.0);
+        drinkSound = loadSound("drink.wav", 1.0);
     }
 
     private static AudioClip loadSound(String fileName, double baseVolume) {
@@ -77,7 +159,7 @@ public class SoundManager {
             URL url = SoundManager.class.getResource("/sounds/" + fileName);
             if (url != null) {
                 AudioClip clip = new AudioClip(url.toString());
-                clip.setVolume(baseVolume * masterVolume); // ✅ correct variable
+                clip.setVolume(baseVolume * sfxVolume); // 
                 return clip;
             } else {
                 System.err.println("Không tìm thấy file âm thanh: /sounds/" + fileName);
@@ -86,6 +168,10 @@ public class SoundManager {
             System.err.println("Lỗi load âm thanh " + fileName + ": " + e.getMessage());
         }
         return null;
+    }
+
+    public static void playTransformSound() {
+        if (transformSound != null) { transformSound.stop(); transformSound.play(); }
     }
 
     public static void playNsMissSound() { 
@@ -154,11 +240,125 @@ public class SoundManager {
         if (witchSummon != null) { witchSummon.stop(); witchSummon.play(); }
     }
 
+    public static void playWitchDmgTakenSound() {
+        if (witchDmgTaken != null) { witchDmgTaken.stop(); witchDmgTaken.play(); }
+    }
+
+    public static void playWitchDiedSound() {
+        if (witchDied != null) { witchDied.stop(); witchDied.play(); }
+    }
+
+    public static void playGateBurnSound() {
+        if (gateBurn != null) { gateBurn.stop(); gateBurn.play(); }
+    }
+
     public static void playButtonHoverSound() {
         if (btnHover != null) { btnHover.stop(); btnHover.play(); }
     }
     public static void playButtonClickSound() {
         if (btnClick != null) { btnClick.stop(); btnClick.play(); }
+    }
+
+    public static void playPauseSound() {
+        if (pauseSound != null) { pauseSound.stop(); pauseSound.play(); }
+    }
+
+    public static void playUnpauseSound() {
+        if (unpauseSound != null) { unpauseSound.stop(); unpauseSound.play(); }
+    }
+
+    public static void playBossStartSound() {
+        if (bossStart != null) { bossStart.stop(); bossStart.play(); }
+    }
+
+    public static void playBossTeleport1Sound() {
+        if (bossTele1 != null) { bossTele1.stop(); bossTele1.play(); }
+    }
+
+    public static void playBossTeleport2Sound() {
+        if (bossTele2 != null) { bossTele2.stop(); bossTele2.play(); }
+    }
+
+    public static void playBossSkill2Sound() {
+        if (bossSkill2 != null) { bossSkill2.stop(); bossSkill2.play(); }
+    }
+
+    public static void playBossUltimateSound() {
+        if (bossUlti != null) { bossUlti.stop(); bossUlti.play(); }
+    }
+
+    public static void playDragonRoarSound() {
+        if (dragonRoar != null) { dragonRoar.stop(); dragonRoar.play(); }
+    }
+
+    public static void playExplosionSound() {
+        if (explosion != null) { explosion.stop(); explosion.play(); }
+    }
+
+    public static void playPlayerIdleSound() {
+        if (playerIdle != null) { playerIdle.stop(); playerIdle.play(); }
+    }
+
+    public static void playSwordSwingSound() {
+        if (swordSwing != null) { swordSwing.stop(); swordSwing.play(); }
+    }
+
+    public static void playSwordSwing1Sound() {
+        if (swordSwing1 != null) { swordSwing1.stop(); swordSwing1.play(); }
+    }
+
+    public static void playSwordSwing2Sound() {
+        if (swordSwing2 != null) { swordSwing2.stop(); swordSwing2.play(); }
+    }
+
+    public static void playTeleSound() {
+        if (tele != null) { tele.stop(); tele.play(); }
+    }
+
+    public static void playUltiReadySound() {
+        if (ultiReady != null) { ultiReady.stop(); ultiReady.play(); }
+    }
+
+    public static void playWhooshSound() {
+        if (whoosh != null) { whoosh.stop(); whoosh.play(); }
+    }
+
+    public static void playDashSound() {
+        if (dashSound != null) { dashSound.stop(); dashSound.play(); }
+    }
+
+    public static void playCoinSound() {
+        if (coinSound != null) { coinSound.stop(); coinSound.play(); }
+    }
+
+    public static void playInteractSound() {
+        if (interactSound != null) { interactSound.stop(); interactSound.play(); }
+    }
+
+    public static void playBuySuccessRandomSound() {
+        if (Math.random() < 0.5) { if (buySuc1 != null) { buySuc1.stop(); buySuc1.play(); } }
+        else { if (buySuc2 != null) { buySuc2.stop(); buySuc2.play(); } }
+    }
+
+    public static void playCantBuySound() {
+        if (cantBuy != null) { cantBuy.stop(); cantBuy.play(); }
+        if (noMoney != null) { noMoney.stop(); noMoney.play(); }
+    }
+
+    public static void playLine1Sound() {
+        if (line1Sound != null) { line1Sound.stop(); line1Sound.play(); }
+    }
+
+    public static void playChestHitSound() {
+        if (chestHit != null) { chestHit.stop(); chestHit.play(); }
+    }
+
+    public static void playChestOpenSound() {
+        if (chestOpen != null) { chestOpen.stop(); chestOpen.play(); }
+    }
+
+    public static void playDrinkSound() {
+        if (drinkSound != null) { drinkSound.stop(); drinkSound.play(); }
     }
 
     public static void stopEnemySounds() {
@@ -167,6 +367,16 @@ public class SoundManager {
         if (knightReady != null) { knightReady.stop(); }
         if (treeMoving != null) { treeMoving.stop(); }
         if (treeAtk != null) { treeAtk.stop(); }
+        if (bossStart != null) { bossStart.stop(); }
+        if (bossTele1 != null) { bossTele1.stop(); }
+        if (bossTele2 != null) { bossTele2.stop(); }
+        if (bossSkill2 != null) { bossSkill2.stop(); }
+        if (bossUlti != null) { bossUlti.stop(); }
+        if (dragonRoar != null) { dragonRoar.stop(); }
+        if (explosion != null) { explosion.stop(); }
+        if (ultiReady != null) { ultiReady.stop(); }
+        if (tele != null) { tele.stop(); }
+        if (whoosh != null) { whoosh.stop(); }
     }
 
     public static void stopGameplaySounds() {
@@ -184,5 +394,32 @@ public class SoundManager {
         if (knightReady != null) { knightReady.stop(); }
         if (treeMoving != null) { treeMoving.stop(); }
         if (treeAtk != null) { treeAtk.stop(); }
+        if (witchDmgTaken != null) { witchDmgTaken.stop(); }
+        if (witchDied != null) { witchDied.stop(); }
+        if (gateBurn != null) { gateBurn.stop(); }
+        if (bossStart != null) { bossStart.stop(); }
+        if (bossTele1 != null) { bossTele1.stop(); }
+        if (bossTele2 != null) { bossTele2.stop(); }
+        if (bossSkill2 != null) { bossSkill2.stop(); }
+        if (bossUlti != null) { bossUlti.stop(); }
+        if (dragonRoar != null) { dragonRoar.stop(); }
+        if (explosion != null) { explosion.stop(); }
+        if (ultiReady != null) { ultiReady.stop(); }
+        if (tele != null) { tele.stop(); }
+        if (whoosh != null) { whoosh.stop(); }
+        if (swordSwing != null) { swordSwing.stop(); }
+        if (swordSwing1 != null) { swordSwing1.stop(); }
+        if (swordSwing2 != null) { swordSwing2.stop(); }
+        if (playerIdle != null) { playerIdle.stop(); }
+        if (dashSound != null) { dashSound.stop(); }
+        if (interactSound != null) { interactSound.stop(); }
+        if (buySuc1 != null) { buySuc1.stop(); }
+        if (buySuc2 != null) { buySuc2.stop(); }
+        if (cantBuy != null) { cantBuy.stop(); }
+        if (noMoney != null) { noMoney.stop(); }
+        if (line1Sound != null) { line1Sound.stop(); }
+        if (chestHit != null) { chestHit.stop(); }
+        if (chestOpen != null) { chestOpen.stop(); }
+        if (drinkSound != null) { drinkSound.stop(); }
     }
 }

@@ -16,8 +16,20 @@ public class StaticEntity  extends BaseEntity{
             super(x, y, spriteSheets, numFrames, renderWidth, renderHeight);
         }
 
+    private int animTimer = 0;
+    private int animDelay = 15; // Tốc độ chuyển frame (4 hình/giây cho animation môi trường)
+
     @Override
     public void update() {
-        // Không làm gì — entity tĩnh
+        if (numFrames > 1) {
+            animTimer++;
+            if (animTimer >= animDelay) {
+                animTimer = 0;
+                frameIndex++;
+                if (frameIndex >= numFrames) {
+                    frameIndex = 0;
+                }
+            }
+        }
     }
 }

@@ -1,0 +1,273 @@
+package com.hust.game.ui;
+
+import com.hust.game.constants.GameConstants;
+import com.hust.game.entities.player.Player;
+import com.hust.game.map.MapManager;
+
+import javafx.geometry.Pos;
+import javafx.scene.Group;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.shape.Rectangle;
+
+import java.util.function.Function;
+
+public class Minimap {
+
+    private Group root;
+
+    private ImageView mapView;
+    private ImageView playerDot;
+    private Group mapContainer;
+    private double miniX;
+    private double miniY;
+
+    private double zoom = 1.0;
+
+    private double panX = 0;
+    private double panY = 0;
+    private double lastMouseX;
+    private double lastMouseY;
+
+    private void applyTransform() {
+
+        mapContainer.setScaleX(zoom);
+        mapContainer.setScaleY(zoom);
+
+        mapContainer.setTranslateX(panX);
+        mapContainer.setTranslateY(panY);
+    }
+
+    public Minimap(
+            int width,
+            int height,
+            Runnable onClose,
+            Function<String, Image> imageLoader,
+            Player player,
+            MapManager mapManager,
+            double zoom
+    ) {
+
+        // ===== DARK OVERLAY =====
+        Region background = new Region();
+        background.setPrefSize(width, height);
+        background.setStyle("-fx-background-color: rgba(0,0,0,0.75);");
+
+        // ===== LOAD MINIMAP IMAGE =====
+        Image minimapImage = imageLoader.apply(
+                "/assets/maps/level" + mapManager.level + ".png"
+        );
+
+        // ===== MAP VIEW =====
+        mapView = new ImageView(minimapImage);
+
+        // Fit map to screen width
+        mapView.setFitWidth(width);
+        mapView.setPreserveRatio(true);
+        mapView.setSmooth(false);
+
+        // ===== PLAYER ICON =====
+        playerDot = new ImageView(
+                imageLoader.apply("/assets/player_icon.png")
+        );
+
+        playerDot.setFitWidth(20);
+        playerDot.setFitHeight(20);
+        playerDot.setPreserveRatio(true);
+
+        // ===== WORLD SIZE =====
+        double worldWidth =
+                GameConstants.MAX_WORLD_COL * GameConstants.TILE_SIZE;
+
+        double worldHeight =
+                GameConstants.MAX_WORLD_ROW * GameConstants.TILE_SIZE;
+
+        // ===== LEVEL SETTINGS =====
+        double offsetX = 0;
+        double offsetY = 0;
+
+        double miniXMultiplier = 1.0;
+        double miniYMultiplier = 1.0;
+
+        switch (mapManager.level) {
+
+            // ===== LEVEL 1 =====
+            case 1:
+                worldWidth = 256 * GameConstants.TILE_SIZE;
+                worldHeight = 32 * GameConstants.TILE_SIZE;
+
+                miniXMultiplier = 2.0;
+                break;
+
+            // ===== LEVEL 2 =====
+            case 2:
+                mapView.setFitWidth(width * 0.9);
+                mapView.setPreserveRatio(true);
+
+                worldWidth = 6000;
+                worldHeight = 3150;
+                break;
+
+            default:
+                worldWidth = 256 * GameConstants.TILE_SIZE;
+                worldHeight = 32 * GameConstants.TILE_SIZE;
+        }
+
+        // ===== DISPLAYED MINIMAP SIZE =====
+        double minimapWidth = mapView.getFitWidth();
+
+        double minimapHeight =
+                minimapImage.getHeight()
+                        * (mapView.getFitWidth() / minimapImage.getWidth());
+
+        mapView.setLayoutX(-minimapWidth / 2.0);
+        mapView.setLayoutY(-minimapHeight / 2.0);
+
+        // ===== PLAYER POSITION =====
+        this.miniX =
+                (player.getX() / worldWidth)
+                        * minimapWidth
+                        * miniXMultiplier
+                        - offsetX;
+
+        this.miniY =
+                (player.getY() / worldHeight)
+                        * minimapHeight
+                        * miniYMultiplier
+                        - offsetY;
+
+        miniX -= minimapWidth / 2.0;
+        miniY -= minimapHeight / 2.0;
+
+        // ===== APPLY POSITION =====
+        playerDot.setLayoutX(miniX);
+        playerDot.setLayoutY(miniY);
+
+        // ===== ROOT OVERLAY =====
+        StackPane overlay = new StackPane();
+        overlay.setAlignment(Pos.CENTER);
+        overlay.setPrefSize(width, height);
+        overlay.setMinSize(width, height);
+        overlay.setMaxSize(width, height);
+
+        Rectangle clip = new Rectangle(width, height);
+        overlay.setClip(clip);
+
+        mapContainer = new Group(
+                mapView,
+                playerDot
+        );
+
+        this.zoom = zoom;
+        panX = -miniX * zoom;
+        panY = -miniY * zoom;
+
+        applyTransform();
+
+        overlay.getChildren().addAll(
+                background,
+                mapContainer
+        );
+
+        root = new Group(overlay);
+
+        overlay.setOnMousePressed(e -> {
+            startDrag(e.getSceneX(), e.getSceneY());
+        });
+
+        overlay.setOnMouseDragged(e -> {
+            drag(e.getSceneX(), e.getSceneY());
+        });
+
+        overlay.setOnScroll(e -> {
+
+            if (e.getDeltaY() > 0) {
+                zoomIn();
+            } else {
+                zoomOut();
+            }
+
+            e.consume();
+        });
+    }
+
+
+    public double getZoom() {
+        return zoom;
+    }
+
+    public double getPanX() {
+        return panX;
+    }
+
+    public double getPanY() {
+        return panY;
+    }
+
+    private void zoomAtPlayer(double factor) {
+
+        double screenX = miniX * zoom + panX;
+        double screenY = miniY * zoom + panY;
+
+        zoom *= factor;
+
+        panX = screenX - miniX * zoom;
+        panY = screenY - miniY * zoom;
+
+        applyTransform();
+    }
+
+    public void zoomIn() {
+        zoomAtPlayer(1.1);
+    }
+
+    public void zoomOut() {
+        zoomAtPlayer(1.0 / 1.1);
+    }
+
+    public void moveUp() {
+        panY += 30;
+        applyTransform();
+    }
+
+    public void moveDown() {
+        panY -= 30;
+        applyTransform();
+    }
+
+    public void moveLeft() {
+        panX += 30;
+        applyTransform();
+    }
+
+    public void moveRight() {
+        panX -= 30;
+        applyTransform();
+    }
+
+    public void startDrag(double mouseX, double mouseY) {
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+    }
+
+    public void drag(double mouseX, double mouseY) {
+
+        double dx = mouseX - lastMouseX;
+        double dy = mouseY - lastMouseY;
+
+        panX += dx;
+        panY += dy;
+
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
+
+        applyTransform();
+    }
+
+
+    public Group getRoot() {
+        return root;
+    }
+}
