@@ -20,6 +20,7 @@ public class Witch extends Enemy {
     private static final int SUMMON_SEARCH_RADIUS_TILES = 18;
     private static final int LOCAL_GUARD_TARGET_COUNT = 2;
     private static final double LOCAL_GUARD_RANGE_TILES = 7.0;
+    private static final double CIRCLE_RENDER_SIZE = 96.0;
     private int skillCooldownTimer = 0;
     private int circleCountSinceLastSummon = 3;
     private EnemyManager enemyManager;
@@ -757,8 +758,8 @@ public class Witch extends Enemy {
             // 2. Giai đoạn xử lý Vòng lửa
             if (circleTimer <= 180) {
                 // Vòng lửa bám đuôi Player
-                circleX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0 - 32;
-                circleY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0 - 32;
+                circleX = targetPlayer.getX() + targetPlayer.getRenderWidth() / 2.0 - CIRCLE_RENDER_SIZE / 2.0;
+                circleY = targetPlayer.getY() + targetPlayer.getRenderHeight() / 2.0 - CIRCLE_RENDER_SIZE / 2.0;
             } else if (circleTimer <= 210) {
                 // Vòng dừng lại khóa mục tiêu (chuẩn bị nổ)
             } else if (circleTimer == 211) {
@@ -837,7 +838,7 @@ public class Witch extends Enemy {
 
                 double cWidth = currentCircle.getWidth() / cFrames;
                 gc.drawImage(currentCircle, cIndex * cWidth, 0, cWidth, currentCircle.getHeight(),
-                        circleX, circleY + 5, 64, 64);
+                        circleX, circleY + 4, CIRCLE_RENDER_SIZE, CIRCLE_RENDER_SIZE);
             }
         }
     }
