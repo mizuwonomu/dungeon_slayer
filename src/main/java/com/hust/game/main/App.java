@@ -1118,6 +1118,7 @@ public class App extends Application {
                     );
                     tutorialClearScreen.setVisible(true);
                     root.getChildren().add(tutorialClearScreen.getRoot());
+                    applyCursorToNode(tutorialClearScreen.getRoot());
                     isTutorialClearUIShown = true;
                 }
 
@@ -1173,6 +1174,7 @@ public class App extends Application {
                     );
                     levelClearScreen.setVisible(true);
                     root.getChildren().add(levelClearScreen.getRoot());
+                    applyCursorToNode(levelClearScreen.getRoot());
                     isLevelClearUIShown = true;
                 }
 
