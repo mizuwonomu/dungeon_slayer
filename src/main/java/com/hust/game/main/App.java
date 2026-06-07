@@ -666,7 +666,7 @@ public class App extends Application {
                                 screenShakeAmplitude = combatManager.consumeShakeAmplitude();
                             }
 
-                            if (tutorialManager != null) {
+                            if (tutorialManager != null && gameManager.getCurrentLevelIndex() == 0) {
                                 tutorialManager.update(player, input, isMousePressed);
                             }
 
@@ -968,7 +968,7 @@ public class App extends Application {
                     npc.renderOverlay(gc);
                 }
                 
-                if (tutorialManager != null) {
+                if (tutorialManager != null && gameManager.getCurrentLevelIndex() == 0) {
                     tutorialManager.render(gc);
                 }
 
@@ -1078,6 +1078,9 @@ public class App extends Application {
                             () -> {
                                 isTutorialClearUIShown = false;
                                 root.getChildren().remove(tutorialClearScreen.getRoot());
+                                tutorialManager = null;
+                                player.restoreVitals();
+                                com.hust.game.ui.DamageTextManager.clear();
                                 
                                 isDataLoaded = false;
                                 startLoadingPhase(1);

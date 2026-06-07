@@ -840,6 +840,11 @@ public class Player extends MovingEntity implements Collidable, Damageable, Atta
         currentMana = Math.min(maxMana, currentMana + amount);
     }
 
+    public void restoreVitals() {
+        currentHp = maxHp;
+        currentMana = maxMana;
+    }
+
     /** Trả về true khi máu = 0 → game over */
     @Override
     public boolean isDead() {
