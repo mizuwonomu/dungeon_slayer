@@ -68,6 +68,10 @@ public class DamageTextManager {
         }
     }
 
+    public static void clear() {
+        texts.clear();
+    }
+
     public static void update() {
         texts.removeIf(dt -> --dt.timer <= 0); // Giảm timer và xoá nếu hết thời gian
         for (DamageText dt : texts) {
